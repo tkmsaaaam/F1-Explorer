@@ -251,7 +251,7 @@ while True:
         plotter.plot_with_lap_end(lap_end_map, gap_ahead_map, "gap_ahead", 0, 10)
         plotter.plot_with_lap_end(lap_end_map, gap_top_map, "gap_top", 0, 35)
         plotter.plot_positions(lap_end_map, position_map, "position")
-        plotter.plot(laptime_map, "laptime", 3, 1)
+        plotter.plot_laptime(laptime_map, "laptime", 3, 1)
         plotter.plot_laptime_diff(laptime_map, "laptime_diffs", 0.75, 0.75)
 
         plotter.plot_weather(air_temp_map, 'air_temp')
