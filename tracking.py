@@ -131,50 +131,27 @@ def handle_session_data(t, data):
 
     for no, value in items.items():
         message = util.join_with_colon(t, str(no), str(value))
-        write_to_file_top(f"{logs_path}/session.txt", message)
+        util.write_to_file_top(f"{logs_path}/session.txt", message)
 
 
 def handle_session_info_data(t, data):
     message = util.join_with_colon(t, str(data))
-    write_to_file_top(f"{logs_path}/session_info.txt", message)
+    util.write_to_file_top(f"{logs_path}/session_info.txt", message)
 
 
 def handle_race_control(t, data):
     message = util.join_with_colon(t, str(data))
-    write_to_file_top(f"{logs_path}/race_control.txt", message)
+    util.write_to_file_top(f"{logs_path}/race_control.txt", message)
 
 
 def handle_track_status(t, data):
     message = util.join_with_colon(t, str(data))
-    write_to_file_top(f"{logs_path}/track_status.txt", message)
+    util.write_to_file_top(f"{logs_path}/track_status.txt", message)
 
 
 def handle_extrapolated_clock(t, data):
     message = util.join_with_colon(t, str(data))
-    write_to_file_top(f"{logs_path}/extrapolated_clock.txt", message)
-
-
-def write_to_file_top(filepath: str, content: str):
-    """
-    ファイルの先頭に文字列を書き込みます。
-    ファイルが存在しなければ新しく作成します。
-
-    Parameters:
-    - filepath: 書き込み対象のファイルパス
-    - content: 先頭に書き込む文字列（末尾に改行は自動で追加）
-    """
-    content += '\n'
-
-    if os.path.exists(filepath):
-        # 既存ファイルの内容を読み込んでから先頭に書き込む
-        with open(filepath, 'r', encoding='utf-8') as file:
-            original = file.read()
-        with open(filepath, 'w', encoding='utf-8') as file:
-            file.write(content + original)
-    else:
-        # ファイルがなければ新規作成して書き込む
-        with open(filepath, 'w', encoding='utf-8') as file:
-            file.write(content)
+    util.write_to_file_top(f"{logs_path}/extrapolated_clock.txt", message)
 
 
 def handle(message):
@@ -260,5 +237,5 @@ while True:
         plotter.plot_weather(wind_speed_map, 'wind_speed')
     else:
         log.info("plot is skipped")
-    write_to_file_top(f"{logs_path}/timestamp.txt", f"{datetime.now()}")
+    util.write_to_file_top(f"{logs_path}/timestamp.txt", f"{datetime.now()}")
     time.sleep(60)
