@@ -120,25 +120,6 @@ def handle_weather(data, time):
             wind_speed_map[time] = float(windSpeed)
 
 
-def handle_session_data(t, data):
-    if 'StatusSeries' not in data:
-        return
-    items = data["StatusSeries"]
-
-    if isinstance(items, list):
-        log.warning(f"session data is a list {items}")
-        return
-
-    for no, value in items.items():
-        message = util.join_with_colon(t, str(no), str(value))
-        util.write_to_file_top(f"{logs_path}/session.txt", message)
-
-
-def handle_session_info_data(t, data):
-    message = util.join_with_colon(t, str(data))
-    util.write_to_file_top(f"{logs_path}/session_info.txt", message)
-
-
 def handle_race_control(t, data):
     message = util.join_with_colon(t, str(data))
     util.write_to_file_top(f"{logs_path}/race_control.txt", message)
@@ -147,11 +128,6 @@ def handle_race_control(t, data):
 def handle_track_status(t, data):
     message = util.join_with_colon(t, str(data))
     util.write_to_file_top(f"{logs_path}/track_status.txt", message)
-
-
-def handle_extrapolated_clock(t, data):
-    message = util.join_with_colon(t, str(data))
-    util.write_to_file_top(f"{logs_path}/extrapolated_clock.txt", message)
 
 
 def handle(message):
@@ -166,18 +142,12 @@ def handle(message):
         handle_timing_app_data(msg[1], datetime.fromisoformat(msg[2].replace("Z", "+00:00")))
     if category == "TimingData":
         handle_timing_data(msg[1], datetime.fromisoformat(msg[2].replace("Z", "+00:00")))
-    if category == "SessionData":
-        handle_session_data(msg[2], msg[1])
     if category == "WeatherData":
         handle_weather(msg[1], datetime.fromisoformat(msg[2].replace("Z", "+00:00")))
-    if category == "SessionInfo":
-        handle_session_info_data(msg[2], msg[1])
     if category == "RaceControlMessages":
         handle_race_control(msg[2], msg[1])
     if category == "TrackStatus":
         handle_track_status(msg[2], msg[1])
-    if category == "ExtrapolatedClock":
-        handle_extrapolated_clock(msg[2], msg[1])
 
 
 os.makedirs(images_path, exist_ok=True)
@@ -186,23 +156,11 @@ os.makedirs(logs_path + "/ahead_diffs", exist_ok=True)
 os.makedirs(logs_path + "/fastest_diffs", exist_ok=True)
 
 try:
-    os.remove(f"{logs_path}/session.txt")
-except FileNotFoundError:
-    pass
-try:
-    os.remove(f"{logs_path}/session_info.txt")
-except FileNotFoundError:
-    pass
-try:
     os.remove(f"{logs_path}/race_control.txt")
 except FileNotFoundError:
     pass
 try:
     os.remove(f"{logs_path}/track_status.txt")
-except FileNotFoundError:
-    pass
-try:
-    os.remove(f"{logs_path}/extrapolated_clock.txt")
 except FileNotFoundError:
     pass
 
@@ -237,5 +195,9 @@ while True:
         plotter.plot_weather(wind_speed_map, 'wind_speed')
     else:
         log.info("plot is skipped")
+    try:
+        os.remove(f"{logs_path}/timestamp.txt")
+    except FileNotFoundError:
+        pass
     util.write_to_file_top(f"{logs_path}/timestamp.txt", f"{datetime.now()}")
     time.sleep(60)
