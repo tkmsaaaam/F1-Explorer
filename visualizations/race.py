@@ -49,16 +49,17 @@ def laptime(laps: Laps, log: Logger, filepath: str):
         }
         driver_lap_times[int(drv)] = lap_times
     fig, ax = plt.subplots(figsize=(12, 8))
+    plt.tight_layout()
     plt.style.use('dark_background')
+    ax.grid(True)
+    ax.invert_yaxis()
+    ax.legend()
     for no, laps in driver_lap_times.items():
         style = set_style(no)
         x = sorted(laps.keys())
         y = [laps[lap] for lap in x]
         ax.plot(x, y, **style)
-    ax.legend()
-    ax.invert_yaxis()
     ax.set_ylim(top=min, bottom=min + 10)
-    plt.tight_layout()
     plt.savefig(filepath, dpi=450, bbox_inches='tight')
     log.info(f"Saved plot to {filepath}")
 
@@ -79,16 +80,17 @@ def laptime_diff(laps: Laps, log: Logger, filepath: str):
 
         lap_delta_map[int(drv)] = deltas
     fig, ax = plt.subplots(figsize=(12, 8))
+    plt.tight_layout()
     plt.style.use('dark_background')
+    ax.grid(True)
+    ax.invert_yaxis()
+    ax.legend()
     for no, laps in lap_delta_map.items():
         style = set_style(no)
         x = sorted(laps.keys())
         y = [laps[lap] for lap in x]
         ax.plot(x, y, **style)
-    ax.legend()
-    ax.invert_yaxis()
     ax.set_ylim(bottom=-1, top=1)
-    plt.tight_layout()
     plt.savefig(filepath, dpi=450, bbox_inches='tight')
     log.info(f"Saved plot to {filepath}")
 
@@ -116,16 +118,17 @@ def gap_to_ahead(laps: Laps, log: Logger, filepath: str):
                 gap_to_ahead[driver_number] = {}
             gap_to_ahead[driver_number][lap_number] = diff.total_seconds()
     fig, ax = plt.subplots(figsize=(12, 8))
+    plt.tight_layout()
     plt.style.use('dark_background')
+    ax.grid(True)
+    ax.invert_yaxis()
+    ax.legend()
     for no, laps in gap_to_ahead.items():
         style = set_style(no)
         x = sorted(laps.keys())
         y = [laps[lap] for lap in x]
         ax.plot(x, y, **style)
-    ax.legend()
-    ax.invert_yaxis()
     ax.set_ylim(top=0)
-    plt.tight_layout()
     plt.savefig(filepath, dpi=450, bbox_inches='tight')
     log.info(f"Saved plot to {filepath}")
 
@@ -149,15 +152,16 @@ def gap_to_top(laps: Laps, log: Logger, filepath: str):
                 gap_to_top[driver_number] = {}
             gap_to_top[driver_number][lap_number] = diff.total_seconds()
     fig, ax = plt.subplots(figsize=(12, 8))
+    plt.tight_layout()
     plt.style.use('dark_background')
+    ax.grid(True)
+    ax.invert_yaxis()
+    ax.legend()
     for no, laps in gap_to_top.items():
         style = set_style(no)
         x = sorted(laps.keys())
         y = [laps[lap] for lap in x]
         ax.plot(x, y, **style)
-    ax.legend()
-    ax.invert_yaxis()
-    plt.tight_layout()
     plt.savefig(filepath, dpi=450, bbox_inches='tight')
     log.info(f"Saved plot to {filepath}")
 
@@ -174,22 +178,24 @@ def positions(laps: Laps, log: Logger, filepath: str):
             if not pd.isna(row.Position)
         }
     fig, ax = plt.subplots(figsize=(12, 8))
+    plt.tight_layout()
     plt.style.use('dark_background')
+    ax.grid(True)
+    ax.invert_yaxis()
+    ax.legend()
     for no, laps in position_map.items():
         style = set_style(int(no))
         x = sorted(laps.keys())
         y = [laps[lap] for lap in x]
         ax.plot(x, y, **style)
-    ax.legend()
-    ax.invert_yaxis()
-    plt.tight_layout()
     plt.savefig(filepath, dpi=450, bbox_inches='tight')
     log.info(f"Saved plot to {filepath}")
 
 
 def tyres(laps: Laps, drivers: Drivers, log: Logger, filepath: str):
-    # プロット準備
     fig, ax = plt.subplots(figsize=(12, 8))
+    plt.tight_layout()
+    plt.style.use('dark_background')
     driver_y = {}  # ドライバー → Y軸位置
     for i, driver in enumerate(drivers):
         driver_laps = laps.pick_drivers(driver)
@@ -241,21 +247,20 @@ def tyres(laps: Laps, drivers: Drivers, log: Logger, filepath: str):
                        for compound, color in config.compound_colors.items()]
     ax.legend(handles=legend_elements, title='Compound', loc='upper right')
 
-    plt.tight_layout()
     plt.savefig(filepath, dpi=450, bbox_inches='tight')
     log.info(f"Saved plot to {filepath}")
 
 
 def plot_weather(session: Session, log: Logger, key: str, filepath: str):
     fig, ax = plt.subplots(figsize=(10, 6))
+    plt.tight_layout()
     plt.style.use('dark_background')
+    ax.grid(True)
     weather = session.weather_data.sort_values('Time')
 
     x = list((session.date + weather['Time']).values)
     y = weather[key].to_list()
     ax.plot(x, y)
-    ax.invert_yaxis()
-    plt.tight_layout()
     plt.gcf().autofmt_xdate()
     plt.savefig(filepath, dpi=300, bbox_inches='tight')
     log.info(f"Saved plot to {filepath}")

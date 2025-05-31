@@ -14,23 +14,41 @@ logging.basicConfig(
 )
 log = logging.getLogger(__name__)
 
-results_path = config.live_data_path + "/results"
+results_path = "../live/data/results"
 logs_path = results_path + "/logs"
 images_path = results_path + "/images"
 
 
 def set_style(no: int):
-    d = config.f1_driver_info_2025[no]
+    d = config.f1_driver_info_2025.get(no, {
+        "acronym": "UNDEFINED",
+        "driver": "Undefined",
+        "team": "Undefined",
+        "team_color": "#808080",
+        "t_cam": "black"
+    })
     style = {"color": d["team_color"], "linestyle": "solid" if d["t_cam"] == "black" else "dashed",
-             "label": d["acronym"], "linewidth": "0.7"}
+             "label": d["acronym"], "linewidth": "0.5"}
     return style
 
 
 def plot_tyres(stint_map):
     # チーム→ドライバー順で並び替え
     sorted_drivers = sorted(stint_map.keys(),
-                            key=lambda d: (config.f1_driver_info_2025[d]["team"],
-                                           config.f1_driver_info_2025[d]["acronym"]))
+                            key=lambda d: (config.f1_driver_info_2025.get(d, {
+                                "acronym": "UNDEFINED",
+                                "driver": "Undefined",
+                                "team": "Undefined",
+                                "team_color": "#808080",
+                                "t_cam": "black"
+                            })["team"],
+                                           config.f1_driver_info_2025.get(d, {
+                                               "acronym": "UNDEFINED",
+                                               "driver": "Undefined",
+                                               "team": "Undefined",
+                                               "team_color": "#808080",
+                                               "t_cam": "black"
+                                           })["acronym"]))
 
     fig, ax = plt.subplots(figsize=(10, 6))
     yticks = []
@@ -41,7 +59,13 @@ def plot_tyres(stint_map):
         y = i
         x = 0
         yticks.append(y)
-        acronym = config.f1_driver_info_2025[driver_number]["acronym"]
+        acronym = config.f1_driver_info_2025.get(driver_number, {
+            "acronym": "UNDEFINED",
+            "driver": "Undefined",
+            "team": "Undefined",
+            "team_color": "#808080",
+            "t_cam": "black"
+        })["acronym"]
         yticklabels.append(acronym)
 
         driver_stints = stint_map[driver_number]
@@ -67,6 +91,7 @@ def plot_tyres(stint_map):
     output_path: str = f"{images_path}/tyres.png"
     plt.savefig(output_path, dpi=300, bbox_inches='tight')
     log.info(f"Saved plot to {output_path}")
+    plt.close()
 
 
 def plot_with_lap_end(map_by_timedelta, target_map, filename: str, minimum: int, maximum: int):
@@ -99,12 +124,14 @@ def plot_with_lap_end(map_by_timedelta, target_map, filename: str, minimum: int,
         y = [laps[lap] for lap in x]
         ax.plot(x, y, **style)
     ax.legend()
+    ax.grid(True)
     ax.invert_yaxis()
     # ax.set_ylim(minimum, maximum)
     plt.tight_layout()
     output_path = f"{images_path}/{filename}.png"
     plt.savefig(output_path, dpi=450, bbox_inches='tight')
     log.info(f"Saved plot to {output_path}")
+    plt.close()
 
 
 def plot_positions(map_by_timedelta, target_map, filename: str):
@@ -145,11 +172,13 @@ def plot_positions(map_by_timedelta, target_map, filename: str):
         y = [laps[lap] for lap in x]
         ax.plot(x, y, **style)
     ax.legend()
+    ax.grid(True)
     ax.invert_yaxis()
     plt.tight_layout()
     output_path: str = f"{images_path}/{filename}.png"
     plt.savefig(output_path, dpi=450, bbox_inches='tight')
     log.info(f"Saved plot to {output_path}")
+    plt.close()
 
 
 def plot_laptime(dicts, filename: str, minus: int, plus: int):
@@ -172,10 +201,12 @@ def plot_laptime(dicts, filename: str, minus: int, plus: int):
         ax.set_ylim(min_time, capped_max_time)
     ax.invert_yaxis()
     ax.legend()
+    ax.grid(True)
     plt.tight_layout()
     output_path: str = f"{images_path}/{filename}.png"
     plt.savefig(output_path, dpi=450, bbox_inches='tight')
     log.info(f"Saved plot to {output_path}")
+    plt.close()
 
 
 def plot_laptime_diff(dicts, filename: str, minus: float, plus: float):
@@ -196,10 +227,12 @@ def plot_laptime_diff(dicts, filename: str, minus: float, plus: float):
     if minus != 0 or plus != 0:
         ax.set_ylim(- minus, plus)
     ax.legend()
+    ax.grid(True)
     plt.tight_layout()
     output_path: str = f"{images_path}/{filename}.png"
     plt.savefig(output_path, dpi=450, bbox_inches='tight')
     log.info(f"Saved plot to {output_path}")
+    plt.close()
 
 
 def plot_weather(m, filename):
@@ -211,8 +244,9 @@ def plot_weather(m, filename):
         x.append(k)
         y.append(v)
     ax.plot(x, y)
-    ax.invert_yaxis()
     plt.tight_layout()
+    ax.grid(True)
     output_path = f"{images_path}/{filename}.png"
     plt.savefig(output_path, dpi=300, bbox_inches='tight')
     log.info(f"Saved plot to {output_path}")
+    plt.close()

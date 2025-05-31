@@ -4,9 +4,7 @@ import os
 import time
 from datetime import datetime
 
-import config
-import plotter
-import util
+from backup import plotter, util
 
 logging.basicConfig(
     level=logging.INFO,
@@ -28,7 +26,7 @@ lap_end_map = {}
 lap_number_map = {}
 current_positon = {}
 
-results_path = config.live_data_path + "/results"
+results_path = "../live/data/results"
 logs_path = results_path + "/logs"
 images_path = results_path + "/images"
 
@@ -164,7 +162,7 @@ try:
 except FileNotFoundError:
     pass
 
-file_path = "live/data/source/2025_Monaco_Race.txt"  # 読み込むファイル
+file_path = "../live/data/source/2025_Monaco_Race.txt"  # 読み込むファイル
 start = 0  # 最初に読み込んだ行数
 prev_start = -1  # 直前の読み込み行数（初期値は不一致にしておく）
 
