@@ -10,65 +10,64 @@ from matplotlib.patches import Patch
 
 import config
 import util
-from plotter import set_style
 
 
-def execute(session: Session, log: Logger, dir_path: str):
-    images = f"{dir_path}/images"
-    logs = f"{dir_path}/logs"
-    laptime(session.laps, log, f"{images}/laptime.png")
-    laptime_diff(session.laps, log, f"{images}/laptime_diffs.png")
-    gap_to_ahead(session.laps, log, f"{images}/gap_ahead.png")
-    gap_to_top(session.laps, log, f"{images}/gap_top.png")
-    positions(session.laps, log, f"{images}/position.png")
-    tyres(session.laps, session.drivers, log, f"{images}/tyres.png")
-    plot_weather(session, log, 'AirTemp', f"{images}/air_temp.png")
-    plot_weather(session, log, 'TrackTemp', f"{images}/track_temp.png")
-    plot_weather(session, log, 'WindSpeed', f"{images}/wind_speed.png")
-    plot_weather(session, log, 'Rainfall', f"{images}/rainfall.png")
-    write_messages(session, logs)
-    write_track_status(session, logs)
+def execute(session: Session, log: Logger, images_path: str, logs_path: str):
+    laptime(session.laps, log, f"{images_path}/laptime.png", session)
+    laptime_diff(session.laps, log, f"{images_path}/laptime_diffs.png", session)
+    gap_to_ahead(session.laps, log, f"{images_path}/gap_ahead.png", session)
+    gap_to_top(session.laps, log, f"{images_path}/gap_top.png", session)
+    positions(session.laps, log, f"{images_path}/position.png", session)
+    tyres(session.laps, session.drivers, log, f"{images_path}/tyres.png")
+    write_messages(session, logs_path)
+    write_track_status(session, logs_path)
     try:
-        os.remove(f"{dir_path}/logs/timestamp.txt")
+        os.remove(f"{logs_path}/timestamp.txt")
     except FileNotFoundError:
         pass
-    util.write_to_file_top(f"{dir_path}/logs/timestamp.txt", str(datetime.datetime.now()))
+    util.write_to_file_top(f"{logs_path}/timestamp.txt", str(datetime.datetime.now()))
 
 
-def laptime(laps: Laps, log: Logger, filepath: str):
+def laptime(laps: Laps, log: Logger, filepath: str, session: Session):
     # ドライバーごとにラップタイムを記録
     driver_lap_times = {}
 
     min = laps.sort_values(by='LapTime').iloc[0].LapTime.total_seconds()
-    for drv in laps['DriverNumber'].unique():
-        driver_laps = laps[laps['DriverNumber'] == drv].sort_values(by='LapNumber')
+    for drv in laps.DriverNumber.unique():
+        driver_laps = laps[laps.DriverNumber == drv].sort_values(by='LapNumber')
         lap_times = {
             int(lap.LapNumber): lap.LapTime.total_seconds()
             for _, lap in driver_laps.iterrows()
             if pd.notna(lap.LapTime)
         }
         driver_lap_times[int(drv)] = lap_times
-    fig, ax = plt.subplots(figsize=(12, 8))
-    plt.tight_layout()
-    plt.style.use('dark_background')
-    ax.grid(True)
-    ax.invert_yaxis()
-    ax.legend()
+    fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150)
     for no, laps in driver_lap_times.items():
-        style = set_style(no)
+        d = config.f1_driver_info_2025.get(no, {
+            "acronym": "UNDEFINED",
+            "driver": "Undefined",
+            "team": "Undefined",
+            "team_color": "#808080",
+            "t_cam": "black"
+        })
+        color = '#' + session.get_driver(str(no)).TeamColor
+        label = session.get_driver(str(no)).Abbreviation
+        linestyle = "solid" if d["t_cam"] == "black" else "dashed"
         x = sorted(laps.keys())
         y = [laps[lap] for lap in x]
-        ax.plot(x, y, **style)
+        ax.plot(x, y, color=color, label=label, linestyle=linestyle, linewidth=0.75)
+
+    ax.legend()
+    ax.invert_yaxis()
     ax.set_ylim(top=min, bottom=min + 10)
-    plt.savefig(filepath, dpi=450, bbox_inches='tight')
-    log.info(f"Saved plot to {filepath}")
+    util.save(fig, ax, filepath, log)
 
 
-def laptime_diff(laps: Laps, log: Logger, filepath: str):
+def laptime_diff(laps: Laps, log: Logger, filepath: str, session: Session):
     lap_delta_map = {}
 
-    for drv in laps['DriverNumber'].unique():
-        driver_laps = laps[laps['DriverNumber'] == drv].sort_values(by='LapNumber')
+    for drv in laps.DriverNumber.unique():
+        driver_laps = laps[laps.DriverNumber == drv].sort_values(by='LapNumber')
         deltas = {}
         for i in range(1, len(driver_laps)):
             curr_lap = driver_laps.iloc[i]
@@ -79,31 +78,38 @@ def laptime_diff(laps: Laps, log: Logger, filepath: str):
                 deltas[int(curr_lap.LapNumber)] = delta
 
         lap_delta_map[int(drv)] = deltas
-    fig, ax = plt.subplots(figsize=(12, 8))
-    plt.tight_layout()
-    plt.style.use('dark_background')
-    ax.grid(True)
-    ax.invert_yaxis()
-    ax.legend()
+    fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150)
+
     for no, laps in lap_delta_map.items():
-        style = set_style(no)
+        d = config.f1_driver_info_2025.get(no, {
+            "acronym": "UNDEFINED",
+            "driver": "Undefined",
+            "team": "Undefined",
+            "team_color": "#808080",
+            "t_cam": "black"
+        })
+        color = '#' + session.get_driver(str(no)).TeamColor
+        label = session.get_driver(str(no)).Abbreviation
+        linestyle = "solid" if d["t_cam"] == "black" else "dashed"
         x = sorted(laps.keys())
         y = [laps[lap] for lap in x]
-        ax.plot(x, y, **style)
+        ax.plot(x, y, color=color, label=label, linestyle=linestyle, linewidth=0.75)
+
+    ax.legend()
+    ax.invert_yaxis()
     ax.set_ylim(bottom=-1, top=1)
-    plt.savefig(filepath, dpi=450, bbox_inches='tight')
-    log.info(f"Saved plot to {filepath}")
+    util.save(fig, ax, filepath, log)
 
 
-def gap_to_ahead(laps: Laps, log: Logger, filepath: str):
+def gap_to_ahead(laps: Laps, log: Logger, filepath: str, session: Session):
     # ドライバー・ラップごとに並べる
     laps = laps.sort_values(by=['LapNumber', 'Position'])
 
     # ラップごとの前走車とのギャップを保持する辞書
     gap_to_ahead = {}
-    # 各ラップについて前走車との差を計算
-    for lap_number in laps['LapNumber'].unique():
-        lap_data = laps[laps['LapNumber'] == lap_number].copy()
+    # 各ラップについて前走車との差を計算1
+    for lap_number in laps.LapNumber.unique():
+        lap_data = laps[laps.LapNumber == lap_number].copy()
         lap_data = lap_data.sort_values(by='Position')
 
         for i in range(1, len(lap_data)):
@@ -111,95 +117,111 @@ def gap_to_ahead(laps: Laps, log: Logger, filepath: str):
             ahead = lap_data.iloc[i - 1]
 
             # 同じラップ内での差（前走車との差）
-            diff = current['Time'] - ahead['Time']
+            diff = current.Time - ahead.Time
 
-            driver_number = int(current['DriverNumber'])
+            driver_number = int(current.DriverNumber)
             if driver_number not in gap_to_ahead:
                 gap_to_ahead[driver_number] = {}
             gap_to_ahead[driver_number][lap_number] = diff.total_seconds()
-    fig, ax = plt.subplots(figsize=(12, 8))
-    plt.tight_layout()
-    plt.style.use('dark_background')
-    ax.grid(True)
-    ax.invert_yaxis()
-    ax.legend()
+    fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150)
     for no, laps in gap_to_ahead.items():
-        style = set_style(no)
+        d = config.f1_driver_info_2025.get(no, {
+            "acronym": "UNDEFINED",
+            "driver": "Undefined",
+            "team": "Undefined",
+            "team_color": "#808080",
+            "t_cam": "black"
+        })
+        color = '#' + session.get_driver(str(no)).TeamColor
+        label = session.get_driver(str(no)).Abbreviation
+        linestyle = "solid" if d["t_cam"] == "black" else "dashed"
         x = sorted(laps.keys())
         y = [laps[lap] for lap in x]
-        ax.plot(x, y, **style)
+        ax.plot(x, y, color=color, label=label, linestyle=linestyle, linewidth=0.75)
+
+    ax.legend()
+    ax.invert_yaxis()
     ax.set_ylim(top=0)
-    plt.savefig(filepath, dpi=450, bbox_inches='tight')
-    log.info(f"Saved plot to {filepath}")
+    util.save(fig, ax, filepath, log)
 
 
-def gap_to_top(laps: Laps, log: Logger, filepath: str):
+def gap_to_top(laps: Laps, log: Logger, filepath: str, session: Session):
     gap_to_top = {}
     laps.sort_values(by=['LapNumber', 'Position'])
 
-    for lap_number in laps['LapNumber'].unique():
-        lap_data = laps[laps['LapNumber'] == lap_number].copy()
+    for lap_number in laps.LapNumber.unique():
+        lap_data = laps[laps.LapNumber == lap_number].copy()
         lap_data = lap_data.sort_values(by='Position')
 
         for i in range(1, len(lap_data)):
             current = lap_data.iloc[i]
             top = lap_data.iloc[0]
 
-            diff = current['Time'] - top['Time']
+            diff = current.Time - top.Time
 
-            driver_number = int(current['DriverNumber'])
+            driver_number = int(current.DriverNumber)
             if driver_number not in gap_to_top:
                 gap_to_top[driver_number] = {}
             gap_to_top[driver_number][lap_number] = diff.total_seconds()
-    fig, ax = plt.subplots(figsize=(12, 8))
-    plt.tight_layout()
-    plt.style.use('dark_background')
-    ax.grid(True)
-    ax.invert_yaxis()
-    ax.legend()
+    fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150)
     for no, laps in gap_to_top.items():
-        style = set_style(no)
+        d = config.f1_driver_info_2025.get(no, {
+            "acronym": "UNDEFINED",
+            "driver": "Undefined",
+            "team": "Undefined",
+            "team_color": "#808080",
+            "t_cam": "black"
+        })
+        color = '#' + session.get_driver(str(no)).TeamColor
+        label = session.get_driver(str(no)).Abbreviation
+        linestyle = "solid" if d["t_cam"] == "black" else "dashed"
         x = sorted(laps.keys())
         y = [laps[lap] for lap in x]
-        ax.plot(x, y, **style)
-    plt.savefig(filepath, dpi=450, bbox_inches='tight')
-    log.info(f"Saved plot to {filepath}")
+        ax.plot(x, y, color=color, label=label, linestyle=linestyle, linewidth=0.75)
+
+    ax.legend()
+    ax.invert_yaxis()
+    util.save(fig, ax, filepath, log)
 
 
-def positions(laps: Laps, log: Logger, filepath: str):
+def positions(laps: Laps, log: Logger, filepath: str, session: Session):
     # ドライバーごとのポジションデータを構築
     position_map = {}
 
-    for drv in laps['DriverNumber'].unique():
-        driver_laps = laps[laps['DriverNumber'] == drv]
+    for drv in laps.DriverNumber.unique():
+        driver_laps = laps[laps.DriverNumber == drv]
         position_map[drv] = {
             int(row.LapNumber): int(row.Position)
             for _, row in driver_laps.iterrows()
             if not pd.isna(row.Position)
         }
-    fig, ax = plt.subplots(figsize=(12, 8))
-    plt.tight_layout()
-    plt.style.use('dark_background')
-    ax.grid(True)
-    ax.invert_yaxis()
-    ax.legend()
+    fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150)
     for no, laps in position_map.items():
-        style = set_style(int(no))
+        d = config.f1_driver_info_2025.get(int(no), {
+            "acronym": "UNDEFINED",
+            "driver": "Undefined",
+            "team": "Undefined",
+            "team_color": "#808080",
+            "t_cam": "black"
+        })
+        color = '#' + session.get_driver(no).TeamColor
+        label = session.get_driver(no).Abbreviation
+        linestyle = "solid" if d["t_cam"] == "black" else "dashed"
         x = sorted(laps.keys())
         y = [laps[lap] for lap in x]
-        ax.plot(x, y, **style)
-    plt.savefig(filepath, dpi=450, bbox_inches='tight')
-    log.info(f"Saved plot to {filepath}")
+        ax.plot(x, y, color=color, label=label, linestyle=linestyle, linewidth=0.75)
+
+    ax.legend()
+    ax.invert_yaxis()
+    util.save(fig, ax, filepath, log)
 
 
 def tyres(laps: Laps, drivers: Drivers, log: Logger, filepath: str):
-    fig, ax = plt.subplots(figsize=(12, 8))
-    plt.tight_layout()
-    plt.style.use('dark_background')
+    fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150)
     driver_y = {}  # ドライバー → Y軸位置
     for i, driver in enumerate(drivers):
         driver_laps = laps.pick_drivers(driver)
-        driver_laps = driver_laps[~driver_laps['Compound'].isnull()]  # Compoundがあるラップのみ
+        driver_laps = driver_laps[~driver_laps.Compound.isnull()]  # Compoundがあるラップのみ
 
         prev_compound = None
         stint_start = None
@@ -208,8 +230,8 @@ def tyres(laps: Laps, drivers: Drivers, log: Logger, filepath: str):
         y = i
 
         for _, lap in driver_laps.iterrows():
-            compound = lap['Compound']
-            lap_number = lap['LapNumber']
+            compound = lap.Compound
+            lap_number = lap.LapNumber
 
             if prev_compound is None:
                 prev_compound = compound
@@ -217,7 +239,7 @@ def tyres(laps: Laps, drivers: Drivers, log: Logger, filepath: str):
             elif compound != prev_compound:
                 # スティント終了、プロット
                 edge = 'gray'
-                if 'New' in lap and lap['New'] == True:
+                if 'New' in lap and lap.New == True:
                     edge = 'black'
                 ax.barh(y=y,
                         width=lap_number - stint_start,
@@ -230,10 +252,10 @@ def tyres(laps: Laps, drivers: Drivers, log: Logger, filepath: str):
         # 最後のスティントを描画
         if stint_start is not None:
             edge = 'gray'
-            if 'New' in driver_laps.iloc[-1] and driver_laps.iloc[-1]['New'] == True:
+            if 'New' in driver_laps.iloc[-1] and driver_laps.iloc[-1].New == True:
                 edge = 'black'
             ax.barh(y=y,
-                    width=driver_laps.iloc[-1]['LapNumber'] - stint_start + 1,
+                    width=driver_laps.iloc[-1].LapNumber - stint_start + 1,
                     left=stint_start,
                     color=config.compound_colors.get(prev_compound, 'gray'),
                     edgecolor=edge)
@@ -247,23 +269,7 @@ def tyres(laps: Laps, drivers: Drivers, log: Logger, filepath: str):
                        for compound, color in config.compound_colors.items()]
     ax.legend(handles=legend_elements, title='Compound', loc='upper right')
 
-    plt.savefig(filepath, dpi=450, bbox_inches='tight')
-    log.info(f"Saved plot to {filepath}")
-
-
-def plot_weather(session: Session, log: Logger, key: str, filepath: str):
-    fig, ax = plt.subplots(figsize=(10, 6))
-    plt.tight_layout()
-    plt.style.use('dark_background')
-    ax.grid(True)
-    weather = session.weather_data.sort_values('Time')
-
-    x = list((session.date + weather['Time']).values)
-    y = weather[key].to_list()
-    ax.plot(x, y)
-    plt.gcf().autofmt_xdate()
-    plt.savefig(filepath, dpi=300, bbox_inches='tight')
-    log.info(f"Saved plot to {filepath}")
+    util.save(fig, ax, filepath, log)
 
 
 def write_messages(session: Session, logs_path: str):
@@ -273,13 +279,13 @@ def write_messages(session: Session, logs_path: str):
         pass
     messages = session.race_control_messages.sort_values('Time')
     for i in range(0, len(messages)):
-        t = session.race_control_messages['Time'].iloc[i]
-        l = session.race_control_messages['Lap'].iloc[i]
-        c = session.race_control_messages['Category'].iloc[i]
-        f = session.race_control_messages['Flag'].iloc[i]
-        s = session.race_control_messages['Scope'].iloc[i]
-        n = session.race_control_messages['RacingNumber'].iloc[i]
-        m = session.race_control_messages['Message'].iloc[i]
+        t = session.race_control_messages.Time.iloc[i]
+        l = session.race_control_messages.Lap.iloc[i]
+        c = session.race_control_messages.Category.iloc[i]
+        f = session.race_control_messages.Flag.iloc[i]
+        s = session.race_control_messages.Scope.iloc[i]
+        n = session.race_control_messages.RacingNumber.iloc[i]
+        m = session.race_control_messages.Message.iloc[i]
         message = util.join_with_colon(str(t), str(l), str(c), str(f), str(s), str(n), str(m))
         util.write_to_file_top(f"{logs_path}/race_control.txt", message)
 
@@ -291,8 +297,8 @@ def write_track_status(session: Session, logs_path: str):
         pass
     messages = session.track_status.sort_values('Time')
     for i in range(0, len(messages)):
-        t = session.race_control_messages['Time'].iloc[i]
-        s = session.race_control_messages['Status'].iloc[i]
-        m = session.race_control_messages['Message'].iloc[i]
+        t = session.race_control_messages.Time.iloc[i]
+        s = session.race_control_messages.Status.iloc[i]
+        m = session.race_control_messages.Message.iloc[i]
         message = util.join_with_colon(str(t), str(s), str(m))
         util.write_to_file_top(f"{logs_path}/track_status.txt", message)
