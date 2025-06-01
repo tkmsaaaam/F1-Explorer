@@ -4,7 +4,8 @@ import os
 import time
 from datetime import datetime
 
-from backup import plotter, util
+import util
+from backup import plotter
 
 logging.basicConfig(
     level=logging.INFO,
@@ -23,12 +24,47 @@ position_map = {}
 
 lap_end_map = {}
 
-lap_number_map = {}
-current_positon = {}
-
 results_path = "../live/data/results"
 logs_path = results_path + "/logs"
 images_path = results_path + "/images"
+
+
+def time_str_to_seconds(time_str):
+    if time_str == "":
+        return 0
+    parts = time_str.split(":")
+
+    if len(parts) == 1:
+        # "SSS.sss"
+        return float(parts[0])
+    elif len(parts) == 2:
+        # "MM:SS.sss"
+        minutes, seconds = parts
+        return int(minutes) * 60 + float(seconds)
+    elif len(parts) == 3:
+        # "HH:MM:SS.sss"
+        hours, minutes, seconds = parts
+        return int(hours) * 3600 + int(minutes) * 60 + float(seconds)
+    else:
+        raise ValueError(f"Unsupported time format: {time_str}")
+
+
+def push(driver_number: int, lap_number: int, target_map, value):
+    if driver_number in target_map:
+        target_map[driver_number][lap_number] = value
+    else:
+        target_map[driver_number] = {lap_number: value}
+
+
+def push_stint(key, driver_number: int, stint_number: int, stint, m):
+    if key in stint:
+        if driver_number in m:
+            if stint_number in m[driver_number]:
+                m[driver_number][stint_number][key] = stint[key]
+            else:
+                m[driver_number][stint_number] = {key: stint[key]}
+        else:
+            m[driver_number] = {stint_number: {key: stint[key]}}
 
 
 def to_json_style(s):
@@ -47,24 +83,24 @@ def handle_timing_data(data, time):
             lap_time: str = v["LastLapTime"]["Value"]
             lap_number: int = v["NumberOfLaps"]
             if lap_time != "":
-                t = util.time_str_to_seconds(lap_time)
-                util.push(driver_number, lap_number, laptime_map, t)
-            util.push(driver_number, lap_number, lap_end_map, time)
+                t = time_str_to_seconds(lap_time)
+                push(driver_number, lap_number, laptime_map, t)
+            push(driver_number, lap_number, lap_end_map, time)
         if 'Position' in v:
             position_str: str = v["Position"]
             position = int(position_str)
-            util.push(driver_number, time, position_map, position)
+            push(driver_number, time, position_map, position)
         if 'GapToLeader' in v:
             if not 'L' in v["GapToLeader"]:
                 diff_str: str = v["GapToLeader"].replace("+", "")
-                diff = util.time_str_to_seconds(diff_str)
-                util.push(driver_number, time, gap_top_map, diff)
+                diff = time_str_to_seconds(diff_str)
+                push(driver_number, time, gap_top_map, diff)
         if 'IntervalToPositionAhead' in v:
             if 'Value' in v["IntervalToPositionAhead"]:
                 if not 'L' in v["IntervalToPositionAhead"]["Value"]:
                     diff_str: str = v["IntervalToPositionAhead"]["Value"].replace("+", "")
-                    diff = util.time_str_to_seconds(diff_str)
-                    util.push(driver_number, time, gap_ahead_map, diff)
+                    diff = time_str_to_seconds(diff_str)
+                    push(driver_number, time, gap_ahead_map, diff)
 
 
 def handle_timing_app_data(data, time):
@@ -81,14 +117,14 @@ def handle_timing_app_data(data, time):
             if 'LapTime' in stint and 'LapNumber' in stint:
                 lap_time = stint["LapTime"]
                 lap_number = stint["LapNumber"]
-                t = util.time_str_to_seconds(lap_time)
-                util.push(driver_number, lap_number, lap_end_map, t)
-                util.push(driver_number, lap_number, lap_end_map, time)
+                t = time_str_to_seconds(lap_time)
+                push(driver_number, lap_number, lap_end_map, t)
+                push(driver_number, lap_number, lap_end_map, time)
             stint_number = int(stint_no)
-            util.push_stint('Compound', driver_number, stint_number, stint, stint_map)
-            util.push_stint('New', driver_number, stint_number, stint, stint_map)
-            util.push_stint('TotalLaps', driver_number, stint_number, stint, stint_map)
-            util.push_stint('StartLaps', driver_number, stint_number, stint, stint_map)
+            push_stint('Compound', driver_number, stint_number, stint, stint_map)
+            push_stint('New', driver_number, stint_number, stint, stint_map)
+            push_stint('TotalLaps', driver_number, stint_number, stint, stint_map)
+            push_stint('StartLaps', driver_number, stint_number, stint, stint_map)
 
 
 air_temp_map = {}
@@ -109,13 +145,13 @@ def handle_weather(data, time):
         if rainfall != "":
             rainfall_map[time] = float(rainfall)
     if 'TrackTemp' in data:
-        trackTemp: str = data["TrackTemp"]
-        if trackTemp != "":
-            track_temp_map[time] = float(trackTemp)
+        track_temp: str = data["TrackTemp"]
+        if track_temp != "":
+            track_temp_map[time] = float(track_temp)
     if 'WindSpeed' in data:
-        windSpeed: str = data["WindSpeed"]
-        if windSpeed != "":
-            wind_speed_map[time] = float(windSpeed)
+        wind_speed: str = data["WindSpeed"]
+        if wind_speed != "":
+            wind_speed_map[time] = float(wind_speed)
 
 
 def handle_race_control(t, data):
@@ -149,9 +185,6 @@ def handle(message):
 
 
 os.makedirs(images_path, exist_ok=True)
-os.makedirs(logs_path + "/positions", exist_ok=True)
-os.makedirs(logs_path + "/ahead_diffs", exist_ok=True)
-os.makedirs(logs_path + "/fastest_diffs", exist_ok=True)
 
 try:
     os.remove(f"{logs_path}/race_control.txt")
@@ -181,10 +214,10 @@ while True:
     # ファイルが更新されていた場合のみplotを実行
     if start != prev_start:
         plotter.plot_tyres(stint_map)
-        plotter.plot_with_lap_end(lap_end_map, gap_ahead_map, "gap_ahead", 0, 10)
-        plotter.plot_with_lap_end(lap_end_map, gap_top_map, "gap_top", 0, 35)
+        plotter.plot_with_lap_end(lap_end_map, gap_ahead_map, "gap_ahead")
+        plotter.plot_with_lap_end(lap_end_map, gap_top_map, "gap_top")
         plotter.plot_positions(lap_end_map, position_map, "position")
-        plotter.plot_laptime(laptime_map, "laptime", 3, 1)
+        plotter.plot_laptime(laptime_map, "laptime")
         plotter.plot_laptime_diff(laptime_map, "laptime_diffs", 0.75, 0.75)
 
         plotter.plot_weather(air_temp_map, 'air_temp')

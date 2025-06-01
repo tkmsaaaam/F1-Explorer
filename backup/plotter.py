@@ -4,6 +4,7 @@ import logging
 from matplotlib import pyplot as plt
 
 import config
+import util
 
 logging.basicConfig(
     level=logging.INFO,
@@ -28,7 +29,7 @@ def set_style(no: int):
         "t_cam": "black"
     })
     style = {"color": d["team_color"], "linestyle": "solid" if d["t_cam"] == "black" else "dashed",
-             "label": d["acronym"], "linewidth": "0.5"}
+             "label": d["acronym"], "linewidth": "0.75"}
     return style
 
 
@@ -50,7 +51,7 @@ def plot_tyres(stint_map):
                                                "t_cam": "black"
                                            })["acronym"]))
 
-    fig, ax = plt.subplots(figsize=(10, 6))
+    fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150)
     yticks = []
     yticklabels = []
 
@@ -87,14 +88,11 @@ def plot_tyres(stint_map):
     ax.set_yticklabels(yticklabels)
     ax.set_xlim(0, max_lap)
     plt.grid(axis='x', linestyle=':', alpha=0.7)
-    plt.tight_layout()
     output_path: str = f"{images_path}/tyres.png"
-    plt.savefig(output_path, dpi=300, bbox_inches='tight')
-    log.info(f"Saved plot to {output_path}")
-    plt.close()
+    util.save_with_fig(fig, ax, output_path, log)
 
 
-def plot_with_lap_end(map_by_timedelta, target_map, filename: str, minimum: int, maximum: int):
+def plot_with_lap_end(map_by_timedelta, target_map, filename: str):
     m_by_lap_end = {}
     for driver, lap_dict in map_by_timedelta.items():
         # 対象ドライバーの position 情報を取得してソート
@@ -115,23 +113,16 @@ def plot_with_lap_end(map_by_timedelta, target_map, filename: str, minimum: int,
 
         m_by_lap_end[driver] = driver_result
 
-    fig, ax = plt.subplots(figsize=(10, 6))
-    plt.style.use('dark_background')
-
+    fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150)
     for no, laps in m_by_lap_end.items():
         style = set_style(no)
         x = sorted(laps.keys())
         y = [laps[lap] for lap in x]
         ax.plot(x, y, **style)
     ax.legend()
-    ax.grid(True)
     ax.invert_yaxis()
-    # ax.set_ylim(minimum, maximum)
-    plt.tight_layout()
     output_path = f"{images_path}/{filename}.png"
-    plt.savefig(output_path, dpi=450, bbox_inches='tight')
-    log.info(f"Saved plot to {output_path}")
-    plt.close()
+    util.save_with_fig(fig, ax, output_path, log)
 
 
 def plot_positions(map_by_timedelta, target_map, filename: str):
@@ -156,8 +147,7 @@ def plot_positions(map_by_timedelta, target_map, filename: str):
 
         lap_end_positions[driver] = driver_result
 
-    fig, ax = plt.subplots(figsize=(10, 6))
-    plt.style.use('dark_background')
+    fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150)
     current_positon_map = {}
     for no, laps in lap_end_positions.items():
         current_positon_map[laps[len(laps) + 1]] = no
@@ -172,18 +162,13 @@ def plot_positions(map_by_timedelta, target_map, filename: str):
         y = [laps[lap] for lap in x]
         ax.plot(x, y, **style)
     ax.legend()
-    ax.grid(True)
     ax.invert_yaxis()
-    plt.tight_layout()
     output_path: str = f"{images_path}/{filename}.png"
-    plt.savefig(output_path, dpi=450, bbox_inches='tight')
-    log.info(f"Saved plot to {output_path}")
-    plt.close()
+    util.save_with_fig(fig, ax, output_path, log)
 
 
-def plot_laptime(dicts, filename: str, minus: int, plus: int):
-    fig, ax = plt.subplots(figsize=(10, 6))
-    plt.style.use('dark_background')
+def plot_laptime(dicts, filename: str):
+    fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150)
     all_y = []
     for no, data in dicts.items():
         style = set_style(no)
@@ -199,19 +184,14 @@ def plot_laptime(dicts, filename: str, minus: int, plus: int):
         capped_max_time = max(v for v in all_y if v <= threshold)
         log.info(f"min: {min_time}, capped max: {capped_max_time}")
         ax.set_ylim(min_time, capped_max_time)
-    ax.invert_yaxis()
     ax.legend()
-    ax.grid(True)
-    plt.tight_layout()
+    ax.invert_yaxis()
     output_path: str = f"{images_path}/{filename}.png"
-    plt.savefig(output_path, dpi=450, bbox_inches='tight')
-    log.info(f"Saved plot to {output_path}")
-    plt.close()
+    util.save_with_fig(fig, ax, output_path, log)
 
 
 def plot_laptime_diff(dicts, filename: str, minus: float, plus: float):
-    fig, ax = plt.subplots(figsize=(10, 6))
-    plt.style.use('dark_background')
+    fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150)
     for no, data in dicts.items():
         style = set_style(no)
         x = []
@@ -227,26 +207,17 @@ def plot_laptime_diff(dicts, filename: str, minus: float, plus: float):
     if minus != 0 or plus != 0:
         ax.set_ylim(- minus, plus)
     ax.legend()
-    ax.grid(True)
-    plt.tight_layout()
     output_path: str = f"{images_path}/{filename}.png"
-    plt.savefig(output_path, dpi=450, bbox_inches='tight')
-    log.info(f"Saved plot to {output_path}")
-    plt.close()
+    util.save_with_fig(fig, ax, output_path, log)
 
 
 def plot_weather(m, filename):
-    fig, ax = plt.subplots(figsize=(10, 6))
-    plt.style.use('dark_background')
+    fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150)
     x = []
     y = []
     for k, v in sorted(m.items()):
         x.append(k)
         y.append(v)
     ax.plot(x, y)
-    plt.tight_layout()
-    ax.grid(True)
     output_path = f"{images_path}/{filename}.png"
-    plt.savefig(output_path, dpi=300, bbox_inches='tight')
-    log.info(f"Saved plot to {output_path}")
-    plt.close()
+    util.save_with_fig(fig, ax, output_path, log)
