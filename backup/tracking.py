@@ -195,7 +195,7 @@ try:
 except FileNotFoundError:
     pass
 
-file_path = "../live/data/source/2025_Monaco_Race.txt"  # 読み込むファイル
+file_path = "../live/data/source/2025_Spain_Race.txt"  # 読み込むファイル
 start = 0  # 最初に読み込んだ行数
 prev_start = -1  # 直前の読み込み行数（初期値は不一致にしておく）
 

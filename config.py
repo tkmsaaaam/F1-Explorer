@@ -1,5 +1,3 @@
-live_data_path = './live/data'
-
 compound_colors = {
     "HARD": "white",
     "MEDIUM": "yellow",

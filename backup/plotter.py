@@ -89,7 +89,7 @@ def plot_tyres(stint_map):
     ax.set_xlim(0, max_lap)
     plt.grid(axis='x', linestyle=':', alpha=0.7)
     output_path: str = f"{images_path}/tyres.png"
-    util.save_with_fig(fig, ax, output_path, log)
+    util.save(fig, ax, output_path, log)
 
 
 def plot_with_lap_end(map_by_timedelta, target_map, filename: str):
@@ -122,7 +122,7 @@ def plot_with_lap_end(map_by_timedelta, target_map, filename: str):
     ax.legend()
     ax.invert_yaxis()
     output_path = f"{images_path}/{filename}.png"
-    util.save_with_fig(fig, ax, output_path, log)
+    util.save(fig, ax, output_path, log)
 
 
 def plot_positions(map_by_timedelta, target_map, filename: str):
@@ -164,7 +164,7 @@ def plot_positions(map_by_timedelta, target_map, filename: str):
     ax.legend()
     ax.invert_yaxis()
     output_path: str = f"{images_path}/{filename}.png"
-    util.save_with_fig(fig, ax, output_path, log)
+    util.save(fig, ax, output_path, log)
 
 
 def plot_laptime(dicts, filename: str):
@@ -187,7 +187,7 @@ def plot_laptime(dicts, filename: str):
     ax.legend()
     ax.invert_yaxis()
     output_path: str = f"{images_path}/{filename}.png"
-    util.save_with_fig(fig, ax, output_path, log)
+    util.save(fig, ax, output_path, log)
 
 
 def plot_laptime_diff(dicts, filename: str, minus: float, plus: float):
@@ -208,7 +208,7 @@ def plot_laptime_diff(dicts, filename: str, minus: float, plus: float):
         ax.set_ylim(- minus, plus)
     ax.legend()
     output_path: str = f"{images_path}/{filename}.png"
-    util.save_with_fig(fig, ax, output_path, log)
+    util.save(fig, ax, output_path, log)
 
 
 def plot_weather(m, filename):
@@ -220,4 +220,4 @@ def plot_weather(m, filename):
         y.append(v)
     ax.plot(x, y)
     output_path = f"{images_path}/{filename}.png"
-    util.save_with_fig(fig, ax, output_path, log)
+    util.save(fig, ax, output_path, log)
