@@ -1,6 +1,7 @@
 import os
 from logging import Logger
 
+import pandas
 from fastf1.core import Session
 from matplotlib import pyplot as plt
 from plotly import graph_objects
@@ -9,7 +10,7 @@ import config
 import util
 
 
-def plot_lap_number_by_timing(session, driver_numbers: list[int], log: Logger):
+def plot_lap_number_by_timing(session: Session, driver_numbers: list[int], log: Logger):
     """
     y = ラップ番号
     x = 時間
@@ -46,8 +47,9 @@ def plot_lap_number_by_timing(session, driver_numbers: list[int], log: Logger):
                     legends.append(driver_number)
                 x = []
                 y = []
-            x.append(lap.LapStartDate)
-            y.append(lap.LapNumber)
+            if not pandas.isna(lap.LapStartDate):
+                x.append(lap.LapStartDate)
+                y.append(lap.LapNumber)
             stint_number = stint
         if len(x) > 0 and len(y) > 0:
             if driver_number in legends:
@@ -56,26 +58,25 @@ def plot_lap_number_by_timing(session, driver_numbers: list[int], log: Logger):
                 ax.plot(x, y, color=d["team_color"], linestyle="solid" if d["t_cam"] == "black" else "dashed",
                         label=d["acronym"])
                 legends.append(driver_number)
-    ax.legend()
+    if ax.get_legend() is not None:
+        ax.legend()
     output_path = f"./images/{session.event.year}/{session.event.RoundNumber}_{session.event.Location}/{session.name.replace(' ', '')}/lap_number_by_timing.png"
     util.save(fig, ax, output_path, log)
 
 
 def plot_laptime(session: Session, log: Logger):
     laps = session.laps
-    # ヘッダー作成
-    max_laps = max(len(laps[laps['DriverNumber'] == d]) for d in session.drivers)
-    header = ["Lap"] +  [session.get_driver(driver_number)['Abbreviation'] for driver_number in session.drivers]
+    header = ["Lap"] + [session.get_driver(driver_number)['Abbreviation'] for driver_number in session.drivers]
 
-    # 行データと背景色用のリストを作成
+    max_laps = max(len(laps[laps['DriverNumber'] == d]) for d in session.drivers)
     lap_numbers = list(range(1, max_laps + 1))
     data_rows = [lap_numbers]
-    fill_colors = [["#f0f0f0"] * max_laps]  # ラップ番号列の色
+    fill_colors = [["#f0f0f0"] * max_laps]
 
     for driver in header:
         if driver == 'Lap':
             continue
-        driver_laps = laps[laps['Driver'] == driver]
+        driver_laps = laps[laps['Driver'] == driver].sort_values(by='LapNumber')
         lap_times = []
         bg_colors = []
         for i in range(0, len(driver_laps)):
@@ -84,7 +85,7 @@ def plot_laptime(session: Session, log: Logger):
             compound = lap.Compound
             bg_colors.append(config.compound_colors.get(compound, "#dddddd"))
         if len(driver_laps) < max_laps:
-            for i in range(0, max_laps-len(driver_laps)):
+            for i in range(0, max_laps - len(driver_laps)):
                 lap_times.append("")
                 bg_colors.append("#f0f0f0")
         data_rows.append(lap_times)
@@ -95,14 +96,18 @@ def plot_laptime(session: Session, log: Logger):
         header=dict(values=header, fill_color='lightgrey', align='center'),
         cells=dict(values=data_rows, fill_color=fill_colors, align='center')
     )])
+    fig.update_layout(
+        autosize=True,
+        margin=dict(autoexpand=True)
+    )
 
     output_path = f"./images/{session.event.year}/{session.event.RoundNumber}_{session.event.Location}/{session.name.replace(' ', '')}/laptimes.png"
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
-    fig.write_image(output_path, width=1920, height=1080)
+    fig.write_image(output_path, width=1920, height=1620)
     log.info(f"Saved plot to {output_path}")
 
 
-def plot_laptime_by_lap_number(session, driver_numbers: list[int], log: Logger):
+def plot_laptime_by_lap_number(session: Session, driver_numbers: list[int], log: Logger):
     """
     y = ラップタイム
     x = ラップ番号
@@ -156,7 +161,7 @@ def plot_laptime_by_lap_number(session, driver_numbers: list[int], log: Logger):
     util.save(fig, ax, output_path, log)
 
 
-def plot_laptime_by_timing(session, driver_numbers: list[int], log: Logger):
+def plot_laptime_by_timing(session: Session, driver_numbers: list[int], log: Logger):
     """
     y = ラップタイム
     x = 時間
@@ -193,8 +198,9 @@ def plot_laptime_by_timing(session, driver_numbers: list[int], log: Logger):
                     legends.append(driver_number)
                 x = []
                 y = []
-            x.append(lap.LapStartDate)
-            y.append(lap.LapTime.seconds)
+            if not pandas.isna(lap.LapStartDate):
+                x.append(lap.LapStartDate)
+                y.append(lap.LapTime.seconds)
             stint_number = stint
         if len(x) > 0 and len(y) > 0:
             if driver_number in legends:
@@ -207,5 +213,6 @@ def plot_laptime_by_timing(session, driver_numbers: list[int], log: Logger):
     ax.set_ylim(top=min, bottom=min * 1.25)
     output_path = f"./images/{session.event.year}/{session.event.RoundNumber}_{session.event.Location}/{session.name.replace(' ', '')}/laptime_by_timing.png"
     ax.invert_yaxis()
-    ax.legend()
+    if ax.get_legend() is not None:
+        ax.legend()
     util.save(fig, ax, output_path, log)

@@ -195,12 +195,14 @@ try:
 except FileNotFoundError:
     pass
 
-file_path = "../live/data/source/2025_Spain_Race.txt"  # 読み込むファイル
+with open('../config.json', 'r', encoding='utf-8') as file:
+    config = json.load(file)
+
 start = 0  # 最初に読み込んだ行数
 prev_start = -1  # 直前の読み込み行数（初期値は不一致にしておく）
 
 while True:
-    with open(file_path, "r", encoding="utf-8") as f:
+    with open(config['FilePath'], "r", encoding="utf-8") as f:
         lines = f.readlines()
         new_lines = lines[start:]  # 新しい行だけ取得
 
