@@ -1,12 +1,12 @@
+import json
 import logging
 
 import fastf1.plotting
 
 from visualizations import run_volume, short_runs, weather, weekend
 
-year = 2025
-race_number = 9
-ses = 'Q'
+with open('./config.json', 'r', encoding='utf-8') as file:
+    config = json.load(file)
 
 logging.basicConfig(
     level=logging.INFO,
@@ -18,14 +18,14 @@ logging.basicConfig(
 log = logging.getLogger(__name__)
 
 fastf1.Cache.enable_cache('./cache')
-session = fastf1.get_session(year, race_number, ses)
+session = fastf1.get_session(config['Year'], config['Round'], config['Session'])
 session.load()
 
-log.info(f"{year} Race {race_number} {session.event.EventName} {ses}")
+log.info(f"{config['Year']} Race {config['Round']} {session.event.EventName} {config['Session']}")
 
 drivers = list(map(int, session.drivers))
 
-weekend.plot_tyre(year, race_number, log)
+weekend.plot_tyre(config['Year'], config['Round'], log)
 
 run_volume.plot_lap_number_by_timing(session, drivers, log)
 run_volume.plot_laptime(session, log)
