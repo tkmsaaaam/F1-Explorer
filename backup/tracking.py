@@ -29,10 +29,10 @@ logs_path = results_path + "/logs"
 images_path = results_path + "/images"
 
 
-def time_str_to_seconds(time_str):
-    if time_str == "":
+def str_to_seconds(time: str):
+    if time == "":
         return 0
-    parts = time_str.split(":")
+    parts = time.split(":")
 
     if len(parts) == 1:
         # "SSS.sss"
@@ -46,7 +46,7 @@ def time_str_to_seconds(time_str):
         hours, minutes, seconds = parts
         return int(hours) * 3600 + int(minutes) * 60 + float(seconds)
     else:
-        raise ValueError(f"Unsupported time format: {time_str}")
+        raise ValueError(f"Unsupported time format: {time}")
 
 
 def push(driver_number: int, lap_number: int, target_map, value):
@@ -67,7 +67,7 @@ def push_stint(key, driver_number: int, stint_number: int, stint, m):
             m[driver_number] = {stint_number: {key: stint[key]}}
 
 
-def to_json_style(s):
+def to_json_style(s: str) -> str:
     replaced = s.replace("'", '"') \
         .replace('True', 'true') \
         .replace('False', 'false')
@@ -83,7 +83,7 @@ def handle_timing_data(data, time):
             lap_time: str = v["LastLapTime"]["Value"]
             lap_number: int = v["NumberOfLaps"]
             if lap_time != "":
-                t = time_str_to_seconds(lap_time)
+                t = str_to_seconds(lap_time)
                 push(driver_number, lap_number, laptime_map, t)
             push(driver_number, lap_number, lap_end_map, time)
         if 'Position' in v:
@@ -93,13 +93,13 @@ def handle_timing_data(data, time):
         if 'GapToLeader' in v:
             if not 'L' in v["GapToLeader"]:
                 diff_str: str = v["GapToLeader"].replace("+", "")
-                diff = time_str_to_seconds(diff_str)
+                diff = str_to_seconds(diff_str)
                 push(driver_number, time, gap_top_map, diff)
         if 'IntervalToPositionAhead' in v:
             if 'Value' in v["IntervalToPositionAhead"]:
                 if not 'L' in v["IntervalToPositionAhead"]["Value"]:
                     diff_str: str = v["IntervalToPositionAhead"]["Value"].replace("+", "")
-                    diff = time_str_to_seconds(diff_str)
+                    diff = str_to_seconds(diff_str)
                     push(driver_number, time, gap_ahead_map, diff)
 
 
@@ -117,7 +117,7 @@ def handle_timing_app_data(data, time):
             if 'LapTime' in stint and 'LapNumber' in stint:
                 lap_time = stint["LapTime"]
                 lap_number = stint["LapNumber"]
-                t = time_str_to_seconds(lap_time)
+                t = str_to_seconds(lap_time)
                 push(driver_number, lap_number, lap_end_map, t)
                 push(driver_number, lap_number, lap_end_map, time)
             stint_number = int(stint_no)

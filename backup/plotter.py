@@ -20,7 +20,7 @@ logs_path = results_path + "/logs"
 images_path = results_path + "/images"
 
 
-def set_style(no: int):
+def set_style(no: int) -> dict[str, str]:
     d = config.f1_driver_info_2025.get(no, {
         "acronym": "UNDEFINED",
         "driver": "Undefined",
@@ -33,7 +33,7 @@ def set_style(no: int):
     return style
 
 
-def plot_tyres(stint_map):
+def plot_tyres(stint_map: dict):
     # チーム→ドライバー順で並び替え
     sorted_drivers = sorted(stint_map.keys(),
                             key=lambda d: (config.f1_driver_info_2025.get(d, {
@@ -125,7 +125,7 @@ def plot_with_lap_end(map_by_timedelta, target_map, filename: str):
     util.save(fig, ax, output_path, log)
 
 
-def plot_positions(map_by_timedelta, target_map, filename: str):
+def plot_positions(map_by_timedelta: dict, target_map: dict, filename: str):
     lap_end_positions = {}
     for driver, lap_dict in map_by_timedelta.items():
         # 対象ドライバーの position 情報を取得してソート
@@ -167,7 +167,7 @@ def plot_positions(map_by_timedelta, target_map, filename: str):
     util.save(fig, ax, output_path, log)
 
 
-def plot_laptime(dicts, filename: str):
+def plot_laptime(dicts: dict, filename: str):
     fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150)
     all_y = []
     for no, data in dicts.items():
@@ -190,7 +190,7 @@ def plot_laptime(dicts, filename: str):
     util.save(fig, ax, output_path, log)
 
 
-def plot_laptime_diff(dicts, filename: str, minus: float, plus: float):
+def plot_laptime_diff(dicts: dict, filename: str, minus: float, plus: float):
     fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150)
     for no, data in dicts.items():
         style = set_style(no)
@@ -211,7 +211,7 @@ def plot_laptime_diff(dicts, filename: str, minus: float, plus: float):
     util.save(fig, ax, output_path, log)
 
 
-def plot_weather(m, filename):
+def plot_weather(m: dict, filename: str):
     fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150)
     x = []
     y = []

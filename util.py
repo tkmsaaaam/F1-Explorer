@@ -6,7 +6,7 @@ from matplotlib.axes import Axes
 from matplotlib.figure import Figure
 
 
-def join_with_colon(*args):
+def join_with_colon(*args) -> str:
     return ' : '.join(args)
 
 

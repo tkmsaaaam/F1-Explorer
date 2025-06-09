@@ -8,6 +8,7 @@ import numpy as np
 import pandas
 import plotly.express as px
 from fastf1 import plotting
+from fastf1.core import Session
 from fastf1.mvapi import CircuitInfo
 from matplotlib import pyplot as plt
 from matplotlib.collections import LineCollection
@@ -17,7 +18,7 @@ import config
 import util
 
 
-def plot_best_laptime(session, driver_numbers: list[int], log: Logger, key: str):
+def plot_best_laptime(session: Session, driver_numbers: list[int], log: Logger, key: str):
     data = []
     minimum = 100
     maximum = 0
@@ -68,7 +69,7 @@ def plot_best_laptime(session, driver_numbers: list[int], log: Logger, key: str)
     log.info(f"Saved plot to {output_path}")
 
 
-def plot_best_speed(session, driver_numbers: list[int], log: Logger, key: str):
+def plot_best_speed(session: Session, driver_numbers: list[int], log: Logger, key: str):
     data = []
     minimum = 1000
     maximum = 0
@@ -119,7 +120,7 @@ def plot_best_speed(session, driver_numbers: list[int], log: Logger, key: str):
     log.info(f"Saved plot to {output_path}")
 
 
-def plot_ideal_best(session, driver_numbers: list[int], log: Logger):
+def plot_ideal_best(session: Session, driver_numbers: list[int], log: Logger):
     """
     y = 理論値
     x = ラップタイム
@@ -159,7 +160,7 @@ def plot_ideal_best(session, driver_numbers: list[int], log: Logger):
     util.save(fig, ax, output_path, log)
 
 
-def plot_ideal_best_diff(session, driver_numbers: list[int], log: Logger):
+def plot_ideal_best_diff(session: Session, driver_numbers: list[int], log: Logger):
     """
     y = 理論値 - ラップタイム
     x = ラップタイム
@@ -199,7 +200,7 @@ def plot_ideal_best_diff(session, driver_numbers: list[int], log: Logger):
     util.save(fig, ax, output_path, log)
 
 
-def plot_gear_shift_on_track(session, driver_numbers: list[str], log: Logger):
+def plot_gear_shift_on_track(session: Session, driver_numbers: list[str], log: Logger):
     """
     ドライバーごとに最速ラップのシフト変化をコースマップにプロットする
     Args:
@@ -234,7 +235,7 @@ def plot_gear_shift_on_track(session, driver_numbers: list[str], log: Logger):
         util.save(fig, ax, output_path, log)
 
 
-def plot_speed_and_laptime(session, driver_numbers: list[int], log: Logger):
+def plot_speed_and_laptime(session: Session, driver_numbers: list[int], log: Logger):
     """
     y = ラップタイム
     x = 最高速
@@ -270,7 +271,7 @@ def plot_speed_and_laptime(session, driver_numbers: list[int], log: Logger):
     util.save(fig, ax, output_path, log)
 
 
-def plot_speed_distance(session, driver_numbers: list[str], circuit_info: CircuitInfo, log: Logger):
+def plot_speed_distance(session: Session, driver_numbers: list[str], circuit_info: CircuitInfo, log: Logger):
     """
     y = スピード
     x = 距離
@@ -312,7 +313,7 @@ def plot_speed_distance(session, driver_numbers: list[str], circuit_info: Circui
         util.save(fig, ax, output_path, log)
 
 
-def plot_speed_distance_comparison(session, driver_numbers: list[str], circuit_info: CircuitInfo, log: Logger):
+def plot_speed_distance_comparison(session: Session, driver_numbers: list[str], circuit_info: CircuitInfo, log: Logger):
     drivers_per_fig = 5
     num_groups = math.ceil(len(driver_numbers) / drivers_per_fig)
 
@@ -414,11 +415,8 @@ def plot_speed_on_track(session, driver_numbers: list[str], log: Logger):
         util.save(fig, ax, output_path, log)
 
 
-def _plot_driver_telemetry(session, circuit_info, log,
-                           driver_numbers, key, ylabel, value_func):
-    import matplotlib.pyplot as plt
-    from fastf1 import plotting
-
+def _plot_driver_telemetry(session: Session, circuit_info: CircuitInfo, log: Logger,
+                           driver_numbers: list[int], key: str, ylabel, value_func):
     group_size = 5
     for i in range(0, len(driver_numbers), group_size):
         group = driver_numbers[i:i + group_size]
@@ -466,7 +464,7 @@ def _plot_driver_telemetry(session, circuit_info, log,
         plt.close(fig)
 
 
-def plot_throttle(session, circuit_info, log):
+def plot_throttle(session: Session, circuit_info: CircuitInfo, log: Logger):
     driver_numbers = session.laps['DriverNumber'].unique()
     driver_numbers.sort()
     _plot_driver_telemetry(
@@ -478,7 +476,7 @@ def plot_throttle(session, circuit_info, log):
     )
 
 
-def plot_brake(session, circuit_info, log):
+def plot_brake(session: Session, circuit_info: CircuitInfo, log: Logger):
     driver_numbers = session.laps['DriverNumber'].unique()
     driver_numbers.sort()
     _plot_driver_telemetry(
@@ -490,7 +488,7 @@ def plot_brake(session, circuit_info, log):
     )
 
 
-def plot_drs(session, circuit_info, log):
+def plot_drs(session: Session, circuit_info: CircuitInfo, log: Logger):
     driver_numbers = session.laps['DriverNumber'].unique()
     driver_numbers.sort()
     _plot_driver_telemetry(
@@ -502,7 +500,7 @@ def plot_drs(session, circuit_info, log):
     )
 
 
-def plot_tyre_age_and_laptime(session, driver_numbers: list[int], log: Logger):
+def plot_tyre_age_and_laptime(session: Session, driver_numbers: list[int], log: Logger):
     """
     y = ラップタイム
     x = タイヤ使用歴

@@ -1,4 +1,4 @@
-compound_colors = {
+compound_colors: dict[str, str] = {
     "HARD": "white",
     "MEDIUM": "yellow",
     "SOFT": "red",
@@ -6,7 +6,7 @@ compound_colors = {
     "WET": "blue"
 }
 
-f1_driver_info_2025 = {
+f1_driver_info_2025: dict[int, dict[str, str]] = {
     1: {
         "acronym": "VER",
         "driver": "Max Verstappen",
