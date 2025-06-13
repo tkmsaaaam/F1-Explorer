@@ -53,11 +53,11 @@ def plot_by_tyre_age_and_tyre(session: Session, log: Logger):
             })
             color = '#' + session.get_driver(str(driver_number)).TeamColor
             label = session.get_driver(str(driver_number)).Abbreviation
-            linestyle = "solid" if d["t_cam"] == "black" else "dashed"
+            line_style = "solid" if d["t_cam"] == "black" else "dashed"
             if driver_number in legends:
                 ax.plot(x, y, linewidth=0.75)
             else:
-                ax.plot(x, y, linewidth=0.75, color=color, label=label, linestyle=linestyle)
+                ax.plot(x, y, linewidth=0.75, color=color, label=label, linestyle=line_style)
                 legends.append(driver_number)
         ax.legend(loc='upper right', fontsize='small')
         ax.invert_yaxis()

@@ -4,6 +4,7 @@ from logging import Logger
 
 import fastf1
 import matplotlib as mpl
+import matplotlib.cm as cm
 import numpy as np
 import pandas
 import plotly.express as px
@@ -12,6 +13,7 @@ from fastf1.core import Session
 from fastf1.mvapi import CircuitInfo
 from matplotlib import pyplot as plt
 from matplotlib.collections import LineCollection
+from matplotlib.colorbar import ColorbarBase
 from matplotlib.pyplot import colormaps
 
 import config
@@ -23,7 +25,7 @@ def plot_best_laptime(session: Session, driver_numbers: list[int], log: Logger, 
     minimum = 100
     maximum = 0
     for driver_number in driver_numbers:
-        min = 100
+        minimum = 100
         laps = session.laps.pick_drivers(driver_number).sort_values(by='LapNumber')
         driver_name = None
         color = None
@@ -31,8 +33,8 @@ def plot_best_laptime(session: Session, driver_numbers: list[int], log: Logger, 
             lap = laps.iloc[i]
             if not lap.IsAccurate:
                 continue
-            if min > lap[key].total_seconds():
-                min = lap[key].total_seconds()
+            if minimum > lap[key].total_seconds():
+                minimum = lap[key].total_seconds()
                 driver_name = lap.Driver
                 color = config.f1_driver_info_2025.get(driver_number, {
                     "acronym": "UNDEFINED",
@@ -41,13 +43,13 @@ def plot_best_laptime(session: Session, driver_numbers: list[int], log: Logger, 
                     "team_color": "#808080",
                     "t_cam": "black"
                 })['team_color']
-        if minimum > min:
-            minimum = min
-        if maximum < min:
-            maximum = min
+        if minimum > minimum:
+            minimum = minimum
+        if maximum < minimum:
+            maximum = minimum
         data.append({
             'Acronym': driver_name,
-            key: min,
+            key: minimum,
             'Color': color
         })
     df = pandas.DataFrame(data).sort_values(key)
@@ -74,7 +76,7 @@ def plot_best_speed(session: Session, driver_numbers: list[int], log: Logger, ke
     minimum = 1000
     maximum = 0
     for driver_number in driver_numbers:
-        min = 1000
+        minimum = 1000
         laps = session.laps.pick_drivers(driver_number).sort_values(by='LapNumber')
         driver_name = None
         color = None
@@ -82,8 +84,8 @@ def plot_best_speed(session: Session, driver_numbers: list[int], log: Logger, ke
             lap = laps.iloc[i]
             if not lap.IsAccurate:
                 continue
-            if min > lap[key]:
-                min = lap[key]
+            if minimum > lap[key]:
+                minimum = lap[key]
                 driver_name = lap.Driver
                 color = config.f1_driver_info_2025.get(driver_number, {
                     "acronym": "UNDEFINED",
@@ -92,13 +94,13 @@ def plot_best_speed(session: Session, driver_numbers: list[int], log: Logger, ke
                     "team_color": "#808080",
                     "t_cam": "black"
                 })['team_color']
-        if minimum > min:
-            minimum = min
-        if maximum < min:
-            maximum = min
+        if minimum > minimum:
+            minimum = minimum
+        if maximum < minimum:
+            maximum = minimum
         data.append({
             'Acronym': driver_name,
-            key: min,
+            key: minimum,
             'Color': color
         })
     df = pandas.DataFrame(data).sort_values(key)
@@ -206,6 +208,7 @@ def plot_gear_shift_on_track(session: Session, driver_numbers: list[str], log: L
     Args:
         session: 分析対象のセッション
         driver_numbers: セッションに参加している車番一覧
+        log: ロガー
     """
     for driver_number in driver_numbers:
         fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150)
@@ -397,7 +400,7 @@ def plot_speed_on_track(session, driver_numbers: list[str], log: Logger):
         ax.plot(lap.telemetry['X'], lap.telemetry['Y'],
                 color='black', linestyle='-', linewidth=16, zorder=0)
 
-        colormap = mpl.cm.plasma
+        colormap = cm.get_cmap("plasma")
         norm = plt.Normalize(color.min(), color.max())
         lc = LineCollection(segments, cmap=colormap, norm=norm,
                             linestyle='-', linewidth=5)
@@ -408,15 +411,15 @@ def plot_speed_on_track(session, driver_numbers: list[str], log: Logger):
         axes = 0.25, 0.05, 0.5, 0.05
 
         color_bar_axes = fig.add_axes(axes)
-        normalLegend = mpl.colors.Normalize(vmin=color.min(), vmax=color.max())
-        mpl.colorbar.ColorbarBase(color_bar_axes, norm=normalLegend, cmap=colormap,
+        normal_legend = mpl.colors.Normalize(vmin=color.min(), vmax=color.max())
+        mpl.colorbar.ColorbarBase(color_bar_axes, norm=normal_legend, cmap=colormap,
                                   orientation="horizontal")
         output_path = f"./images/{session.event.year}/{session.event.RoundNumber}_{session.event.Location}/{session.name.replace(' ', '')}/speed_on_track/{driver_number}_{lap.Driver}.png"
         util.save(fig, ax, output_path, log)
 
 
 def _plot_driver_telemetry(session: Session, circuit_info: CircuitInfo, log: Logger,
-                           driver_numbers: list[int], key: str, ylabel, value_func):
+                           driver_numbers: list[int], key: str, label, value_func):
     group_size = 5
     for i in range(0, len(driver_numbers), group_size):
         group = driver_numbers[i:i + group_size]
@@ -433,11 +436,11 @@ def _plot_driver_telemetry(session: Session, circuit_info: CircuitInfo, log: Log
             driver_name = laps.Driver
             team_color = plotting.get_team_color(laps.Team, session=session)
             camera_color = config.f1_driver_info_2025.get(int(driver_number), {}).get('t_cam', 'black')
-            linestyle = 'solid' if camera_color == 'black' else 'dashed'
+            line_style = 'solid' if camera_color == 'black' else 'dashed'
 
             y_data = value_func(car_data)
             ax.plot(car_data.Distance, y_data, label=driver_name,
-                    color=team_color, linestyle=linestyle)
+                    color=team_color, linestyle=line_style)
 
             v_min = min(v_min, y_data.min())
             v_max = max(v_max, y_data.max())
@@ -450,7 +453,7 @@ def _plot_driver_telemetry(session: Session, circuit_info: CircuitInfo, log: Log
                     va='center_baseline', ha='center', size='small')
 
         ax.set_ylim(v_min - 0.1 * (v_max - v_min), v_max + 0.1 * (v_max - v_min))
-        ax.set_ylabel(ylabel)
+        ax.set_ylabel(label)
         ax.set_xlabel("Distance [m]")
         ax.grid(True)
         ax.legend(loc='upper right', fontsize='small')
@@ -471,7 +474,7 @@ def plot_throttle(session: Session, circuit_info: CircuitInfo, log: Logger):
         session, circuit_info, log,
         driver_numbers,
         key='throttle',
-        ylabel='Throttle [%]',
+        label='Throttle [%]',
         value_func=lambda data: data.Throttle
     )
 
@@ -483,7 +486,7 @@ def plot_brake(session: Session, circuit_info: CircuitInfo, log: Logger):
         session, circuit_info, log,
         driver_numbers,
         key='brake',
-        ylabel='Brake',
+        label='Brake',
         value_func=lambda data: data.Brake.astype(float)
     )
 
@@ -495,7 +498,7 @@ def plot_drs(session: Session, circuit_info: CircuitInfo, log: Logger):
         session, circuit_info, log,
         driver_numbers,
         key='drs',
-        ylabel='DRS',
+        label='DRS',
         value_func=lambda data: data.DRS.astype(float)
     )
 

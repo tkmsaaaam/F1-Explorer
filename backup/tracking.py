@@ -29,10 +29,10 @@ logs_path = results_path + "/logs"
 images_path = results_path + "/images"
 
 
-def str_to_seconds(time: str):
-    if time == "":
+def str_to_seconds(param: str):
+    if param == "":
         return 0
-    parts = time.split(":")
+    parts = param.split(":")
 
     if len(parts) == 1:
         # "SSS.sss"
@@ -46,7 +46,7 @@ def str_to_seconds(time: str):
         hours, minutes, seconds = parts
         return int(hours) * 3600 + int(minutes) * 60 + float(seconds)
     else:
-        raise ValueError(f"Unsupported time format: {time}")
+        raise ValueError(f"Unsupported time format: {param}")
 
 
 def push(driver_number: int, lap_number: int, target_map, value):
@@ -74,7 +74,7 @@ def to_json_style(s: str) -> str:
     return replaced
 
 
-def handle_timing_data(data, time):
+def handle_timing_data(data, t: datetime):
     if not isinstance(data, dict):
         return
     for driver, v in data['Lines'].items():
@@ -85,25 +85,25 @@ def handle_timing_data(data, time):
             if lap_time != "":
                 t = str_to_seconds(lap_time)
                 push(driver_number, lap_number, laptime_map, t)
-            push(driver_number, lap_number, lap_end_map, time)
+            push(driver_number, lap_number, lap_end_map, t)
         if 'Position' in v:
             position_str: str = v["Position"]
             position = int(position_str)
-            push(driver_number, time, position_map, position)
+            push(driver_number, t, position_map, position)
         if 'GapToLeader' in v:
             if not 'L' in v["GapToLeader"]:
                 diff_str: str = v["GapToLeader"].replace("+", "")
                 diff = str_to_seconds(diff_str)
-                push(driver_number, time, gap_top_map, diff)
+                push(driver_number, t, gap_top_map, diff)
         if 'IntervalToPositionAhead' in v:
             if 'Value' in v["IntervalToPositionAhead"]:
                 if not 'L' in v["IntervalToPositionAhead"]["Value"]:
                     diff_str: str = v["IntervalToPositionAhead"]["Value"].replace("+", "")
                     diff = str_to_seconds(diff_str)
-                    push(driver_number, time, gap_ahead_map, diff)
+                    push(driver_number, t, gap_ahead_map, diff)
 
 
-def handle_timing_app_data(data, time):
+def handle_timing_app_data(data, handled_time: datetime):
     if not isinstance(data, dict):
         return
     for driver, v in data['Lines'].items():
@@ -119,7 +119,7 @@ def handle_timing_app_data(data, time):
                 lap_number = stint["LapNumber"]
                 t = str_to_seconds(lap_time)
                 push(driver_number, lap_number, lap_end_map, t)
-                push(driver_number, lap_number, lap_end_map, time)
+                push(driver_number, lap_number, lap_end_map, handled_time)
             stint_number = int(stint_no)
             push_stint('Compound', driver_number, stint_number, stint, stint_map)
             push_stint('New', driver_number, stint_number, stint, stint_map)
@@ -133,25 +133,25 @@ track_temp_map = {}
 wind_speed_map = {}
 
 
-def handle_weather(data, time):
+def handle_weather(data, t: datetime):
     if not isinstance(data, dict):
         return
     if 'AirTemp' in data:
         air_temp: str = data["AirTemp"]
         if air_temp != "":
-            air_temp_map[time] = float(air_temp)
+            air_temp_map[t] = float(air_temp)
     if 'Rainfall' in data:
         rainfall: str = data["Rainfall"]
         if rainfall != "":
-            rainfall_map[time] = float(rainfall)
+            rainfall_map[t] = float(rainfall)
     if 'TrackTemp' in data:
         track_temp: str = data["TrackTemp"]
         if track_temp != "":
-            track_temp_map[time] = float(track_temp)
+            track_temp_map[t] = float(track_temp)
     if 'WindSpeed' in data:
         wind_speed: str = data["WindSpeed"]
         if wind_speed != "":
-            wind_speed_map[time] = float(wind_speed)
+            wind_speed_map[t] = float(wind_speed)
 
 
 def handle_race_control(t, data):

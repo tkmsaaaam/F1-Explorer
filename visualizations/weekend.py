@@ -14,12 +14,12 @@ def plot_tyre(year: int, race_number: int, log: Logger):
     for session_name in sessions:
         try:
             session = fastf1.get_session(year, race_number, session_name)
-        except (ValueError):
+        except ValueError:
             continue
         try:
             session.load()
             laps = session.laps
-        except (DataNotLoadedError):
+        except DataNotLoadedError:
             continue
         for driver in session.drivers:
             driver_laps = laps[laps['DriverNumber'] == driver]

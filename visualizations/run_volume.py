@@ -154,8 +154,8 @@ def plot_laptime_by_lap_number(session: Session, driver_numbers: list[int], log:
                 ax.plot(x, y, color=d["team_color"], linestyle="solid" if d["t_cam"] == "black" else "dashed",
                         label=d["acronym"])
                 legends.append(driver_number)
-    min = session.laps.LapTime.min().seconds
-    ax.set_ylim(top=min, bottom=min * 1.25)
+    minimum = session.laps.LapTime.min().seconds
+    ax.set_ylim(top=minimum, bottom=minimum * 1.25)
     ax.legend()
     output_path = f"./images/{session.event.year}/{session.event.RoundNumber}_{session.event.Location}/{session.name.replace(' ', '')}/laptime_by_lap_number.png"
     util.save(fig, ax, output_path, log)
@@ -209,8 +209,8 @@ def plot_laptime_by_timing(session: Session, driver_numbers: list[int], log: Log
                 ax.plot(x, y, color=d["team_color"], linestyle="solid" if d["t_cam"] == "black" else "dashed",
                         label=d["acronym"])
                 legends.append(driver_number)
-    min = session.laps.LapTime.min().seconds
-    ax.set_ylim(top=min, bottom=min * 1.25)
+    minimum = session.laps.LapTime.min().seconds
+    ax.set_ylim(top=minimum, bottom=minimum * 1.25)
     output_path = f"./images/{session.event.year}/{session.event.RoundNumber}_{session.event.Location}/{session.name.replace(' ', '')}/laptime_by_timing.png"
     ax.invert_yaxis()
     if ax.get_legend() is not None:

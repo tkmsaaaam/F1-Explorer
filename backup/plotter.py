@@ -52,14 +52,14 @@ def plot_tyres(stint_map: dict):
                                            })["acronym"]))
 
     fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150)
-    yticks = []
-    yticklabels = []
+    y_ticks = []
+    y_tick_labels = []
 
     max_lap = 0
     for i, driver_number in enumerate(sorted_drivers):
         y = i
         x = 0
-        yticks.append(y)
+        y_ticks.append(y)
         acronym = config.f1_driver_info_2025.get(driver_number, {
             "acronym": "UNDEFINED",
             "driver": "Undefined",
@@ -67,7 +67,7 @@ def plot_tyres(stint_map: dict):
             "team_color": "#808080",
             "t_cam": "black"
         })["acronym"]
-        yticklabels.append(acronym)
+        y_tick_labels.append(acronym)
 
         driver_stints = stint_map[driver_number]
         for stint_num in sorted(driver_stints.keys()):
@@ -84,8 +84,8 @@ def plot_tyres(stint_map: dict):
             if x > max_lap:
                 max_lap = x
 
-    ax.set_yticks(yticks)
-    ax.set_yticklabels(yticklabels)
+    ax.set_yticks(y_ticks)
+    ax.set_yticklabels(y_tick_labels)
     ax.set_xlim(0, max_lap)
     plt.grid(axis='x', linestyle=':', alpha=0.7)
     output_path: str = f"{images_path}/tyres.png"

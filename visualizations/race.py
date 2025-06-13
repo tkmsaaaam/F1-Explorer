@@ -32,7 +32,7 @@ def laptime(laps: Laps, log: Logger, filepath: str, session: Session):
     # ドライバーごとにラップタイムを記録
     driver_lap_times = {}
 
-    min = laps.sort_values(by='LapTime').iloc[0].LapTime.total_seconds()
+    minimum = laps.sort_values(by='LapTime').iloc[0].LapTime.total_seconds()
     for drv in laps.DriverNumber.unique():
         driver_laps = laps[laps.DriverNumber == drv].sort_values(by='LapNumber')
         lap_times = {
@@ -52,14 +52,14 @@ def laptime(laps: Laps, log: Logger, filepath: str, session: Session):
         })
         color = '#' + session.get_driver(str(no)).TeamColor
         label = session.get_driver(str(no)).Abbreviation
-        linestyle = "solid" if d["t_cam"] == "black" else "dashed"
+        line_style = "solid" if d["t_cam"] == "black" else "dashed"
         x = sorted(laps.keys())
         y = [laps[lap] for lap in x]
-        ax.plot(x, y, color=color, label=label, linestyle=linestyle, linewidth=0.75)
+        ax.plot(x, y, color=color, label=label, linestyle=line_style, linewidth=0.75)
 
     ax.legend()
     ax.invert_yaxis()
-    ax.set_ylim(top=min, bottom=min + 10)
+    ax.set_ylim(top=minimum, bottom=minimum + 10)
     util.save(fig, ax, filepath, log)
 
 
@@ -90,10 +90,10 @@ def laptime_diff(laps: Laps, log: Logger, filepath: str, session: Session):
         })
         color = '#' + session.get_driver(str(no)).TeamColor
         label = session.get_driver(str(no)).Abbreviation
-        linestyle = "solid" if d["t_cam"] == "black" else "dashed"
+        line_style = "solid" if d["t_cam"] == "black" else "dashed"
         x = sorted(laps.keys())
         y = [laps[lap] for lap in x]
-        ax.plot(x, y, color=color, label=label, linestyle=linestyle, linewidth=0.75)
+        ax.plot(x, y, color=color, label=label, linestyle=line_style, linewidth=0.75)
 
     ax.legend()
     ax.invert_yaxis()
@@ -106,7 +106,7 @@ def gap_to_ahead(laps: Laps, log: Logger, filepath: str, session: Session):
     laps = laps.sort_values(by=['LapNumber', 'Position'])
 
     # ラップごとの前走車とのギャップを保持する辞書
-    gap_to_ahead = {}
+    mapping = {}
     # 各ラップについて前走車との差を計算1
     for lap_number in laps.LapNumber.unique():
         lap_data = laps[laps.LapNumber == lap_number].copy()
@@ -120,11 +120,11 @@ def gap_to_ahead(laps: Laps, log: Logger, filepath: str, session: Session):
             diff = current.Time - ahead.Time
 
             driver_number = int(current.DriverNumber)
-            if driver_number not in gap_to_ahead:
-                gap_to_ahead[driver_number] = {}
-            gap_to_ahead[driver_number][lap_number] = diff.total_seconds()
+            if driver_number not in mapping:
+                mapping[driver_number] = {}
+            mapping[driver_number][lap_number] = diff.total_seconds()
     fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150)
-    for no, laps in gap_to_ahead.items():
+    for no, laps in mapping.items():
         d = config.f1_driver_info_2025.get(no, {
             "acronym": "UNDEFINED",
             "driver": "Undefined",
@@ -134,10 +134,10 @@ def gap_to_ahead(laps: Laps, log: Logger, filepath: str, session: Session):
         })
         color = '#' + session.get_driver(str(no)).TeamColor
         label = session.get_driver(str(no)).Abbreviation
-        linestyle = "solid" if d["t_cam"] == "black" else "dashed"
+        line_style = "solid" if d["t_cam"] == "black" else "dashed"
         x = sorted(laps.keys())
         y = [laps[lap] for lap in x]
-        ax.plot(x, y, color=color, label=label, linestyle=linestyle, linewidth=0.75)
+        ax.plot(x, y, color=color, label=label, linestyle=line_style, linewidth=0.75)
 
     ax.legend()
     ax.invert_yaxis()
@@ -146,7 +146,7 @@ def gap_to_ahead(laps: Laps, log: Logger, filepath: str, session: Session):
 
 
 def gap_to_top(laps: Laps, log: Logger, filepath: str, session: Session):
-    gap_to_top = {}
+    mapping = {}
     laps.sort_values(by=['LapNumber', 'Position'])
 
     for lap_number in laps.LapNumber.unique():
@@ -160,11 +160,11 @@ def gap_to_top(laps: Laps, log: Logger, filepath: str, session: Session):
             diff = current.Time - top.Time
 
             driver_number = int(current.DriverNumber)
-            if driver_number not in gap_to_top:
-                gap_to_top[driver_number] = {}
-            gap_to_top[driver_number][lap_number] = diff.total_seconds()
+            if driver_number not in mapping:
+                mapping[driver_number] = {}
+            mapping[driver_number][lap_number] = diff.total_seconds()
     fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150)
-    for no, laps in gap_to_top.items():
+    for no, laps in mapping.items():
         d = config.f1_driver_info_2025.get(no, {
             "acronym": "UNDEFINED",
             "driver": "Undefined",
@@ -174,10 +174,10 @@ def gap_to_top(laps: Laps, log: Logger, filepath: str, session: Session):
         })
         color = '#' + session.get_driver(str(no)).TeamColor
         label = session.get_driver(str(no)).Abbreviation
-        linestyle = "solid" if d["t_cam"] == "black" else "dashed"
+        line_style = "solid" if d["t_cam"] == "black" else "dashed"
         x = sorted(laps.keys())
         y = [laps[lap] for lap in x]
-        ax.plot(x, y, color=color, label=label, linestyle=linestyle, linewidth=0.75)
+        ax.plot(x, y, color=color, label=label, linestyle=line_style, linewidth=0.75)
 
     ax.legend()
     ax.invert_yaxis()
@@ -206,10 +206,10 @@ def positions(laps: Laps, log: Logger, filepath: str, session: Session):
         })
         color = '#' + session.get_driver(no).TeamColor
         label = session.get_driver(no).Abbreviation
-        linestyle = "solid" if d["t_cam"] == "black" else "dashed"
+        line_style = "solid" if d["t_cam"] == "black" else "dashed"
         x = sorted(laps.keys())
         y = [laps[lap] for lap in x]
-        ax.plot(x, y, color=color, label=label, linestyle=linestyle, linewidth=0.75)
+        ax.plot(x, y, color=color, label=label, linestyle=line_style, linewidth=0.75)
 
     ax.legend()
     ax.invert_yaxis()
