@@ -22,8 +22,8 @@ import util
 
 def plot_best_laptime(session: Session, driver_numbers: list[int], log: Logger, key: str):
     data = []
-    minimum = 100
-    maximum = 0
+    all_minimum = 100
+    all_maximum = 0
     for driver_number in driver_numbers:
         minimum = 100
         laps = session.laps.pick_drivers(driver_number).sort_values(by='LapNumber')
@@ -43,10 +43,12 @@ def plot_best_laptime(session: Session, driver_numbers: list[int], log: Logger, 
                     "team_color": "#808080",
                     "t_cam": "black"
                 })['team_color']
-        if minimum > minimum:
-            minimum = minimum
-        if maximum < minimum:
-            maximum = minimum
+        if minimum == 100:
+            continue
+        if all_minimum > minimum:
+            all_minimum = minimum
+        if all_maximum < minimum:
+            all_maximum = minimum
         data.append({
             'Acronym': driver_name,
             key: minimum,
@@ -62,7 +64,7 @@ def plot_best_laptime(session: Session, driver_numbers: list[int], log: Logger, 
         color_discrete_map={row["Acronym"]: row["Color"] for _, row in df.iterrows()}
     )
     fig.update_yaxes(
-        range=[minimum - 0.1, maximum + 0.1],
+        range=[all_minimum - 0.1, all_maximum + 0.1],
         tickformat=".3f"  # 小数点1桁で表示
     )
     output_path = f"./images/{session.event.year}/{session.event.RoundNumber}_{session.event.Location}/{session.name.replace(' ', '')}/{key}.png"
@@ -73,10 +75,10 @@ def plot_best_laptime(session: Session, driver_numbers: list[int], log: Logger, 
 
 def plot_best_speed(session: Session, driver_numbers: list[int], log: Logger, key: str):
     data = []
-    minimum = 1000
-    maximum = 0
+    all_minimum = 1000
+    all_maximum = 0
     for driver_number in driver_numbers:
-        minimum = 1000
+        maximum = 0
         laps = session.laps.pick_drivers(driver_number).sort_values(by='LapNumber')
         driver_name = None
         color = None
@@ -84,8 +86,8 @@ def plot_best_speed(session: Session, driver_numbers: list[int], log: Logger, ke
             lap = laps.iloc[i]
             if not lap.IsAccurate:
                 continue
-            if minimum > lap[key]:
-                minimum = lap[key]
+            if maximum < lap[key]:
+                maximum = lap[key]
                 driver_name = lap.Driver
                 color = config.f1_driver_info_2025.get(driver_number, {
                     "acronym": "UNDEFINED",
@@ -94,16 +96,18 @@ def plot_best_speed(session: Session, driver_numbers: list[int], log: Logger, ke
                     "team_color": "#808080",
                     "t_cam": "black"
                 })['team_color']
-        if minimum > minimum:
-            minimum = minimum
-        if maximum < minimum:
-            maximum = minimum
+        if maximum == 0:
+            continue
+        if all_minimum > maximum:
+            all_minimum = maximum
+        if all_maximum < maximum:
+            all_maximum = maximum
         data.append({
             'Acronym': driver_name,
-            key: minimum,
+            key: maximum,
             'Color': color
         })
-    df = pandas.DataFrame(data).sort_values(key)
+    df = pandas.DataFrame(data).sort_values(key, ascending=False)
     fig = px.bar(
         df,
         x='Acronym',
@@ -113,7 +117,7 @@ def plot_best_speed(session: Session, driver_numbers: list[int], log: Logger, ke
         color_discrete_map={row["Acronym"]: row["Color"] for _, row in df.iterrows()}
     )
     fig.update_yaxes(
-        range=[minimum - 5, maximum + 5],
+        range=[all_minimum - 5, all_maximum + 5],
         tickformat=".1f"  # 小数点1桁で表示
     )
     output_path = f"./images/{session.event.year}/{session.event.RoundNumber}_{session.event.Location}/{session.name.replace(' ', '')}/{key}.png"
@@ -148,13 +152,16 @@ def plot_ideal_best(session: Session, driver_numbers: list[int], log: Logger):
             lap = laps.iloc[i]
             if not lap.IsAccurate:
                 continue
-            if sec1 > lap.Sector1Time.seconds:
-                sec1 = lap.Sector1Time.seconds
-            if sec2 > lap.Sector2Time.seconds:
-                sec2 = lap.Sector2Time.seconds
-            if sec3 > lap.Sector3Time.seconds:
-                sec3 = lap.Sector3Time.seconds
-        x = session.laps.pick_drivers(driver_number).pick_fastest().LapTime.seconds
+            if sec1 > lap.Sector1Time.total_seconds():
+                sec1 = lap.Sector1Time.total_seconds()
+            if sec2 > lap.Sector2Time.total_seconds():
+                sec2 = lap.Sector2Time.total_seconds()
+            if sec3 > lap.Sector3Time.total_seconds():
+                sec3 = lap.Sector3Time.total_seconds()
+        fastest = session.laps.pick_drivers(driver_number).pick_fastest()
+        if fastest is None:
+            continue
+        x = fastest.LapTime.total_seconds()
         y = sec1 + sec2 + sec3
         ax.scatter(x, y, c=driver['team_color'])
         ax.annotate(driver['acronym'], (x, y), fontsize=9, ha='right')
@@ -164,7 +171,7 @@ def plot_ideal_best(session: Session, driver_numbers: list[int], log: Logger):
 
 def plot_ideal_best_diff(session: Session, driver_numbers: list[int], log: Logger):
     """
-    y = 理論値 - ラップタイム
+    y = ラップタイム - 理論値
     x = ラップタイム
     Args:
         session: 分析対象のセッション
@@ -188,14 +195,17 @@ def plot_ideal_best_diff(session: Session, driver_numbers: list[int], log: Logge
             lap = laps.iloc[i]
             if not lap.IsAccurate:
                 continue
-            if sec1 > lap.Sector1Time.seconds:
-                sec1 = lap.Sector1Time.seconds
-            if sec2 > lap.Sector2Time.seconds:
-                sec2 = lap.Sector2Time.seconds
-            if sec3 > lap.Sector3Time.seconds:
-                sec3 = lap.Sector3Time.seconds
+            if sec1 > lap.Sector1Time.total_seconds():
+                sec1 = lap.Sector1Time.total_seconds()
+            if sec2 > lap.Sector2Time.total_seconds():
+                sec2 = lap.Sector2Time.total_seconds()
+            if sec3 > lap.Sector3Time.total_seconds():
+                sec3 = lap.Sector3Time.total_seconds()
         y = sec1 + sec2 + sec3
-        x = y - session.laps.pick_drivers(driver_number).pick_fastest().LapTime.seconds
+        fastest = session.laps.pick_drivers(driver_number).pick_fastest()
+        if fastest is None:
+            continue
+        x = y - fastest.LapTime.total_seconds()
         ax.scatter(x, y, c=driver['team_color'])
         ax.annotate(driver['acronym'], (x, y), fontsize=9, ha='right')
     output_path = f"./images/{session.event.year}/{session.event.RoundNumber}_{session.event.Location}/{session.name.replace(' ', '')}/ideal_best_diff.png"
@@ -213,6 +223,8 @@ def plot_gear_shift_on_track(session: Session, driver_numbers: list[str], log: L
     for driver_number in driver_numbers:
         fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150)
         lap = session.laps.pick_drivers(driver_number).pick_fastest()
+        if lap is None:
+            continue
         tel = lap.get_telemetry()
         x = np.array(tel['X'].values)
         y = np.array(tel['Y'].values)
@@ -288,6 +300,8 @@ def plot_speed_distance(session: Session, driver_numbers: list[str], circuit_inf
         fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150)
 
         laps = session.laps.pick_drivers(driver_number).pick_fastest()
+        if laps is None:
+            continue
         car_data = laps.get_car_data().add_distance()
         team_color = fastf1.plotting.get_team_color(laps.Team,
                                                     session=session)
@@ -329,6 +343,8 @@ def plot_speed_distance_comparison(session: Session, driver_numbers: list[str], 
 
         for driver_number in driver_group:
             laps = session.laps.pick_drivers(driver_number).pick_fastest()
+            if laps is None:
+                continue
             car_data = laps.get_car_data().add_distance()
 
             team_color = fastf1.plotting.get_team_color(laps.Team, session=session)
@@ -350,6 +366,8 @@ def plot_speed_distance_comparison(session: Session, driver_numbers: list[str], 
 
         for driver_number in driver_group:
             laps = session.laps.pick_drivers(driver_number).pick_fastest()
+            if laps is None:
+                continue
             car_data = laps.get_car_data().add_distance()
             v_min = min(v_min, car_data.Speed.min())
             v_max = max(v_max, car_data.Speed.max())
@@ -383,6 +401,8 @@ def plot_speed_on_track(session, driver_numbers: list[str], log: Logger):
     # Uncomparable
     for driver_number in driver_numbers:
         lap = session.laps.pick_drivers(driver_number).pick_fastest()
+        if lap is None:
+            continue
         x = lap.telemetry['X']
         y = lap.telemetry['Y']
         color = lap.telemetry['Speed']
@@ -429,7 +449,7 @@ def _plot_driver_telemetry(session: Session, circuit_info: CircuitInfo, log: Log
 
         for driver_number in group:
             laps = session.laps.pick_drivers(driver_number).pick_fastest()
-            if laps.empty:
+            if laps is None or laps.empty:
                 continue
 
             car_data = laps.get_car_data().add_distance()

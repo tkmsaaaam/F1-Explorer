@@ -21,19 +21,18 @@ def plot_by_tyre_age_and_tyre(session: Session, log: Logger):
     """
     min_consecutive_laps = 2  # ロングランとみなす連続ラップ数のしきい値
 
-    # プロット準備
-    fastf1.plotting.setup_mpl(mpl_timedelta_support=True, misc_mpl_mods=False, color_scheme='light')
-
     all_laps = session.laps
 
     compounds = all_laps.Compound.unique()
     for compound in compounds:
+        # プロット準備
+        fastf1.plotting.setup_mpl(mpl_timedelta_support=True, misc_mpl_mods=False, color_scheme='light')
         fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150)
         laps = all_laps[all_laps.Compound == compound]
         grouped_by_driver = laps.groupby(['DriverNumber', 'Stint'])
         legends = []
-        for (d, stint_num), stint_laps in grouped_by_driver:
-            driver_number = int(d)
+        for (driver_number_str, stint_num), stint_laps in grouped_by_driver:
+            driver_number = int(driver_number_str)
             if len(stint_laps) < min_consecutive_laps:
                 continue
             stint_laps = stint_laps.sort_values(by='TyreLife')
@@ -51,11 +50,11 @@ def plot_by_tyre_age_and_tyre(session: Session, log: Logger):
                 "team_color": "#808080",
                 "t_cam": "black"
             })
-            color = '#' + session.get_driver(str(driver_number)).TeamColor
-            label = session.get_driver(str(driver_number)).Abbreviation
+            color = '#' + session.get_driver(driver_number_str).TeamColor
+            label = session.get_driver(driver_number_str).Abbreviation
             line_style = "solid" if d["t_cam"] == "black" else "dashed"
             if driver_number in legends:
-                ax.plot(x, y, linewidth=0.75)
+                ax.plot(x, y, linewidth=0.75, color=color, linestyle=line_style)
             else:
                 ax.plot(x, y, linewidth=0.75, color=color, label=label, linestyle=line_style)
                 legends.append(driver_number)
