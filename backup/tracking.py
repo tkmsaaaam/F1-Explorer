@@ -49,7 +49,7 @@ def str_to_seconds(param: str):
         raise ValueError(f"Unsupported time format: {param}")
 
 
-def push(driver_number: int, lap_number: int, target_map, value):
+def push(driver_number: int, lap_number: int | datetime, target_map, value):
     if driver_number in target_map:
         target_map[driver_number][lap_number] = value
     else:
@@ -83,8 +83,7 @@ def handle_timing_data(data, t: datetime):
             lap_time: str = v["LastLapTime"]["Value"]
             lap_number: int = v["NumberOfLaps"]
             if lap_time != "":
-                t = str_to_seconds(lap_time)
-                push(driver_number, lap_number, laptime_map, t)
+                push(driver_number, lap_number, laptime_map, str_to_seconds(lap_time))
             push(driver_number, lap_number, lap_end_map, t)
         if 'Position' in v:
             position_str: str = v["Position"]
@@ -202,7 +201,7 @@ start = 0  # 最初に読み込んだ行数
 prev_start = -1  # 直前の読み込み行数（初期値は不一致にしておく）
 
 while True:
-    with open(config['FilePath'], "r", encoding="utf-8") as f:
+    with open('../live/data/source/'+config['FileName'], "r", encoding="utf-8") as f:
         lines = f.readlines()
         new_lines = lines[start:]  # 新しい行だけ取得
 

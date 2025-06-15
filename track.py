@@ -30,7 +30,8 @@ os.makedirs(images_path, exist_ok=True)
 
 while True:
     try:
-        livedata = LiveTimingData(config['FilePath'])
+        livedata = LiveTimingData('./live/data/source/'+config['FileName'], _files_read=True)
+        livedata.load()
         session = fastf1.get_session(config['Year'], config['Round'], 'Race')
         session.load(livedata=livedata)
         race.execute(session, log, "./live/data/results/images", "./live/data/results/logs")
