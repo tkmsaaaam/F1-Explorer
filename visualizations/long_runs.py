@@ -35,6 +35,8 @@ def plot_by_tyre_age_and_tyre(session: Session, log: Logger):
             driver_number = int(driver_number_str)
             if len(stint_laps) < min_consecutive_laps:
                 continue
+            driver_name = stint_laps.Driver.iloc[0]
+            color = fastf1.plotting.get_team_color(stint_laps.Team.iloc[0], session)
             stint_laps = stint_laps.sort_values(by='TyreLife')
             y = []
             x = []
@@ -43,20 +45,11 @@ def plot_by_tyre_age_and_tyre(session: Session, log: Logger):
                     continue
                 x.append(stint_laps.TyreLife.iloc[i])
                 y.append(stint_laps.LapTime.iloc[i].total_seconds())
-            d = config.f1_driver_info_2025.get(driver_number, {
-                "acronym": "UNDEFINED",
-                "driver": "Undefined",
-                "team": "Undefined",
-                "team_color": "#808080",
-                "t_cam": "black"
-            })
-            color = '#' + session.get_driver(driver_number_str).TeamColor
-            label = session.get_driver(driver_number_str).Abbreviation
-            line_style = "solid" if d["t_cam"] == "black" else "dashed"
+            line_style = "solid" if config.camera_info_2025.get(driver_number, 'black') == "black" else "dashed"
             if driver_number in legends:
                 ax.plot(x, y, linewidth=0.75, color=color, linestyle=line_style)
             else:
-                ax.plot(x, y, linewidth=0.75, color=color, label=label, linestyle=line_style)
+                ax.plot(x, y, linewidth=0.75, color=color, label=driver_name, linestyle=line_style)
                 legends.append(driver_number)
         ax.legend(loc='upper right', fontsize='small')
         ax.invert_yaxis()

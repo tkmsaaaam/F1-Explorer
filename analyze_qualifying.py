@@ -42,6 +42,7 @@ short_runs.plot_best_speed(session, drivers, log, 'SpeedI1')
 short_runs.plot_best_speed(session, drivers, log, 'SpeedI2')
 short_runs.plot_best_speed(session, drivers, log, 'SpeedST')
 
+short_runs.plot_flat_out(session, session.get_circuit_info(), log)
 short_runs.plot_ideal_best(session, drivers, log)
 short_runs.plot_ideal_best_diff(session, drivers, log)
 short_runs.plot_gear_shift_on_track(session, session.drivers, log)

@@ -2,7 +2,9 @@ import datetime
 import os
 from logging import Logger
 
+import fastf1
 import pandas as pd
+from fastf1 import plotting
 from fastf1.core import Session, Laps
 from fastf1.ergast.structure import Drivers
 from matplotlib import pyplot as plt
@@ -30,74 +32,48 @@ def execute(session: Session, log: Logger, images_path: str, logs_path: str):
 
 def laptime(laps: Laps, log: Logger, filepath: str, session: Session):
     # ドライバーごとにラップタイムを記録
-    driver_lap_times = {}
-
     minimum = laps.sort_values(by='LapTime').iloc[0].LapTime.total_seconds()
-    for drv in laps.DriverNumber.unique():
-        driver_laps = laps[laps.DriverNumber == drv].sort_values(by='LapNumber')
-        lap_times = {
-            int(lap.LapNumber): lap.LapTime.total_seconds()
-            for _, lap in driver_laps.iterrows()
-            if pd.notna(lap.LapTime)
-        }
-        driver_lap_times[int(drv)] = lap_times
     fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150)
-    for no, laps in driver_lap_times.items():
-        d = config.f1_driver_info_2025.get(no, {
-            "acronym": "UNDEFINED",
-            "driver": "Undefined",
-            "team": "Undefined",
-            "team_color": "#808080",
-            "t_cam": "black"
-        })
-        color = '#' + session.get_driver(str(no)).TeamColor
-        label = session.get_driver(str(no)).Abbreviation
-        line_style = "solid" if d["t_cam"] == "black" else "dashed"
-        x = sorted(laps.keys())
-        y = [laps[lap] for lap in x]
-        ax.plot(x, y, color=color, label=label, linestyle=line_style, linewidth=0.75)
-
+    grouped = session.laps.groupby(['DriverNumber'])
+    for (driver_number), stint_laps in grouped:
+        if len(stint_laps) < 1:
+            continue
+        driver_name = stint_laps.Driver.iloc[0]
+        color = fastf1.plotting.get_team_color(stint_laps.Team.iloc[0], session)
+        stint_laps = stint_laps.sort_values(by='LapNumber')
+        lap_times = stint_laps['LapTime'].dt.total_seconds().tolist()
+        lap_numbers = stint_laps['LapNumber']
+        ax.plot(lap_numbers, lap_times, color=color,
+                linestyle="solid" if config.camera_info_2025.get(int(stint_laps.DriverNumber.iloc[0]),
+                                                                 'black') == "black" else "dashed",
+                label=driver_name)
     ax.legend()
     ax.invert_yaxis()
-    ax.set_ylim(top=minimum, bottom=minimum + 10)
+    ax.set_ylim(top=minimum, bottom=minimum + 6)
     util.save(fig, ax, filepath, log)
 
 
 def laptime_diff(laps: Laps, log: Logger, filepath: str, session: Session):
-    lap_delta_map = {}
-
-    for drv in laps.DriverNumber.unique():
-        driver_laps = laps[laps.DriverNumber == drv].sort_values(by='LapNumber')
-        deltas = {}
-        for i in range(1, len(driver_laps)):
-            curr_lap = driver_laps.iloc[i]
-            prev_lap = driver_laps.iloc[i - 1]
-
-            if pd.notna(curr_lap.LapTime) and pd.notna(prev_lap.LapTime):
-                delta = curr_lap.LapTime.total_seconds() - prev_lap.LapTime.total_seconds()
-                deltas[int(curr_lap.LapNumber)] = delta
-
-        lap_delta_map[int(drv)] = deltas
     fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150)
-
-    for no, laps in lap_delta_map.items():
-        d = config.f1_driver_info_2025.get(no, {
-            "acronym": "UNDEFINED",
-            "driver": "Undefined",
-            "team": "Undefined",
-            "team_color": "#808080",
-            "t_cam": "black"
-        })
-        color = '#' + session.get_driver(str(no)).TeamColor
-        label = session.get_driver(str(no)).Abbreviation
-        line_style = "solid" if d["t_cam"] == "black" else "dashed"
-        x = sorted(laps.keys())
-        y = [laps[lap] for lap in x]
-        ax.plot(x, y, color=color, label=label, linestyle=line_style, linewidth=0.75)
-
+    grouped = session.laps.groupby(['DriverNumber'])
+    for (driver_number), stint_laps in grouped:
+        if len(stint_laps) < 1:
+            continue
+        driver_name = stint_laps.Driver.iloc[0]
+        color = fastf1.plotting.get_team_color(stint_laps.Team.iloc[0], session)
+        stint_laps = stint_laps.sort_values(by='LapNumber')
+        lap_times = [
+            stint_laps.LapTime.iloc[i].total_seconds() - stint_laps.LapTime.iloc[i - 1].total_seconds()
+            for i in range(1, len(stint_laps) - 1)
+        ]
+        lap_numbers = [stint_laps.LapNumber.iloc[i] for i in range(1, len(stint_laps) - 1)]
+        ax.plot(lap_numbers, lap_times, color=color,
+                linestyle="solid" if config.camera_info_2025.get(stint_laps.DriverNumber.iloc[0],
+                                                                 'black') == "black" else "dashed",
+                label=driver_name)
     ax.legend()
     ax.invert_yaxis()
-    ax.set_ylim(bottom=-1, top=1)
+    ax.set_ylim(bottom=-0.3, top=0.3)
     util.save(fig, ax, filepath, log)
 
 
@@ -125,23 +101,18 @@ def gap_to_ahead(laps: Laps, log: Logger, filepath: str, session: Session):
             mapping[driver_number][lap_number] = diff.total_seconds()
     fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150)
     for no, laps in mapping.items():
-        d = config.f1_driver_info_2025.get(no, {
-            "acronym": "UNDEFINED",
-            "driver": "Undefined",
-            "team": "Undefined",
-            "team_color": "#808080",
-            "t_cam": "black"
-        })
-        color = '#' + session.get_driver(str(no)).TeamColor
-        label = session.get_driver(str(no)).Abbreviation
-        line_style = "solid" if d["t_cam"] == "black" else "dashed"
+        if len(laps) < 1:
+            continue
+        driver = session.get_driver(str(no))
+        line_style = "solid" if config.camera_info_2025.get(no, 'black') == "black" else "dashed"
         x = sorted(laps.keys())
         y = [laps[lap] for lap in x]
-        ax.plot(x, y, color=color, label=label, linestyle=line_style, linewidth=0.75)
+        ax.plot(x, y, color=fastf1.plotting.get_team_color(driver.TeamName, session), label=driver.Abbreviation,
+                linestyle=line_style, linewidth=0.75)
 
     ax.legend()
     ax.invert_yaxis()
-    ax.set_ylim(top=0)
+    ax.set_ylim(top=0, bottom=20)
     util.save(fig, ax, filepath, log)
 
 
@@ -165,22 +136,18 @@ def gap_to_top(laps: Laps, log: Logger, filepath: str, session: Session):
             mapping[driver_number][lap_number] = diff.total_seconds()
     fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150)
     for no, laps in mapping.items():
-        d = config.f1_driver_info_2025.get(no, {
-            "acronym": "UNDEFINED",
-            "driver": "Undefined",
-            "team": "Undefined",
-            "team_color": "#808080",
-            "t_cam": "black"
-        })
-        color = '#' + session.get_driver(str(no)).TeamColor
-        label = session.get_driver(str(no)).Abbreviation
-        line_style = "solid" if d["t_cam"] == "black" else "dashed"
+        if len(laps) < 1:
+            continue
+        driver = session.get_driver(str(no))
+        line_style = "solid" if config.camera_info_2025.get(no, 'black') == "black" else "dashed"
         x = sorted(laps.keys())
         y = [laps[lap] for lap in x]
-        ax.plot(x, y, color=color, label=label, linestyle=line_style, linewidth=0.75)
+        ax.plot(x, y, color=fastf1.plotting.get_team_color(driver.TeamName, session), label=driver.Abbreviation,
+                linestyle=line_style, linewidth=0.75)
 
     ax.legend()
     ax.invert_yaxis()
+    ax.set_ylim(top=0, bottom=30)
     util.save(fig, ax, filepath, log)
 
 
@@ -190,26 +157,21 @@ def positions(laps: Laps, log: Logger, filepath: str, session: Session):
 
     for drv in laps.DriverNumber.unique():
         driver_laps = laps[laps.DriverNumber == drv]
-        position_map[drv] = {
+        position_map[int(drv)] = {
             int(row.LapNumber): int(row.Position)
             for _, row in driver_laps.iterrows()
             if not pd.isna(row.Position)
         }
     fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150)
     for no, laps in position_map.items():
-        d = config.f1_driver_info_2025.get(int(no), {
-            "acronym": "UNDEFINED",
-            "driver": "Undefined",
-            "team": "Undefined",
-            "team_color": "#808080",
-            "t_cam": "black"
-        })
-        color = '#' + session.get_driver(no).TeamColor
-        label = session.get_driver(no).Abbreviation
-        line_style = "solid" if d["t_cam"] == "black" else "dashed"
+        if len(laps) < 1:
+            continue
+        driver = session.get_driver(str(no))
+        line_style = "solid" if config.camera_info_2025.get(no, 'black') == "black" else "dashed"
         x = sorted(laps.keys())
         y = [laps[lap] for lap in x]
-        ax.plot(x, y, color=color, label=label, linestyle=line_style, linewidth=0.75)
+        ax.plot(x, y, color=fastf1.plotting.get_team_color(driver.TeamName, session), label=driver.Abbreviation,
+                linestyle=line_style, linewidth=0.75)
 
     ax.legend()
     ax.invert_yaxis()
