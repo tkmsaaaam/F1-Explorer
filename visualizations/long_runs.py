@@ -16,8 +16,6 @@ def plot_by_tyre_age_and_tyre(session: Session, log: Logger):
         session: プロットするセッション
         log: ロガー
 
-    Returns:
-
     """
     min_consecutive_laps = 2  # ロングランとみなす連続ラップ数のしきい値
 

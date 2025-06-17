@@ -10,13 +10,12 @@ import config
 import util
 
 
-def plot_lap_number_by_timing(session: Session, driver_numbers: list[int], log: Logger):
+def plot_lap_number_by_timing(session: Session, log: Logger):
     """
     y = ラップ番号
     x = 時間
     Args:
         session: 分析対象のセッション
-        driver_numbers: セッションに参加している車番一覧
         log: ロガー
     """
     fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150)
@@ -86,18 +85,17 @@ def plot_laptime(session: Session, log: Logger):
     log.info(f"Saved plot to {output_path}")
 
 
-def plot_laptime_by_lap_number(session: Session, driver_numbers: list[int], log: Logger):
+def plot_laptime_by_lap_number(session: Session, log: Logger):
     """
     y = ラップタイム
     x = ラップ番号
     Args:
         session: 分析対象のセッション
-        driver_numbers: セッションに参加している車番一覧
         log: ロガー
     """
     fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150)
     grouped = session.laps.groupby(['DriverNumber'])
-    for (driver_number), stint_laps in grouped:
+    for _, stint_laps in grouped:
         if len(stint_laps) < 1:
             continue
         driver_name = stint_laps.Driver.iloc[0]
@@ -116,18 +114,17 @@ def plot_laptime_by_lap_number(session: Session, driver_numbers: list[int], log:
     util.save(fig, ax, output_path, log)
 
 
-def plot_laptime_by_timing(session: Session, driver_numbers: list[int], log: Logger):
+def plot_laptime_by_timing(session: Session, log: Logger):
     """
     y = ラップタイム
     x = 時間
     Args:
         session: 分析対象のセッション
-        driver_numbers: セッションに参加している車番一覧
         log: ロガー
     """
     fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150)
     grouped = session.laps.groupby(['DriverNumber'])
-    for (driver_number), stint_laps in grouped:
+    for _, stint_laps in grouped:
         if len(stint_laps) < 1:
             continue
         driver_name = stint_laps.Driver.iloc[0]

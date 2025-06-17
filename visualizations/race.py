@@ -5,22 +5,23 @@ from logging import Logger
 import fastf1
 import pandas as pd
 from fastf1 import plotting
-from fastf1.core import Session, Laps
-from fastf1.ergast.structure import Drivers
+from fastf1.core import Session
 from matplotlib import pyplot as plt
 from matplotlib.patches import Patch
+from plotly import graph_objects
 
 import config
 import util
 
 
 def execute(session: Session, log: Logger, images_path: str, logs_path: str):
-    laptime(session.laps, log, f"{images_path}/laptime.png", session)
-    laptime_diff(session.laps, log, f"{images_path}/laptime_diffs.png", session)
-    gap_to_ahead(session.laps, log, f"{images_path}/gap_ahead.png", session)
-    gap_to_top(session.laps, log, f"{images_path}/gap_top.png", session)
-    positions(session.laps, log, f"{images_path}/position.png", session)
-    tyres(session.laps, session.drivers, log, f"{images_path}/tyres.png")
+    laptime(log, f"{images_path}/laptime.png", session)
+    laptime_diff(log, f"{images_path}/laptime_diffs.png", session)
+    gap(log, f"{images_path}/gap.png", session)
+    gap_to_ahead(log, f"{images_path}/gap_ahead.png", session)
+    gap_to_top(log, f"{images_path}/gap_top.png", session)
+    positions(log, f"{images_path}/position.png", session)
+    tyres(session, log, f"{images_path}/tyres.png")
     write_messages(session, logs_path)
     write_track_status(session, logs_path)
     try:
@@ -30,12 +31,18 @@ def execute(session: Session, log: Logger, images_path: str, logs_path: str):
     util.write_to_file_top(f"{logs_path}/timestamp.txt", str(datetime.datetime.now()))
 
 
-def laptime(laps: Laps, log: Logger, filepath: str, session: Session):
-    # ドライバーごとにラップタイムを記録
-    minimum = laps.sort_values(by='LapTime').iloc[0].LapTime.total_seconds()
+def laptime(log: Logger, filepath: str, session: Session):
+    """
+    x = ラップ番号, y = ラップタイムのドライバーごとの推移
+    Args:
+        log: ロガー
+        filepath: 画像を保存する先のpathとファイル名
+        session: セッション
+    """
+    minimum = session.laps.sort_values(by='LapTime').iloc[0].LapTime.total_seconds()
     fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150)
     grouped = session.laps.groupby(['DriverNumber'])
-    for (driver_number), stint_laps in grouped:
+    for _, stint_laps in grouped:
         if len(stint_laps) < 1:
             continue
         driver_name = stint_laps.Driver.iloc[0]
@@ -53,10 +60,17 @@ def laptime(laps: Laps, log: Logger, filepath: str, session: Session):
     util.save(fig, ax, filepath, log)
 
 
-def laptime_diff(laps: Laps, log: Logger, filepath: str, session: Session):
+def laptime_diff(log: Logger, filepath: str, session: Session):
+    """
+    x = ラップ番号, y = ラップタイム-前のラップタイムのドライバーごとの推移
+    Args:
+        log: ロガー
+        filepath: 画像を保存する先のpathとファイル名
+        session: セッション
+    """
     fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150)
     grouped = session.laps.groupby(['DriverNumber'])
-    for (driver_number), stint_laps in grouped:
+    for _, stint_laps in grouped:
         if len(stint_laps) < 1:
             continue
         driver_name = stint_laps.Driver.iloc[0]
@@ -77,24 +91,74 @@ def laptime_diff(laps: Laps, log: Logger, filepath: str, session: Session):
     util.save(fig, ax, filepath, log)
 
 
-def gap_to_ahead(laps: Laps, log: Logger, filepath: str, session: Session):
-    # ドライバー・ラップごとに並べる
-    laps = laps.sort_values(by=['LapNumber', 'Position'])
+def gap(log: Logger, filepath: str, session: Session):
+    """
+    ラップごとのギャップの一覧を作成する
+    Args:
+        log: ロガー
+        filepath: 画像を保存する先のpathとファイル名
+        session: セッション
+    """
+    results = {}
+    for lap_number in session.laps.LapNumber.unique():
+        lap_data = session.laps[session.laps.LapNumber == lap_number].sort_values(by=['Position', 'LapNumber'])
+        for i in range(0, len(lap_data)):
+            current = lap_data.iloc[i]
+            driver_name = current.Driver
+            if driver_name not in results:
+                results[driver_name] = {'gap': [], 'color': []}
+            if current.Position == 1:
+                results[driver_name]['gap'].append("{:.3f}".format(0))
+                results[driver_name]['color'].append('#ffffff')
+                continue
+            ahead = lap_data.iloc[i - 1]
+            diff = (current.Time - ahead.Time).total_seconds()
+            results[driver_name]['gap'].append("{:.3f}".format(diff))
+            if diff < 3:
+                results[driver_name]['color'].append('#9966ff')
+            elif diff > 20:
+                results[driver_name]['color'].append('#e95464')
+            else:
+                results[driver_name]['color'].append('#ffffff')
+    max_laps = int(session.laps.LapNumber.max())
+    header = ["Lap"]
+    lap_numbers = list(range(1, max_laps + 1))
+    data_rows = [lap_numbers]
+    fill_colors = [["#f0f0f0"] * max_laps]
+    for driver_name, l in results.items():
+        header.append(driver_name)
+        data_rows.append(l['gap'])
+        fill_colors.append(l['color'])
+    fig = graph_objects.Figure(data=[graph_objects.Table(
+        header=dict(values=header, fill_color='lightgrey', align='center'),
+        cells=dict(values=data_rows, fill_color=fill_colors, align='center')
+    )])
+    fig.update_layout(
+        autosize=True,
+        margin=dict(autoexpand=True)
+    )
 
-    # ラップごとの前走車とのギャップを保持する辞書
+    os.makedirs(os.path.dirname(filepath), exist_ok=True)
+    fig.write_image(filepath, width=1920, height=1620)
+    log.info(f"Saved plot to {filepath}")
+
+
+def gap_to_ahead(log: Logger, filepath: str, session: Session):
+    """
+    x = ラップ番号, y = 前走とのギャップのドライバーごとの推移
+    Args:
+        log: ロガー
+        filepath: 画像を保存する先のpathとファイル名
+        session: セッション
+    """
     mapping = {}
-    # 各ラップについて前走車との差を計算1
-    for lap_number in laps.LapNumber.unique():
-        lap_data = laps[laps.LapNumber == lap_number].copy()
-        lap_data = lap_data.sort_values(by='Position')
+    for lap_number in session.laps.sort_values(by=['LapNumber', 'Position']).LapNumber.unique():
+        lap_data = session.laps[session.laps.LapNumber == lap_number].sort_values(by='Position')
 
         for i in range(1, len(lap_data)):
             current = lap_data.iloc[i]
             ahead = lap_data.iloc[i - 1]
-
-            # 同じラップ内での差（前走車との差）
             diff = current.Time - ahead.Time
-
             driver_number = int(current.DriverNumber)
             if driver_number not in mapping:
                 mapping[driver_number] = {}
@@ -109,20 +173,23 @@ def gap_to_ahead(laps: Laps, log: Logger, filepath: str, session: Session):
         y = [laps[lap] for lap in x]
         ax.plot(x, y, color=fastf1.plotting.get_team_color(driver.TeamName, session), label=driver.Abbreviation,
                 linestyle=line_style, linewidth=0.75)
-
     ax.legend()
     ax.invert_yaxis()
     ax.set_ylim(top=0, bottom=20)
     util.save(fig, ax, filepath, log)
 
 
-def gap_to_top(laps: Laps, log: Logger, filepath: str, session: Session):
+def gap_to_top(log: Logger, filepath: str, session: Session):
+    """
+    x = ラップ番号, y = トップとのギャップのドライバーごとの推移
+    Args:
+        log: ロガー
+        filepath: 画像を保存する先のpathとファイル名
+        session: セッション
+    """
     mapping = {}
-    laps.sort_values(by=['LapNumber', 'Position'])
-
-    for lap_number in laps.LapNumber.unique():
-        lap_data = laps[laps.LapNumber == lap_number].copy()
-        lap_data = lap_data.sort_values(by='Position')
+    for lap_number in session.laps.sort_values(by=['LapNumber', 'Position']).LapNumber.unique():
+        lap_data = session.laps[session.laps.LapNumber == lap_number].sort_values(by='Position')
 
         for i in range(1, len(lap_data)):
             current = lap_data.iloc[i]
@@ -151,12 +218,17 @@ def gap_to_top(laps: Laps, log: Logger, filepath: str, session: Session):
     util.save(fig, ax, filepath, log)
 
 
-def positions(laps: Laps, log: Logger, filepath: str, session: Session):
-    # ドライバーごとのポジションデータを構築
+def positions(log: Logger, filepath: str, session: Session):
+    """
+    x = ラップ番号, y = ポジションのドライバーごとの推移
+    Args:
+        log: ロガー
+        filepath: 画像を保存する先のpathとファイル名
+        session: セッション
+    """
     position_map = {}
-
-    for drv in laps.DriverNumber.unique():
-        driver_laps = laps[laps.DriverNumber == drv]
+    for drv in session.laps.DriverNumber.unique():
+        driver_laps = session.laps[session.laps.DriverNumber == drv]
         position_map[int(drv)] = {
             int(row.LapNumber): int(row.Position)
             for _, row in driver_laps.iterrows()
@@ -178,11 +250,18 @@ def positions(laps: Laps, log: Logger, filepath: str, session: Session):
     util.save(fig, ax, filepath, log)
 
 
-def tyres(laps: Laps, drivers: Drivers, log: Logger, filepath: str):
+def tyres(session: Session, log: Logger, filepath: str):
+    """
+    x = ラップ番号, y = 使用タイヤのドライバーごとの推移
+    Args:
+        log: ロガー
+        filepath: 画像を保存する先のpathとファイル名
+        session: セッション
+    """
     fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150)
     driver_y = {}  # ドライバー → Y軸位置
-    for i, driver in enumerate(drivers):
-        driver_laps = laps.pick_drivers(driver)
+    for i, driver in enumerate(session.drivers):
+        driver_laps = session.laps.pick_drivers(driver)
         driver_laps = driver_laps[~driver_laps.Compound.isnull()]  # Compoundがあるラップのみ
 
         prev_compound = None

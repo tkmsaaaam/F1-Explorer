@@ -28,10 +28,10 @@ drivers = list(map(int, session.drivers))
 
 weekend.plot_tyre(config['Year'], config['Round'], log)
 
-run_volume.plot_lap_number_by_timing(session, drivers, log)
+run_volume.plot_lap_number_by_timing(session, log)
 run_volume.plot_laptime(session, log)
-run_volume.plot_laptime_by_timing(session, drivers, log)
-run_volume.plot_laptime_by_lap_number(session, drivers, log)
+run_volume.plot_laptime_by_timing(session, log)
+run_volume.plot_laptime_by_lap_number(session, log)
 
 long_runs.plot_by_tyre_age_and_tyre(session, log)
 
@@ -45,7 +45,7 @@ short_runs.plot_best_speed(session, drivers, log, 'SpeedI1')
 short_runs.plot_best_speed(session, drivers, log, 'SpeedI2')
 short_runs.plot_best_speed(session, drivers, log, 'SpeedST')
 
-short_runs.plot_flat_out(session, session.get_circuit_info(), log)
+short_runs.plot_flat_out(session, log)
 short_runs.plot_ideal_best(session, drivers, log)
 short_runs.plot_ideal_best_diff(session, drivers, log)
 short_runs.plot_gear_shift_on_track(session, session.drivers, log)

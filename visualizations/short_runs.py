@@ -114,7 +114,7 @@ def plot_best_speed(session: Session, driver_numbers: list[int], log: Logger, ke
     log.info(f"Saved plot to {output_path}")
 
 
-def plot_flat_out(session: Session, circuit_info: CircuitInfo, log: Logger):
+def plot_flat_out(session: Session, log: Logger):
     driver_numbers = session.laps['DriverNumber'].unique()
     driver_numbers.sort()
     fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150)
