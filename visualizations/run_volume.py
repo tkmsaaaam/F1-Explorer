@@ -43,6 +43,12 @@ def plot_lap_number_by_timing(session: Session, log: Logger):
 
 
 def plot_laptime(session: Session, log: Logger):
+    """
+    ラップごとのタイムの一覧を作成する
+    Args:
+        session: セッション
+        log: ロガー
+    """
     laps = session.laps
     header = ["Lap"] + [session.get_driver(driver_number)['Abbreviation'] for driver_number in session.drivers]
 
