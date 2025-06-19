@@ -92,7 +92,7 @@ def plot_tyres(stint_map: dict):
     util.save(fig, ax, output_path, log)
 
 
-def plot_with_lap_end(map_by_timedelta, target_map, filename: str):
+def plot_with_lap_end(map_by_timedelta, target_map, filename: str, d: int):
     m_by_lap_end = {}
     for driver, lap_dict in map_by_timedelta.items():
         # 対象ドライバーの position 情報を取得してソート
@@ -123,6 +123,10 @@ def plot_with_lap_end(map_by_timedelta, target_map, filename: str):
     ax.invert_yaxis()
     output_path = f"{images_path}/{filename}.png"
     util.save(fig, ax, output_path, log)
+    if d is not None:
+        ax.set_ylim(d, 0)
+        output_path = f"{images_path}/{filename}_{d}.png"
+        util.save(fig, ax, output_path, log)
 
 
 def plot_positions(map_by_timedelta: dict, target_map: dict, filename: str):
@@ -167,7 +171,7 @@ def plot_positions(map_by_timedelta: dict, target_map: dict, filename: str):
     util.save(fig, ax, output_path, log)
 
 
-def plot_laptime(dicts: dict, filename: str):
+def plot_laptime(dicts: dict, filename: str, d: int):
     fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150)
     all_y = []
     for no, data in dicts.items():
@@ -177,17 +181,18 @@ def plot_laptime(dicts: dict, filename: str):
         all_y.extend(y)
         ax.plot(x, y, **style)
 
-    if all_y:
-        min_time = min(all_y)
-        threshold = min_time + 10.0
-        # 10秒以内の値の最大値を探す
-        capped_max_time = max(v for v in all_y if v <= threshold)
-        log.info(f"min: {min_time}, capped max: {capped_max_time}")
-        ax.set_ylim(min_time, capped_max_time)
+    min_time = min(all_y)
+    ax.set_ylim(min_time + 20, min_time)
     ax.legend()
-    ax.invert_yaxis()
     output_path: str = f"{images_path}/{filename}.png"
     util.save(fig, ax, output_path, log)
+    if all_y and range is not None:
+        threshold = min_time + d
+        capped_max_time = max(v for v in all_y if v <= threshold)
+        log.info(f"min: {min_time}, capped max: {capped_max_time}")
+        ax.set_ylim(capped_max_time, min_time)
+        output_path: str = f"{images_path}/{filename}_{d}.png"
+        util.save(fig, ax, output_path, log)
 
 
 def plot_laptime_diff(dicts: dict, filename: str, minus: float, plus: float):

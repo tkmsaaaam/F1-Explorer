@@ -201,7 +201,7 @@ start = 0  # 最初に読み込んだ行数
 prev_start = -1  # 直前の読み込み行数（初期値は不一致にしておく）
 
 while True:
-    with open('../live/data/source/'+config['FileName'], "r", encoding="utf-8") as f:
+    with open('../live/data/source/' + config['FileName'], "r", encoding="utf-8") as f:
         lines = f.readlines()
         new_lines = lines[start:]  # 新しい行だけ取得
 
@@ -215,10 +215,10 @@ while True:
     # ファイルが更新されていた場合のみplotを実行
     if start != prev_start:
         plotter.plot_tyres(stint_map)
-        plotter.plot_with_lap_end(lap_end_map, gap_ahead_map, "gap_ahead")
-        plotter.plot_with_lap_end(lap_end_map, gap_top_map, "gap_top")
+        plotter.plot_with_lap_end(lap_end_map, gap_ahead_map, "gap_ahead", 8)
+        plotter.plot_with_lap_end(lap_end_map, gap_top_map, "gap_top", 35)
         plotter.plot_positions(lap_end_map, position_map, "position")
-        plotter.plot_laptime(laptime_map, "laptime")
+        plotter.plot_laptime(laptime_map, "laptime", 10)
         plotter.plot_laptime_diff(laptime_map, "laptime_diffs", 0.75, 0.75)
 
         plotter.plot_weather(air_temp_map, 'air_temp')
