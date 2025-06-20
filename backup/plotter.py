@@ -21,35 +21,17 @@ images_path = results_path + "/images"
 
 
 def set_style(no: int) -> dict[str, str]:
-    d = config.f1_driver_info_2025.get(no, {
-        "acronym": "UNDEFINED",
-        "driver": "Undefined",
-        "team": "Undefined",
-        "team_color": "#808080",
-        "t_cam": "black"
-    })
-    style = {"color": d["team_color"], "linestyle": "solid" if d["t_cam"] == "black" else "dashed",
-             "label": d["acronym"], "linewidth": "0.75"}
+    style = {"color": config.team_color_info_2025.get(no, '#808080'),
+             "linestyle": "solid" if config.camera_info_2025.get(no, 'black') == "black" else "dashed",
+             "label": config.name_info_2025.get(no, 'UNDEFINED'), "linewidth": "0.75"}
     return style
 
 
 def plot_tyres(stint_map: dict):
     # チーム→ドライバー順で並び替え
     sorted_drivers = sorted(stint_map.keys(),
-                            key=lambda d: (config.f1_driver_info_2025.get(d, {
-                                "acronym": "UNDEFINED",
-                                "driver": "Undefined",
-                                "team": "Undefined",
-                                "team_color": "#808080",
-                                "t_cam": "black"
-                            })["team"],
-                                           config.f1_driver_info_2025.get(d, {
-                                               "acronym": "UNDEFINED",
-                                               "driver": "Undefined",
-                                               "team": "Undefined",
-                                               "team_color": "#808080",
-                                               "t_cam": "black"
-                                           })["acronym"]))
+                            key=lambda d: (config.team_info_2025.get(d, 'Undefined'),
+                                           config.name_info_2025.get(d, "UNDEFINED")))
 
     fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150)
     y_ticks = []
@@ -60,13 +42,7 @@ def plot_tyres(stint_map: dict):
         y = i
         x = 0
         y_ticks.append(y)
-        acronym = config.f1_driver_info_2025.get(driver_number, {
-            "acronym": "UNDEFINED",
-            "driver": "Undefined",
-            "team": "Undefined",
-            "team_color": "#808080",
-            "t_cam": "black"
-        })["acronym"]
+        acronym = config.name_info_2025.get(driver_number, "UNDEFINED")
         y_tick_labels.append(acronym)
 
         driver_stints = stint_map[driver_number]
