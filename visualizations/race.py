@@ -14,12 +14,14 @@ import config
 import util
 
 
-def execute(session: Session, log: Logger, images_path: str, logs_path: str):
-    laptime(log, f"{images_path}/laptime.png", session)
+def execute(session: Session, log: Logger, images_path: str, logs_path: str, lap_time_range: int | None,
+            gap_top_range: int | None,
+            gap_ahead_range: int | None):
+    laptime(log, images_path, "laptime", session, lap_time_range)
     laptime_diff(log, f"{images_path}/laptime_diffs.png", session)
     gap(log, f"{images_path}/gap.png", session)
-    gap_to_ahead(log, f"{images_path}/gap_ahead.png", session)
-    gap_to_top(log, f"{images_path}/gap_top.png", session)
+    gap_to_ahead(log, images_path, "gap_ahead", session, gap_ahead_range)
+    gap_to_top(log, images_path, "gap_top", session, gap_top_range)
     positions(log, f"{images_path}/position.png", session)
     tyres(session, log, f"{images_path}/tyres.png")
     write_messages(session, logs_path)
@@ -31,13 +33,15 @@ def execute(session: Session, log: Logger, images_path: str, logs_path: str):
     util.write_to_file_top(f"{logs_path}/timestamp.txt", str(datetime.datetime.now()))
 
 
-def laptime(log: Logger, filepath: str, session: Session):
+def laptime(log: Logger, filepath: str, filename: str, session: Session, r: int):
     """
     x = ラップ番号, y = ラップタイムのドライバーごとの推移
     Args:
         log: ロガー
-        filepath: 画像を保存する先のpathとファイル名
+        filepath: 画像を保存する先のpath
+        filename: ファイル名
         session: セッション
+        r: y軸の幅
     """
     minimum = session.laps.sort_values(by='LapTime').iloc[0].LapTime.total_seconds()
     fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150)
@@ -55,9 +59,11 @@ def laptime(log: Logger, filepath: str, session: Session):
                                                                  'black') == "black" else "dashed",
                 label=driver_name)
     ax.legend()
-    ax.invert_yaxis()
-    ax.set_ylim(top=minimum, bottom=minimum + 6)
-    util.save(fig, ax, filepath, log)
+    ax.set_ylim(top=minimum, bottom=minimum + 15)
+    util.save(fig, ax, f"{filepath}/{filename}.png", log)
+    if r is not None:
+        ax.set_ylim(top=minimum, bottom=minimum + r)
+        util.save(fig, ax, f"{filepath}/{filename}_{r}.png", log)
 
 
 def laptime_diff(log: Logger, filepath: str, session: Session):
@@ -143,13 +149,15 @@ def gap(log: Logger, filepath: str, session: Session):
     log.info(f"Saved plot to {filepath}")
 
 
-def gap_to_ahead(log: Logger, filepath: str, session: Session):
+def gap_to_ahead(log: Logger, filepath: str, filename: str, session: Session, r: int):
     """
     x = ラップ番号, y = 前走とのギャップのドライバーごとの推移
     Args:
         log: ロガー
-        filepath: 画像を保存する先のpathとファイル名
+        filepath: 画像を保存する先のpath
+        filename: 画像名
         session: セッション
+        r: y軸の幅
     """
     mapping = {}
     for lap_number in session.laps.sort_values(by=['LapNumber', 'Position']).LapNumber.unique():
@@ -174,18 +182,22 @@ def gap_to_ahead(log: Logger, filepath: str, session: Session):
         ax.plot(x, y, color=fastf1.plotting.get_team_color(driver.TeamName, session), label=driver.Abbreviation,
                 linestyle=line_style, linewidth=0.75)
     ax.legend()
-    ax.invert_yaxis()
-    ax.set_ylim(top=0, bottom=20)
-    util.save(fig, ax, filepath, log)
+    ax.set_ylim(top=0, bottom=30)
+    util.save(fig, ax, f"{filepath}/{filename}.png", log)
+    if r is not None:
+        ax.set_ylim(top=0, bottom=r)
+        util.save(fig, ax, f"{filepath}/{filename}_{r}.png", log)
 
 
-def gap_to_top(log: Logger, filepath: str, session: Session):
+def gap_to_top(log: Logger, filepath: str, filename: str, session: Session, r: int):
     """
     x = ラップ番号, y = トップとのギャップのドライバーごとの推移
     Args:
         log: ロガー
-        filepath: 画像を保存する先のpathとファイル名
+        filepath: 画像を保存する先のpath
+        filename: ファイル名
         session: セッション
+        r: y軸の幅
     """
     mapping = {}
     for lap_number in session.laps.sort_values(by=['LapNumber', 'Position']).LapNumber.unique():
@@ -214,8 +226,11 @@ def gap_to_top(log: Logger, filepath: str, session: Session):
 
     ax.legend()
     ax.invert_yaxis()
-    ax.set_ylim(top=0, bottom=30)
-    util.save(fig, ax, filepath, log)
+    ax.set_ylim(top=0, bottom=60)
+    util.save(fig, ax, f"{filepath}/{filename}.png", log)
+    if r is not None:
+        ax.set_ylim(top=0, bottom=r)
+        util.save(fig, ax, f"{filepath}/{filename}_{r}.png", log)
 
 
 def positions(log: Logger, filepath: str, session: Session):

@@ -23,7 +23,7 @@ images_path = results_path + "/images"
 def set_style(no: int) -> dict[str, str]:
     style = {"color": config.team_color_info_2025.get(no, '#808080'),
              "linestyle": "solid" if config.camera_info_2025.get(no, 'black') == "black" else "dashed",
-             "label": config.name_info_2025.get(no, 'UNDEFINED'), "linewidth": "0.75"}
+             "label": config.name_info_2025.get(no, 'UNDEFINED'), "linewidth": "1"}
     return style
 
 

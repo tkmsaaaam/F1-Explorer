@@ -28,13 +28,25 @@ images_path = results_path + "/images"
 os.makedirs(logs_path, exist_ok=True)
 os.makedirs(images_path, exist_ok=True)
 
+filepath = './live/data/source/' + config['FileName']
+log.info(filepath)
+
 while True:
     try:
-        livedata = LiveTimingData('./live/data/source/'+config['FileName'], _files_read=True)
+        with open('./config.json', 'r', encoding='utf-8') as file:
+            config = json.load(file)
+        keyword = 'SessionInfo'
+        output_file = './live/data/source/tmp.txt'
+        with open(filepath, "r", encoding="utf-8") as fin, open(output_file, "w", encoding="utf-8") as file:
+            for line in fin:
+                if keyword not in line:
+                    file.write(line)
+        livedata = LiveTimingData(output_file, _files_read=True)
         livedata.load()
         session = fastf1.get_session(config['Year'], config['Round'], 'Race')
         session.load(livedata=livedata)
-        race.execute(session, log, "./live/data/results/images", "./live/data/results/logs")
+        race.execute(session, log, "./live/data/results/images", "./live/data/results/logs",
+                     config['Race']['LapTimeRange'], config['Race']['GapTopRange'], config['Race']['GapAheadRange'])
         weather.execute(session, log, "./live/data/results/images")
     except DataNotLoadedError as e:
         log.warning(e)

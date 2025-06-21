@@ -34,6 +34,6 @@ run_volume.plot_laptime_by_timing(session, log)
 run_volume.plot_laptime_by_lap_number(session, log)
 
 path = f"./images/{session.event.year}/{session.event.RoundNumber}_{session.event.Location}/{session.name.replace(' ', '')}"
-race.execute(session, log, path, path)
+race.execute(session, log, path, path, None, None, None)
 
 weather.execute(session, log, path)
