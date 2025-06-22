@@ -28,7 +28,7 @@ def plot_by_tyre_age_and_tyre(session: Session, log: Logger):
         fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150)
         laps = all_laps[all_laps.Compound == compound]
         grouped_by_driver = laps.groupby(['DriverNumber', 'Stint'])
-        legends = []
+        legends = set()
         for (driver_number_str, stint_num), stint_laps in grouped_by_driver:
             driver_number = int(driver_number_str)
             if len(stint_laps) < min_consecutive_laps:
@@ -48,8 +48,8 @@ def plot_by_tyre_age_and_tyre(session: Session, log: Logger):
                 ax.plot(x, y, linewidth=0.75, color=color, linestyle=line_style)
             else:
                 ax.plot(x, y, linewidth=0.75, color=color, label=driver_name, linestyle=line_style)
-                legends.append(driver_number)
-        ax.legend(loc='upper right', fontsize='small')
+                legends.add(driver_number)
+        ax.legend(fontsize='small')
         ax.invert_yaxis()
         output_path = f"./images/{session.event.year}/{session.event.RoundNumber}_{session.event.Location}/{session.name.replace(' ', '')}/long_runs/{compound}.png"
         util.save(fig, ax, output_path, log)
