@@ -58,7 +58,7 @@ def laptime(log: Logger, filepath: str, filename: str, session: Session, r: int)
                 linestyle="solid" if config.camera_info_2025.get(int(stint_laps.DriverNumber.iloc[0]),
                                                                  'black') == "black" else "dashed",
                 label=driver_name)
-    ax.legend()
+    ax.legend(fontsize='small')
     ax.set_ylim(top=minimum, bottom=minimum + 15)
     util.save(fig, ax, f"{filepath}/{filename}.png", log)
     if r is not None:
@@ -91,7 +91,7 @@ def laptime_diff(log: Logger, filepath: str, session: Session):
                 linestyle="solid" if config.camera_info_2025.get(stint_laps.DriverNumber.iloc[0],
                                                                  'black') == "black" else "dashed",
                 label=driver_name)
-    ax.legend()
+    ax.legend(fontsize='small')
     ax.invert_yaxis()
     ax.set_ylim(bottom=-0.3, top=0.3)
     util.save(fig, ax, filepath, log)
@@ -181,7 +181,7 @@ def gap_to_ahead(log: Logger, filepath: str, filename: str, session: Session, r:
         y = [laps[lap] for lap in x]
         ax.plot(x, y, color=fastf1.plotting.get_team_color(driver.TeamName, session), label=driver.Abbreviation,
                 linestyle=line_style, linewidth=0.75)
-    ax.legend()
+    ax.legend(fontsize='small')
     ax.set_ylim(top=0, bottom=30)
     util.save(fig, ax, f"{filepath}/{filename}.png", log)
     if r is not None:
@@ -224,7 +224,7 @@ def gap_to_top(log: Logger, filepath: str, filename: str, session: Session, r: i
         ax.plot(x, y, color=fastf1.plotting.get_team_color(driver.TeamName, session), label=driver.Abbreviation,
                 linestyle=line_style, linewidth=0.75)
 
-    ax.legend()
+    ax.legend(fontsize='small')
     ax.invert_yaxis()
     ax.set_ylim(top=0, bottom=60)
     util.save(fig, ax, f"{filepath}/{filename}.png", log)
@@ -260,7 +260,7 @@ def positions(log: Logger, filepath: str, session: Session):
         ax.plot(x, y, color=fastf1.plotting.get_team_color(driver.TeamName, session), label=driver.Abbreviation,
                 linestyle=line_style, linewidth=0.75)
 
-    ax.legend()
+    ax.legend(fontsize='small')
     ax.invert_yaxis()
     util.save(fig, ax, filepath, log)
 
@@ -323,7 +323,7 @@ def tyres(session: Session, log: Logger, filepath: str):
     # 凡例
     legend_elements = [Patch(facecolor=color, edgecolor='black', label=compound)
                        for compound, color in config.compound_colors.items()]
-    ax.legend(handles=legend_elements, title='Compound', loc='upper right')
+    ax.legend(handles=legend_elements, title='Compound', loc='upper right', fontsize='small')
 
     util.save(fig, ax, filepath, log)
 

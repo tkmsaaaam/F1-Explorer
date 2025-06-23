@@ -37,7 +37,7 @@ def plot_lap_number_by_timing(session: Session, log: Logger):
             ax.plot(lap_starts, lap_numbers, color=color,
                     linestyle="solid" if config.camera_info_2025.get(int(driver_number),
                                                                      'black') == "black" else "dashed")
-    ax.legend()
+    ax.legend(fontsize='small')
     output_path = f"./images/{session.event.year}/{session.event.RoundNumber}_{session.event.Location}/{session.name.replace(' ', '')}/lap_number_by_timing.png"
     util.save(fig, ax, output_path, log)
 
@@ -115,7 +115,7 @@ def plot_laptime_by_lap_number(session: Session, log: Logger):
                 label=driver_name)
     minimum = session.laps.LapTime.min().total_seconds()
     ax.set_ylim(top=minimum, bottom=minimum * 1.25)
-    ax.legend()
+    ax.legend(fontsize='small')
     output_path = f"./images/{session.event.year}/{session.event.RoundNumber}_{session.event.Location}/{session.name.replace(' ', '')}/laptime_by_lap_number.png"
     util.save(fig, ax, output_path, log)
 
@@ -145,5 +145,5 @@ def plot_laptime_by_timing(session: Session, log: Logger):
     minimum = session.laps.LapTime.min().seconds
     ax.set_ylim(top=minimum, bottom=minimum * 1.25)
     output_path = f"./images/{session.event.year}/{session.event.RoundNumber}_{session.event.Location}/{session.name.replace(' ', '')}/laptime_by_timing.png"
-    ax.legend()
+    ax.legend(fontsize='small')
     util.save(fig, ax, output_path, log)

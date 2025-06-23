@@ -377,7 +377,7 @@ def plot_speed_distance_comparison(session: Session, driver_numbers: list[str], 
                     va='center_baseline', ha='center', size='small')
 
         ax.set_ylim(v_min - 40, v_max + 20)
-        ax.legend()
+        ax.legend(fontsize='small')
 
         output_path = (
             f"./images/{session.event.year}/{session.event.RoundNumber}_{session.event.Location}/"

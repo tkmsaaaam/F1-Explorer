@@ -95,7 +95,7 @@ def plot_with_lap_end(map_by_timedelta, target_map, filename: str, d: int):
         x = sorted(laps.keys())
         y = [laps[lap] for lap in x]
         ax.plot(x, y, **style)
-    ax.legend()
+    ax.legend(fontsize='small')
     ax.invert_yaxis()
     output_path = f"{images_path}/{filename}.png"
     util.save(fig, ax, output_path, log)
@@ -141,7 +141,7 @@ def plot_positions(map_by_timedelta: dict, target_map: dict, filename: str):
         x = sorted(laps.keys())
         y = [laps[lap] for lap in x]
         ax.plot(x, y, **style)
-    ax.legend()
+    ax.legend(fontsize='small')
     ax.invert_yaxis()
     output_path: str = f"{images_path}/{filename}.png"
     util.save(fig, ax, output_path, log)
@@ -159,7 +159,7 @@ def plot_laptime(dicts: dict, filename: str, d: int):
 
     min_time = min(all_y)
     ax.set_ylim(min_time + 20, min_time)
-    ax.legend()
+    ax.legend(fontsize='small')
     output_path: str = f"{images_path}/{filename}.png"
     util.save(fig, ax, output_path, log)
     if all_y and range is not None:
@@ -187,7 +187,7 @@ def plot_laptime_diff(dicts: dict, filename: str, minus: float, plus: float):
     ax.invert_yaxis()
     if minus != 0 or plus != 0:
         ax.set_ylim(- minus, plus)
-    ax.legend()
+    ax.legend(fontsize='small')
     output_path: str = f"{images_path}/{filename}.png"
     util.save(fig, ax, output_path, log)
 
