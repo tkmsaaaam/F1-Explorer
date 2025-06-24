@@ -180,7 +180,7 @@ def gap_to_ahead(log: Logger, filepath: str, filename: str, session: Session, r:
         x = sorted(laps.keys())
         y = [laps[lap] for lap in x]
         ax.plot(x, y, color=fastf1.plotting.get_team_color(driver.TeamName, session), label=driver.Abbreviation,
-                linestyle=line_style, linewidth=0.75)
+                linestyle=line_style, linewidth=1)
     ax.legend(fontsize='small')
     ax.set_ylim(top=0, bottom=30)
     util.save(fig, ax, f"{filepath}/{filename}.png", log)
@@ -222,7 +222,7 @@ def gap_to_top(log: Logger, filepath: str, filename: str, session: Session, r: i
         x = sorted(laps.keys())
         y = [laps[lap] for lap in x]
         ax.plot(x, y, color=fastf1.plotting.get_team_color(driver.TeamName, session), label=driver.Abbreviation,
-                linestyle=line_style, linewidth=0.75)
+                linestyle=line_style, linewidth=1)
 
     ax.legend(fontsize='small')
     ax.invert_yaxis()
@@ -258,7 +258,7 @@ def positions(log: Logger, filepath: str, session: Session):
         x = sorted(laps.keys())
         y = [laps[lap] for lap in x]
         ax.plot(x, y, color=fastf1.plotting.get_team_color(driver.TeamName, session), label=driver.Abbreviation,
-                linestyle=line_style, linewidth=0.75)
+                linestyle=line_style, linewidth=1)
 
     ax.legend(fontsize='small')
     ax.invert_yaxis()

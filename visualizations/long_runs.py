@@ -45,9 +45,9 @@ def plot_by_tyre_age_and_tyre(session: Session, log: Logger):
                 y.append(stint_laps.LapTime.iloc[i].total_seconds())
             line_style = "solid" if config.camera_info_2025.get(driver_number, 'black') == "black" else "dashed"
             if driver_number in legends:
-                ax.plot(x, y, linewidth=0.75, color=color, linestyle=line_style)
+                ax.plot(x, y, linewidth=1, color=color, linestyle=line_style)
             else:
-                ax.plot(x, y, linewidth=0.75, color=color, label=driver_name, linestyle=line_style)
+                ax.plot(x, y, linewidth=1, color=color, label=driver_name, linestyle=line_style)
                 legends.add(driver_number)
         ax.legend(fontsize='small')
         ax.invert_yaxis()
