@@ -47,7 +47,7 @@ def laptime(log: Logger, filepath: str, filename: str, session: Session, r: int)
     fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150)
     grouped = session.laps.groupby(['DriverNumber'])
     for _, stint_laps in grouped:
-        if len(stint_laps) < 1:
+        if stint_laps.empty:
             continue
         driver_name = stint_laps.Driver.iloc[0]
         color = fastf1.plotting.get_team_color(stint_laps.Team.iloc[0], session)
@@ -77,7 +77,7 @@ def laptime_diff(log: Logger, filepath: str, session: Session):
     fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150)
     grouped = session.laps.groupby(['DriverNumber'])
     for _, stint_laps in grouped:
-        if len(stint_laps) < 1:
+        if stint_laps.empty:
             continue
         driver_name = stint_laps.Driver.iloc[0]
         color = fastf1.plotting.get_team_color(stint_laps.Team.iloc[0], session)

@@ -27,7 +27,7 @@ def plot_best_laptime(session: Session, driver_numbers: list[int], log: Logger, 
     for driver_number in driver_numbers:
         minimum = 100
         laps = session.laps.pick_drivers(driver_number).sort_values(by='LapNumber')
-        if len(laps) < 1:
+        if laps.empty:
             continue
         driver_name = laps.Driver.iloc[0]
         color = fastf1.plotting.get_team_color(laps.Team.iloc[0], session)
@@ -74,7 +74,7 @@ def plot_best_speed(session: Session, driver_numbers: list[int], log: Logger, ke
     for driver_number in driver_numbers:
         maximum = 0
         laps = session.laps.pick_drivers(driver_number).sort_values(by='LapNumber')
-        if len(laps) < 1:
+        if laps.empty:
             continue
         driver_name = laps.Driver.iloc[0]
         color = fastf1.plotting.get_team_color(laps.Team.iloc[0], session)
@@ -165,7 +165,7 @@ def plot_ideal_best(session: Session, driver_numbers: list[int], log: Logger):
         sec1 = 60
         sec2 = 60
         sec3 = 60
-        if len(laps) < 1:
+        if laps.empty:
             continue
         acronym = laps.Driver.iloc[0]
         color = fastf1.plotting.get_team_color(laps.Team.iloc[0], session)
@@ -205,7 +205,7 @@ def plot_ideal_best_diff(session: Session, driver_numbers: list[int], log: Logge
         sec1 = 60
         sec2 = 60
         sec3 = 60
-        if len(laps) < 1:
+        if laps.empty:
             continue
         acronym = laps.Driver.iloc[0]
         color = fastf1.plotting.get_team_color(laps.Team.iloc[0], session)
