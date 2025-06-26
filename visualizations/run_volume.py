@@ -49,9 +49,9 @@ def plot_laptime(session: Session, log: Logger):
         session: セッション
         log: ロガー
     """
-    laps = session.laps
     header = ["Lap"] + [session.get_driver(driver_number)['Abbreviation'] for driver_number in session.drivers]
 
+    laps = session.laps
     max_laps = max(len(laps[laps['DriverNumber'] == d]) for d in session.drivers)
     lap_numbers = list(range(1, max_laps + 1))
     data_rows = [lap_numbers]
