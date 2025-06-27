@@ -68,6 +68,14 @@ def plot_best_laptime(session: Session, driver_numbers: list[int], log: Logger, 
 
 
 def plot_best_speed(session: Session, driver_numbers: list[int], log: Logger, key: str):
+    """
+    key（セクター）ごとの最高速をプロットする
+    Args:
+        session: セッション
+        driver_numbers: ドライバーの車番一番
+        log: ロガー
+        key: セクター
+    """
     data = []
     all_minimum = 1000
     all_maximum = 0
@@ -335,6 +343,14 @@ def plot_speed_distance(session: Session, driver_numbers: list[str], circuit_inf
 
 
 def plot_speed_distance_comparison(session: Session, driver_numbers: list[str], circuit_info: CircuitInfo, log: Logger):
+    """
+    スピードを比較
+    Args:
+        session: セッション
+        driver_numbers: ドライバーの車番一覧
+        circuit_info: サーキット
+        log: ロガー
+    """
     drivers_per_fig = 5
     num_groups = math.ceil(len(driver_numbers) / drivers_per_fig)
 

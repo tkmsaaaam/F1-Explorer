@@ -14,6 +14,14 @@ def execute(session: Session, log: Logger, dir_path: str):
 
 
 def plot_weather(session: Session, log: Logger, key: str, filepath: str):
+    """
+    気象情報をプロット
+    Args:
+        session: セッション
+        log: ロガー
+        key: キー
+        filepath: 保存先のパス
+    """
     fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150)
     plt.tight_layout()
     weather = session.weather_data.sort_values('Time')
