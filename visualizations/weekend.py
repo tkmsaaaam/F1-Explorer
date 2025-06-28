@@ -25,15 +25,17 @@ def plot_tyre(year: int, race_number: int, log: Logger):
             driver_laps = laps[laps['DriverNumber'] == driver]
             session_names = []
             bg_colors = []
+            stints = set()
             for i in range(0, len(driver_laps)):
                 lap = driver_laps.iloc[i]
-                if lap.TyreLife != 1:
-                    continue
                 if not lap.FreshTyre:
+                    continue
+                if lap.Stint in stints:
                     continue
                 session_names.append(session_name)
                 compound = lap.Compound
                 bg_colors.append(config.compound_colors.get(compound, "#dddddd"))
+                stints.add(lap.Stint)
             driver_name = session.get_driver(driver)['Abbreviation']
             if len(session_names) > 0:
                 if driver_name in drivers:
