@@ -1,22 +1,8 @@
 import os
-from logging import Logger
-
-from matplotlib import pyplot as plt
-from matplotlib.axes import Axes
-from matplotlib.figure import Figure
 
 
 def join_with_colon(*args) -> str:
     return ' : '.join(args)
-
-
-def save(fig: Figure, ax: Axes, path: str, log: Logger):
-    os.makedirs(os.path.dirname(path), exist_ok=True)
-    fig.tight_layout()
-    ax.grid(True)
-    fig.savefig(path, bbox_inches='tight')
-    log.info(f"Saved plot to {path}")
-    plt.close(fig)
 
 
 def write_to_file_top(filepath: str, content: str):

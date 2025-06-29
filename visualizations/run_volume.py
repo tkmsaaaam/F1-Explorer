@@ -7,7 +7,6 @@ from matplotlib import pyplot as plt
 from plotly import graph_objects
 
 import config
-import util
 
 
 def plot_lap_number_by_timing(session: Session, log: Logger):
@@ -18,7 +17,7 @@ def plot_lap_number_by_timing(session: Session, log: Logger):
         session: 分析対象のセッション
         log: ロガー
     """
-    fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150)
+    fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
     grouped = session.laps.groupby(['Stint', 'DriverNumber'])
     for (stint_num, driver_number), stint_laps in grouped:
         if stint_laps.empty:
@@ -38,8 +37,12 @@ def plot_lap_number_by_timing(session: Session, log: Logger):
                     linestyle="solid" if config.camera_info_2025.get(int(driver_number),
                                                                      'black') == "black" else "dashed")
     ax.legend(fontsize='small')
+    ax.grid(True)
     output_path = f"./images/{session.event.year}/{session.event.RoundNumber}_{session.event.Location}/{session.name.replace(' ', '')}/lap_number_by_timing.png"
-    util.save(fig, ax, output_path, log)
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+    fig.savefig(output_path, bbox_inches='tight')
+    log.info(f"Saved plot to {output_path}")
+    plt.close(fig)
 
 
 def plot_laptime(session: Session, log: Logger):
@@ -99,7 +102,7 @@ def plot_laptime_by_lap_number(session: Session, log: Logger):
         session: 分析対象のセッション
         log: ロガー
     """
-    fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150)
+    fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
     grouped = session.laps.groupby(['DriverNumber'])
     for _, stint_laps in grouped:
         if stint_laps.empty:
@@ -116,8 +119,12 @@ def plot_laptime_by_lap_number(session: Session, log: Logger):
     minimum = session.laps.LapTime.min().total_seconds()
     ax.set_ylim(top=minimum, bottom=minimum * 1.25)
     ax.legend(fontsize='small')
+    ax.grid(True)
     output_path = f"./images/{session.event.year}/{session.event.RoundNumber}_{session.event.Location}/{session.name.replace(' ', '')}/laptime_by_lap_number.png"
-    util.save(fig, ax, output_path, log)
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+    fig.savefig(output_path, bbox_inches='tight')
+    log.info(f"Saved plot to {output_path}")
+    plt.close(fig)
 
 
 def plot_laptime_by_timing(session: Session, log: Logger):
@@ -128,7 +135,7 @@ def plot_laptime_by_timing(session: Session, log: Logger):
         session: 分析対象のセッション
         log: ロガー
     """
-    fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150)
+    fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
     grouped = session.laps.groupby(['DriverNumber'])
     for _, stint_laps in grouped:
         if stint_laps.empty:
@@ -146,4 +153,8 @@ def plot_laptime_by_timing(session: Session, log: Logger):
     ax.set_ylim(top=minimum, bottom=minimum * 1.25)
     output_path = f"./images/{session.event.year}/{session.event.RoundNumber}_{session.event.Location}/{session.name.replace(' ', '')}/laptime_by_timing.png"
     ax.legend(fontsize='small')
-    util.save(fig, ax, output_path, log)
+    ax.grid(True)
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+    fig.savefig(output_path, bbox_inches='tight')
+    log.info(f"Saved plot to {output_path}")
+    plt.close(fig)

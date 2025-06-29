@@ -1,3 +1,4 @@
+import os
 from logging import Logger
 
 import fastf1
@@ -6,7 +7,6 @@ from fastf1.core import Session
 from matplotlib import pyplot as plt
 
 import config
-import util
 
 
 def plot_by_tyre_age_and_tyre(session: Session, log: Logger):
@@ -25,7 +25,7 @@ def plot_by_tyre_age_and_tyre(session: Session, log: Logger):
     for compound in compounds:
         # プロット準備
         fastf1.plotting.setup_mpl(mpl_timedelta_support=True, misc_mpl_mods=False, color_scheme='light')
-        fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150)
+        fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
         laps = all_laps[all_laps.Compound == compound]
         grouped_by_driver = laps.groupby(['DriverNumber', 'Stint'])
         legends = set()
@@ -51,5 +51,9 @@ def plot_by_tyre_age_and_tyre(session: Session, log: Logger):
                 legends.add(driver_number)
         ax.legend(fontsize='small')
         ax.invert_yaxis()
+        ax.grid(True)
         output_path = f"./images/{session.event.year}/{session.event.RoundNumber}_{session.event.Location}/{session.name.replace(' ', '')}/long_runs/{compound}.png"
-        util.save(fig, ax, output_path, log)
+        os.makedirs(os.path.dirname(output_path), exist_ok=True)
+        fig.savefig(output_path, bbox_inches='tight')
+        log.info(f"Saved plot to {output_path}")
+        plt.close(fig)

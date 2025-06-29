@@ -44,7 +44,7 @@ def laptime(log: Logger, filepath: str, filename: str, session: Session, r: int)
         r: y軸の幅
     """
     minimum = session.laps.sort_values(by='LapTime').iloc[0].LapTime.total_seconds()
-    fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150)
+    fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
     grouped = session.laps.groupby(['DriverNumber'])
     for _, stint_laps in grouped:
         if stint_laps.empty:
@@ -60,10 +60,20 @@ def laptime(log: Logger, filepath: str, filename: str, session: Session, r: int)
                 label=driver_name)
     ax.legend(fontsize='small')
     ax.set_ylim(top=minimum, bottom=minimum + 15)
-    util.save(fig, ax, f"{filepath}/{filename}.png", log)
+    ax.grid(True)
+    output_path = f"{filepath}/{filename}.png"
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+    fig.savefig(output_path, bbox_inches='tight')
+    log.info(f"Saved plot to {output_path}")
+    plt.close(fig)
     if r is not None:
         ax.set_ylim(top=minimum, bottom=minimum + r)
-        util.save(fig, ax, f"{filepath}/{filename}_{r}.png", log)
+        ax.grid(True)
+        output_path = f"{filepath}/{filename}_{r}.png"
+        os.makedirs(os.path.dirname(output_path), exist_ok=True)
+        fig.savefig(output_path, bbox_inches='tight')
+        log.info(f"Saved plot to {output_path}")
+        plt.close(fig)
 
 
 def laptime_diff(log: Logger, filepath: str, session: Session):
@@ -74,7 +84,7 @@ def laptime_diff(log: Logger, filepath: str, session: Session):
         filepath: 画像を保存する先のpathとファイル名
         session: セッション
     """
-    fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150)
+    fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
     grouped = session.laps.groupby(['DriverNumber'])
     for _, stint_laps in grouped:
         if stint_laps.empty:
@@ -94,7 +104,11 @@ def laptime_diff(log: Logger, filepath: str, session: Session):
     ax.legend(fontsize='small')
     ax.invert_yaxis()
     ax.set_ylim(bottom=-0.3, top=0.3)
-    util.save(fig, ax, filepath, log)
+    ax.grid(True)
+    os.makedirs(os.path.dirname(filepath), exist_ok=True)
+    fig.savefig(filepath, bbox_inches='tight')
+    log.info(f"Saved plot to {filepath}")
+    plt.close(fig)
 
 
 def gap(log: Logger, filepath: str, session: Session):
@@ -171,7 +185,7 @@ def gap_to_ahead(log: Logger, filepath: str, filename: str, session: Session, r:
             if driver_number not in mapping:
                 mapping[driver_number] = {}
             mapping[driver_number][lap_number] = diff.total_seconds()
-    fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150)
+    fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
     for no, laps in mapping.items():
         if len(laps) < 1:
             continue
@@ -183,10 +197,19 @@ def gap_to_ahead(log: Logger, filepath: str, filename: str, session: Session, r:
                 linestyle=line_style, linewidth=1)
     ax.legend(fontsize='small')
     ax.set_ylim(top=0, bottom=30)
-    util.save(fig, ax, f"{filepath}/{filename}.png", log)
+    ax.grid(True)
+    output_path = f"{filepath}/{filename}.png"
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+    fig.savefig(output_path, bbox_inches='tight')
+    log.info(f"Saved plot to {output_path}")
+    plt.close(fig)
     if r is not None:
         ax.set_ylim(top=0, bottom=r)
-        util.save(fig, ax, f"{filepath}/{filename}_{r}.png", log)
+        output_path = f"{filepath}/{filename}_{r}.png"
+        os.makedirs(os.path.dirname(output_path), exist_ok=True)
+        fig.savefig(output_path, bbox_inches='tight')
+        log.info(f"Saved plot to {output_path}")
+        plt.close(fig)
 
 
 def gap_to_top(log: Logger, filepath: str, filename: str, session: Session, r: int):
@@ -213,7 +236,7 @@ def gap_to_top(log: Logger, filepath: str, filename: str, session: Session, r: i
             if driver_number not in mapping:
                 mapping[driver_number] = {}
             mapping[driver_number][lap_number] = diff.total_seconds()
-    fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150)
+    fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
     for no, laps in mapping.items():
         if len(laps) < 1:
             continue
@@ -227,10 +250,20 @@ def gap_to_top(log: Logger, filepath: str, filename: str, session: Session, r: i
     ax.legend(fontsize='small')
     ax.invert_yaxis()
     ax.set_ylim(top=0, bottom=60)
-    util.save(fig, ax, f"{filepath}/{filename}.png", log)
+    ax.grid(True)
+    output_path = f"{filepath}/{filename}.png"
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+    fig.savefig(output_path, bbox_inches='tight')
+    log.info(f"Saved plot to {output_path}")
+    plt.close(fig)
     if r is not None:
         ax.set_ylim(top=0, bottom=r)
-        util.save(fig, ax, f"{filepath}/{filename}_{r}.png", log)
+        ax.grid(True)
+        output_path = f"{filepath}/{filename}_{r}.png"
+        os.makedirs(os.path.dirname(output_path), exist_ok=True)
+        fig.savefig(output_path, bbox_inches='tight')
+        log.info(f"Saved plot to {output_path}")
+        plt.close(fig)
 
 
 def positions(log: Logger, filepath: str, session: Session):
@@ -249,7 +282,7 @@ def positions(log: Logger, filepath: str, session: Session):
             for _, row in driver_laps.iterrows()
             if not pd.isna(row.Position)
         }
-    fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150)
+    fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
     for no, laps in position_map.items():
         if len(laps) < 1:
             continue
@@ -262,7 +295,11 @@ def positions(log: Logger, filepath: str, session: Session):
 
     ax.legend(fontsize='small')
     ax.invert_yaxis()
-    util.save(fig, ax, filepath, log)
+    ax.grid(True)
+    os.makedirs(os.path.dirname(filepath), exist_ok=True)
+    fig.savefig(filepath, bbox_inches='tight')
+    log.info(f"Saved plot to {filepath}")
+    plt.close(fig)
 
 
 def tyres(session: Session, log: Logger, filepath: str):
@@ -273,7 +310,7 @@ def tyres(session: Session, log: Logger, filepath: str):
         filepath: 画像を保存する先のpathとファイル名
         session: セッション
     """
-    fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150)
+    fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
     driver_y = {}  # ドライバー → Y軸位置
     for i, driver in enumerate(session.drivers):
         driver_laps = session.laps.pick_drivers(driver)
@@ -324,8 +361,11 @@ def tyres(session: Session, log: Logger, filepath: str):
     legend_elements = [Patch(facecolor=color, edgecolor='black', label=compound)
                        for compound, color in config.compound_colors.items()]
     ax.legend(handles=legend_elements, title='Compound', loc='upper right', fontsize='small')
-
-    util.save(fig, ax, filepath, log)
+    ax.grid(True)
+    os.makedirs(os.path.dirname(filepath), exist_ok=True)
+    fig.savefig(filepath, bbox_inches='tight')
+    log.info(f"Saved plot to {filepath}")
+    plt.close(fig)
 
 
 def write_messages(session: Session, logs_path: str):

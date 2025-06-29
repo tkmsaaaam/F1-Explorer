@@ -1,9 +1,8 @@
+import os
 from logging import Logger
 
 from fastf1.core import Session
 from matplotlib import pyplot as plt
-
-import util
 
 
 def execute(session: Session, log: Logger, dir_path: str):
@@ -22,7 +21,7 @@ def plot_weather(session: Session, log: Logger, key: str, filepath: str):
         key: キー
         filepath: 保存先のパス
     """
-    fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150)
+    fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
     plt.tight_layout()
     weather = session.weather_data.sort_values('Time')
 
@@ -30,4 +29,8 @@ def plot_weather(session: Session, log: Logger, key: str, filepath: str):
     y = weather[key].to_list()
     ax.plot(x, y)
     plt.gcf().autofmt_xdate()
-    util.save(fig, ax, filepath, log)
+    ax.grid(True)
+    os.makedirs(os.path.dirname(filepath), exist_ok=True)
+    fig.savefig(filepath, bbox_inches='tight')
+    log.info(f"Saved plot to {filepath}")
+    plt.close(fig)

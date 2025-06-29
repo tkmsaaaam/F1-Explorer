@@ -17,7 +17,6 @@ from matplotlib.colorbar import ColorbarBase
 from matplotlib.pyplot import colormaps
 
 import config
-import util
 
 
 def plot_best_laptime(session: Session, driver_numbers: list[int], log: Logger, key: str):
@@ -125,7 +124,7 @@ def plot_best_speed(session: Session, driver_numbers: list[int], log: Logger, ke
 def plot_flat_out(session: Session, log: Logger):
     driver_numbers = session.laps['DriverNumber'].unique()
     driver_numbers.sort()
-    fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150)
+    fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
     for driver_number in driver_numbers:
         lap = session.laps.pick_drivers(driver_number).pick_fastest()
         if lap is None:
@@ -154,8 +153,12 @@ def plot_flat_out(session: Session, log: Logger):
         color = fastf1.plotting.get_team_color(lap.Team, session)
         ax.scatter(x, y, c=color)
         ax.annotate(lap.Driver, (x, y), fontsize=9, ha='right')
+    ax.grid(True)
     output_path = f"./images/{session.event.year}/{session.event.RoundNumber}_{session.event.Location}/{session.name.replace(' ', '')}/flat_out.png"
-    util.save(fig, ax, output_path, log)
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+    fig.savefig(output_path, bbox_inches='tight')
+    log.info(f"Saved plot to {output_path}")
+    plt.close(fig)
 
 
 def plot_ideal_best(session: Session, driver_numbers: list[int], log: Logger):
@@ -167,7 +170,7 @@ def plot_ideal_best(session: Session, driver_numbers: list[int], log: Logger):
         driver_numbers: セッションに参加している車番一覧
         log: ロガー
     """
-    fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150)
+    fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
     for driver_number in driver_numbers:
         laps = session.laps.pick_drivers(driver_number).sort_values(by='LapNumber')
         sec1 = 60
@@ -194,8 +197,12 @@ def plot_ideal_best(session: Session, driver_numbers: list[int], log: Logger):
         y = sec1 + sec2 + sec3
         ax.scatter(x, y, c=color)
         ax.annotate(acronym, (x, y), fontsize=9, ha='right')
+    ax.grid(True)
     output_path = f"./images/{session.event.year}/{session.event.RoundNumber}_{session.event.Location}/{session.name.replace(' ', '')}/ideal_best.png"
-    util.save(fig, ax, output_path, log)
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+    fig.savefig(output_path, bbox_inches='tight')
+    log.info(f"Saved plot to {output_path}")
+    plt.close(fig)
 
 
 def plot_ideal_best_diff(session: Session, driver_numbers: list[int], log: Logger):
@@ -207,7 +214,7 @@ def plot_ideal_best_diff(session: Session, driver_numbers: list[int], log: Logge
         driver_numbers: セッションに参加している車番一覧
         log: ロガー
     """
-    fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150)
+    fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
     for driver_number in driver_numbers:
         laps = session.laps.pick_drivers(driver_number).sort_values(by='LapNumber')
         sec1 = 60
@@ -234,8 +241,12 @@ def plot_ideal_best_diff(session: Session, driver_numbers: list[int], log: Logge
         x = y - fastest.LapTime.total_seconds()
         ax.scatter(x, y, c=color)
         ax.annotate(acronym, (x, y), fontsize=9, ha='right')
+    ax.grid(True)
     output_path = f"./images/{session.event.year}/{session.event.RoundNumber}_{session.event.Location}/{session.name.replace(' ', '')}/ideal_best_diff.png"
-    util.save(fig, ax, output_path, log)
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+    fig.savefig(output_path, bbox_inches='tight')
+    log.info(f"Saved plot to {output_path}")
+    plt.close(fig)
 
 
 def plot_gear_shift_on_track(session: Session, driver_numbers: list[str], log: Logger):
@@ -247,7 +258,7 @@ def plot_gear_shift_on_track(session: Session, driver_numbers: list[str], log: L
         log: ロガー
     """
     for driver_number in driver_numbers:
-        fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150)
+        fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
         lap = session.laps.pick_drivers(driver_number).pick_fastest()
         if lap is None:
             continue
@@ -273,7 +284,10 @@ def plot_gear_shift_on_track(session: Session, driver_numbers: list[str], log: L
         cbar.set_ticks(np.arange(1.5, 9.5))
         cbar.set_ticklabels(np.arange(1, 9))
         output_path = f"./images/{session.event.year}/{session.event.RoundNumber}_{session.event.Location}/{session.name.replace(' ', '')}/shift_on_track/{driver_number}_{lap.Driver}.png"
-        util.save(fig, ax, output_path, log)
+        os.makedirs(os.path.dirname(output_path), exist_ok=True)
+        fig.savefig(output_path, bbox_inches='tight')
+        log.info(f"Saved plot to {output_path}")
+        plt.close(fig)
 
 
 def plot_speed_and_laptime(session: Session, driver_numbers: list[int], log: Logger):
@@ -288,7 +302,7 @@ def plot_speed_and_laptime(session: Session, driver_numbers: list[int], log: Log
     lap_times = []
     top_speeds = []
     driver_colors = []
-    fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150)
+    fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
     for driver_number in driver_numbers:
         lap = session.laps.pick_drivers(driver_number).pick_fastest()
         if lap is None:
@@ -302,8 +316,12 @@ def plot_speed_and_laptime(session: Session, driver_numbers: list[int], log: Log
         driver_colors.append(fastf1.plotting.get_team_color(lap.Team, session))
 
     ax.scatter(top_speeds, lap_times, c=driver_colors)
+    ax.grid(True)
     output_path = f"./images/{session.event.year}/{session.event.RoundNumber}_{session.event.Location}/{session.name.replace(' ', '')}/speed_and_laptime.png"
-    util.save(fig, ax, output_path, log)
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+    fig.savefig(output_path, bbox_inches='tight')
+    log.info(f"Saved plot to {output_path}")
+    plt.close(fig)
 
 
 def plot_speed_distance(session: Session, driver_numbers: list[str], circuit_info: CircuitInfo, log: Logger):
@@ -317,7 +335,7 @@ def plot_speed_distance(session: Session, driver_numbers: list[str], circuit_inf
         log: ロガー
     """
     for driver_number in driver_numbers:
-        fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150)
+        fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
 
         laps = session.laps.pick_drivers(driver_number).pick_fastest()
         if laps is None:
@@ -337,9 +355,12 @@ def plot_speed_distance(session: Session, driver_numbers: list[str], circuit_inf
             ax.text(corner.Distance, v_min - 30, txt,
                     va='center_baseline', ha='center', size='small')
         ax.set_ylim(v_min - 40, v_max + 20)
-
+        ax.grid(True)
         output_path = f"./images/{session.event.year}/{session.event.RoundNumber}_{session.event.Location}/{session.name.replace(' ', '')}/speed_distance/{driver_number}_{laps.Driver}.png"
-        util.save(fig, ax, output_path, log)
+        os.makedirs(os.path.dirname(output_path), exist_ok=True)
+        fig.savefig(output_path, bbox_inches='tight')
+        log.info(f"Saved plot to {output_path}")
+        plt.close(fig)
 
 
 def plot_speed_distance_comparison(session: Session, driver_numbers: list[str], circuit_info: CircuitInfo, log: Logger):
@@ -355,7 +376,7 @@ def plot_speed_distance_comparison(session: Session, driver_numbers: list[str], 
     num_groups = math.ceil(len(driver_numbers) / drivers_per_fig)
 
     for group_index in range(num_groups):
-        fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150)
+        fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
 
         start = group_index * drivers_per_fig
         end = start + drivers_per_fig
@@ -394,12 +415,15 @@ def plot_speed_distance_comparison(session: Session, driver_numbers: list[str], 
 
         ax.set_ylim(v_min - 40, v_max + 20)
         ax.legend(fontsize='small')
-
+        ax.grid(True)
         output_path = (
             f"./images/{session.event.year}/{session.event.RoundNumber}_{session.event.Location}/"
             f"{session.name.replace(' ', '')}/speed_distance/comparison/{start + 1}_{min(end, len(driver_numbers))}.png"
         )
-        util.save(fig, ax, output_path, log)
+        os.makedirs(os.path.dirname(output_path), exist_ok=True)
+        fig.savefig(output_path, bbox_inches='tight')
+        log.info(f"Saved plot to {output_path}")
+        plt.close(fig)
 
 
 def plot_speed_on_track(session, driver_numbers: list[str], log: Logger):
@@ -422,7 +446,7 @@ def plot_speed_on_track(session, driver_numbers: list[str], log: Logger):
         points = np.array([x, y]).T.reshape(-1, 1, 2)
         segments = np.concatenate([points[:-1], points[1:]], axis=1)
 
-        fig, ax = plt.subplots(sharex=True, sharey=True, figsize=(12.8, 7.2))
+        fig, ax = plt.subplots(sharex=True, sharey=True, figsize=(12.8, 7.2), layout='tight')
         rect = 0, 0.08, 1, 1
         fig.tight_layout(rect=rect)
 
@@ -446,8 +470,12 @@ def plot_speed_on_track(session, driver_numbers: list[str], log: Logger):
         normal_legend = mpl.colors.Normalize(vmin=color.min(), vmax=color.max())
         mpl.colorbar.ColorbarBase(color_bar_axes, norm=normal_legend, cmap=colormap,
                                   orientation="horizontal")
+        ax.grid(True)
         output_path = f"./images/{session.event.year}/{session.event.RoundNumber}_{session.event.Location}/{session.name.replace(' ', '')}/speed_on_track/{driver_number}_{lap.Driver}.png"
-        util.save(fig, ax, output_path, log)
+        os.makedirs(os.path.dirname(output_path), exist_ok=True)
+        fig.savefig(output_path, bbox_inches='tight')
+        log.info(f"Saved plot to {output_path}")
+        plt.close(fig)
 
 
 def _plot_driver_telemetry(session: Session, circuit_info: CircuitInfo, log: Logger,
@@ -455,7 +483,7 @@ def _plot_driver_telemetry(session: Session, circuit_info: CircuitInfo, log: Log
     group_size = 5
     for i in range(0, len(driver_numbers), group_size):
         group = driver_numbers[i:i + group_size]
-        fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150)
+        fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
 
         v_min, v_max = float('inf'), float('-inf')
 
@@ -495,7 +523,10 @@ def _plot_driver_telemetry(session: Session, circuit_info: CircuitInfo, log: Log
             f"./images/{session.event.year}/{session.event.RoundNumber}_{session.event.Location}/"
             f"{session.name.replace(' ', '')}/{key}/{i + 1}-{i + len(group)}.png"
         )
-        util.save(fig, ax, output_path, log)
+        ax.grid(True)
+        os.makedirs(os.path.dirname(output_path), exist_ok=True)
+        fig.savefig(output_path, bbox_inches='tight')
+        log.info(f"Saved plot to {output_path}")
         plt.close(fig)
 
 
@@ -547,7 +578,7 @@ def plot_tyre_age_and_laptime(session: Session, driver_numbers: list[int], log: 
     lap_times = []
     tyre_life_list = []
     driver_colors = []
-    fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150)
+    fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
     for driver_number in driver_numbers:
         lap = session.laps.pick_drivers(driver_number).pick_fastest()
         if lap is None:
@@ -562,4 +593,8 @@ def plot_tyre_age_and_laptime(session: Session, driver_numbers: list[int], log: 
     ax.scatter(tyre_life_list, lap_times, c=driver_colors)
     output_path = f"./images/{session.event.year}/{session.event.RoundNumber}_{session.event.Location}/{session.name.replace(' ', '')}/tyre_age_and_laptime.png"
     fig.gca().invert_yaxis()
-    util.save(fig, ax, output_path, log)
+    ax.grid(True)
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+    fig.savefig(output_path, bbox_inches='tight')
+    log.info(f"Saved plot to {output_path}")
+    plt.close(fig)
