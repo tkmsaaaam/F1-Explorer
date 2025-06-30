@@ -8,6 +8,8 @@ import matplotlib.cm as cm
 import numpy as np
 import pandas
 import plotly.express as px
+import plotly.graph_objects as go
+import plotly.io as pio
 from fastf1 import plotting
 from fastf1.core import Session
 from fastf1.mvapi import CircuitInfo
@@ -17,6 +19,84 @@ from matplotlib.colorbar import ColorbarBase
 from matplotlib.pyplot import colormaps
 
 import config
+
+
+def compute_and_save_corner_tables_plotly(
+        session: Session,
+        filename_base: str,
+        log: Logger
+):
+    corners_df = session.get_circuit_info().corners
+    corners = list(zip(
+        corners_df['Number'].astype(str) + corners_df['Letter'].fillna(''),
+        corners_df['Distance']
+    ))
+    corners.sort(key=lambda x: x[1])
+
+    driver_times = {}
+
+    for driver_number in session.drivers:
+        laps = session.laps.pick_drivers(driver_number).pick_fastest()
+        if laps is None or laps.empty:
+            continue
+
+        car_data = laps.get_car_data().add_distance()
+        times = []
+        for name, dist in corners:
+            before_corner = car_data[car_data['Distance'] < dist]
+            if not before_corner.empty:
+                time_before = before_corner.iloc[-1]['Time'].total_seconds()
+                times.append((name, dist, time_before))
+        driver_times[driver_number] = times
+
+    # 区間タイム表
+    segment_rows = []
+    for i in range(1, len(corners)):
+        name = corners[i][0]
+        dist = corners[i][1] - corners[i - 1][1]
+        row = [name, round(dist, 1)]
+        for driver_number in session.drivers:
+            times = driver_times.get(driver_number)
+            if times and len(times) > i:
+                delta = times[i][2] - times[i - 1][2]
+                row.append(round(delta, 3))
+            else:
+                row.append(None)
+        segment_rows.append(row)
+
+    segment_header = ["corner", "distance"] + [session.get_driver(d).Abbreviation for d in session.drivers]
+    segment_data = list(zip(*segment_rows))  # 転置して列ごとに
+
+    fig_segment = go.Figure(data=[go.Table(
+        header=dict(values=segment_header, fill_color='lightgrey', align='center'),
+        cells=dict(values=segment_data, align='center')
+    )])
+    pio.write_image(fig_segment, f"{filename_base}_segments.png", width=1920, height=1080)
+    log.info(f"Segment table saved to {filename_base}_segments.png")
+
+    # 積算タイム表
+    total_rows = []
+    for i in range(len(corners)):
+        name = corners[i][0]
+        dist = corners[i][1]
+        row = [name, round(dist, 1)]
+        for driver_number in session.drivers:
+            times = driver_times.get(driver_number)
+            if times and len(times) > i:
+                row.append(round(times[i][2], 3))
+            else:
+                row.append(None)
+        total_rows.append(row)
+
+    total_header = ["corner", "distance"] + [session.get_driver(d).Abbreviation for d in session.drivers]
+    total_data = list(zip(*total_rows))
+
+    fig_total = go.Figure(data=[go.Table(
+        header=dict(values=total_header, fill_color='lightgrey', align='center'),
+        cells=dict(values=total_data, align='center')
+    )])
+    pio.write_image(fig_total, f"{filename_base}_totals.png", width=1920, height=1080)
+    log.info(f"Total time table saved to {filename_base}_totals.png")
 
 
 def plot_best_laptime(session: Session, driver_numbers: list[int], log: Logger, key: str):
@@ -478,7 +558,7 @@ def plot_speed_on_track(session, driver_numbers: list[str], log: Logger):
         plt.close(fig)
 
 
-def _plot_driver_telemetry(session: Session, circuit_info: CircuitInfo, log: Logger,
+def _plot_driver_telemetry(session: Session, log: Logger,
                            driver_numbers: list[int], key: str, label, value_func):
     group_size = 5
     for i in range(0, len(driver_numbers), group_size):
@@ -506,7 +586,7 @@ def _plot_driver_telemetry(session: Session, circuit_info: CircuitInfo, log: Log
             v_max = max(v_max, y_data.max())
 
         # コーナー線と番号
-        for _, corner in circuit_info.corners.iterrows():
+        for _, corner in session.get_circuit_info().corners.iterrows():
             ax.axvline(x=corner.Distance, linestyle='dotted', color='grey', linewidth=0.8)
             ax.text(corner.Distance, v_min - (v_max - v_min) * 0.05,
                     f"{corner.Number}{corner.Letter}",
@@ -530,11 +610,10 @@ def _plot_driver_telemetry(session: Session, circuit_info: CircuitInfo, log: Log
         plt.close(fig)
 
 
-def plot_throttle(session: Session, circuit_info: CircuitInfo, log: Logger):
+def plot_throttle(session: Session, log: Logger):
     driver_numbers = session.laps['DriverNumber'].unique()
-    driver_numbers.sort()
     _plot_driver_telemetry(
-        session, circuit_info, log,
+        session, log,
         driver_numbers,
         key='throttle',
         label='Throttle [%]',
@@ -542,11 +621,10 @@ def plot_throttle(session: Session, circuit_info: CircuitInfo, log: Logger):
     )
 
 
-def plot_brake(session: Session, circuit_info: CircuitInfo, log: Logger):
+def plot_brake(session: Session, log: Logger):
     driver_numbers = session.laps['DriverNumber'].unique()
-    driver_numbers.sort()
     _plot_driver_telemetry(
-        session, circuit_info, log,
+        session, log,
         driver_numbers,
         key='brake',
         label='Brake',
@@ -554,16 +632,65 @@ def plot_brake(session: Session, circuit_info: CircuitInfo, log: Logger):
     )
 
 
-def plot_drs(session: Session, circuit_info: CircuitInfo, log: Logger):
+def plot_drs(session: Session, log: Logger):
     driver_numbers = session.laps['DriverNumber'].unique()
-    driver_numbers.sort()
-    _plot_driver_telemetry(
-        session, circuit_info, log,
-        driver_numbers,
-        key='drs',
-        label='DRS',
-        value_func=lambda data: data.DRS.astype(float)
+    _plot_driver_telemetry(session, log,
+                           driver_numbers,
+                           key='drs',
+                           label='DRS',
+                           value_func=lambda data: data.DRS.astype(float)
+                           )
+
+
+def plot_telemetry(session: Session, log: Logger,
+                   driver_numbers: list[int], key: str, label, value_func):
+    fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
+
+    v_min, v_max = float('inf'), float('-inf')
+
+    name = ''
+    for driver_number in driver_numbers:
+        laps = session.laps.pick_drivers(driver_number).pick_fastest()
+        if laps is None or laps.empty:
+            continue
+
+        car_data = laps.get_car_data().add_distance()
+        driver_name = laps.Driver
+        team_color = fastf1.plotting.get_team_color(laps.Team, session)
+        camera_color = config.camera_info_2025.get(int(driver_number), 'black')
+        line_style = 'solid' if camera_color == 'black' else 'dashed'
+
+        y_data = value_func(car_data)
+        ax.plot(car_data.Distance, y_data, label=driver_name,
+                color=team_color, linestyle=line_style)
+
+        v_min = min(v_min, y_data.min())
+        v_max = max(v_max, y_data.max())
+        name = name + f"{driver_name}_"
+
+    # コーナー線と番号
+    for _, corner in session.get_circuit_info().corners.iterrows():
+        ax.axvline(x=corner.Distance, linestyle='dotted', color='grey', linewidth=0.8)
+        ax.text(corner.Distance, v_min - (v_max - v_min) * 0.05,
+                f"{corner.Number}{corner.Letter}",
+                va='center_baseline', ha='center', size='small')
+
+    ax.set_ylim(v_min - 0.1 * (v_max - v_min), v_max + 0.1 * (v_max - v_min))
+    ax.set_ylabel(label)
+    ax.set_xlabel("Distance [m]")
+    ax.grid(True)
+    ax.legend(loc='upper right', fontsize='small')
+    plt.tight_layout()
+
+    output_path = (
+        f"./images/{session.event.year}/{session.event.RoundNumber}_{session.event.Location}/"
+        f"{session.name.replace(' ', '')}/{key}/{name}.png"
     )
+    ax.grid(True)
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+    fig.savefig(output_path, bbox_inches='tight')
+    log.info(f"Saved plot to {output_path}")
+    plt.close(fig)
 
 
 def plot_tyre_age_and_laptime(session: Session, driver_numbers: list[int], log: Logger):
