@@ -46,6 +46,10 @@ if config['Session'].startswith('FP'):
     short_runs.plot_best_speed(session, drivers, log, 'SpeedI2')
     short_runs.plot_best_speed(session, drivers, log, 'SpeedST')
 
+    short_runs.compute_and_save_corner_tables_plotly(session,
+                                                     f"./images/{session.event.year}/{session.event['RoundNumber']}_{session.event.Location}/{session.name.replace(' ', '')}/corner_table",
+                                                     log)
+
     short_runs.plot_flat_out(session, log)
     short_runs.plot_ideal_best(session, drivers, log)
     short_runs.plot_ideal_best_diff(session, drivers, log)
