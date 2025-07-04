@@ -49,6 +49,8 @@ def compute_and_save_corner_tables_plotly(
                 times.append((name, dist, time_before))
         driver_times[driver_number] = times
 
+    abbreviations = [session.get_driver(d).Abbreviation for d in session.drivers]
+
     # 区間タイム表
     segment_rows = []
     for i in range(1, len(corners)):
@@ -64,7 +66,7 @@ def compute_and_save_corner_tables_plotly(
                 row.append(None)
         segment_rows.append(row)
 
-    segment_header = ["corner", "distance"] + [session.get_driver(d).Abbreviation for d in session.drivers]
+    segment_header = ["corner", "distance"] + abbreviations
     segment_data = list(zip(*segment_rows))  # 転置して列ごとに
 
     fig_segment = go.Figure(data=[go.Table(
@@ -73,6 +75,30 @@ def compute_and_save_corner_tables_plotly(
     )])
     pio.write_image(fig_segment, f"{filename_base}_segments.png", width=1920, height=1080)
     log.info(f"Segment table saved to {filename_base}_segments.png")
+
+    # 区間タイム順位表
+    segment_rank_rows = []
+    for row in segment_rows:
+        name, dist = row[0], row[1]
+        segment_times = row[2:]
+        time_with_driver = [(t, d) for t, d in zip(segment_times, session.drivers) if t is not None]
+        sorted_times = sorted(time_with_driver)
+        time_to_rank = {d: rank + 1 for rank, (_, d) in enumerate(sorted_times)}
+
+        rank_row = [name, dist]
+        for d in session.drivers:
+            rank_row.append(time_to_rank.get(d, None))
+        segment_rank_rows.append(rank_row)
+
+    rank_header = ["corner", "distance"] + abbreviations
+    rank_data = list(zip(*segment_rank_rows))
+
+    fig_segment_ranks = go.Figure(data=[go.Table(
+        header=dict(values=rank_header, fill_color='lightgrey', align='center'),
+        cells=dict(values=rank_data, align='center')
+    )])
+    pio.write_image(fig_segment_ranks, f"{filename_base}_segment_ranks.png", width=1920, height=1080)
+    log.info(f"Segment rank table saved to {filename_base}_segment_ranks.png")
 
     # 積算タイム表
     total_rows = []
@@ -88,7 +114,7 @@ def compute_and_save_corner_tables_plotly(
                 row.append(None)
         total_rows.append(row)
 
-    total_header = ["corner", "distance"] + [session.get_driver(d).Abbreviation for d in session.drivers]
+    total_header = ["corner", "distance"] + abbreviations
     total_data = list(zip(*total_rows))
 
     fig_total = go.Figure(data=[go.Table(
