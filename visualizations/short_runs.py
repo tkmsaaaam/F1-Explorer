@@ -123,6 +123,43 @@ def compute_and_save_corner_tables_plotly(
     )])
     pio.write_image(fig_total, f"{filename_base}_totals.png", width=1920, height=1080)
     log.info(f"Total time table saved to {filename_base}_totals.png")
+    # セッション最速ラップドライバーのセグメントタイムを取得
+    best_driver_number = session.laps.pick_fastest().DriverNumber
+    best_driver_segments = []
+    best_times = driver_times.get(best_driver_number)
+    if not best_times or len(best_times) < 2:
+        log.warning("Fastest lap driver has insufficient segment data.")
+    else:
+        for i in range(1, len(best_times)):
+            seg_time = best_times[i][2] - best_times[i - 1][2]
+            best_driver_segments.append(seg_time)
+
+    # ギャップ表の作成
+    segment_gap_rows_to_fastest = []
+    for i in range(1, len(corners)):
+        name = corners[i][0]
+        dist = corners[i][1] - corners[i - 1][1]
+        row = [name, round(dist, 1)]
+        best_time = best_driver_segments[i - 1] if i - 1 < len(best_driver_segments) else None
+        for driver_number in session.drivers:
+            times = driver_times.get(driver_number)
+            if times and len(times) > i and best_time is not None:
+                time = times[i][2] - times[i - 1][2]
+                gap = round(time - best_time, 3)
+                row.append(gap)
+            else:
+                row.append(None)
+        segment_gap_rows_to_fastest.append(row)
+
+    gap_header2 = ["corner", "distance"] + abbreviations
+    gap_data2 = list(zip(*segment_gap_rows_to_fastest))
+
+    fig_segment_gaps2 = go.Figure(data=[go.Table(
+        header=dict(values=gap_header2, fill_color='lightgrey', align='center'),
+        cells=dict(values=gap_data2, align='center')
+    )])
+    pio.write_image(fig_segment_gaps2, f"{filename_base}_gaps_to_fastest_lap.png", width=1920, height=1080)
+    log.info(f"Gaps to fastest lap table saved to {filename_base}_gaps_to_fastest_lap.png")
 
 
 def plot_best_laptime(session: Session, driver_numbers: list[int], log: Logger, key: str):
