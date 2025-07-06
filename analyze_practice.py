@@ -49,7 +49,12 @@ if config['Session'].startswith('FP'):
     short_runs.compute_and_save_corner_tables_plotly(session,
                                                      f"./images/{session.event.year}/{session.event['RoundNumber']}_{session.event.Location}/{session.name.replace(' ', '')}/corner_table",
                                                      log)
-
+    corner_map: dict[str: list[int]] = config["corners"]
+    segments = short_runs.plot_mini_segment(session, log, corner_map, config["separator"])
+    short_runs.compute_and_save_segment_tables_plotly(session,
+                                                      f"./images/{session.event.year}/{session.event['RoundNumber']}_{session.event.Location}/{session.name.replace(' ', '')}/table",
+                                                      segments,
+                                                      log)
     short_runs.plot_flat_out(session, log)
     short_runs.plot_ideal_best(session, drivers, log)
     short_runs.plot_ideal_best_diff(session, drivers, log)
