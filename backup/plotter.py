@@ -49,6 +49,8 @@ def plot_tyres(stint_map: dict):
         driver_stints = stint_map[driver_number]
         for stint_num in sorted(driver_stints.keys()):
             stint = driver_stints[stint_num]
+            if not "TotalLaps" in stint:
+                continue
             width = stint["TotalLaps"]
             if "StartLaps" in stint:
                 width = width - stint["StartLaps"]
@@ -170,7 +172,10 @@ def plot_laptime(dicts: dict, filename: str, d: int):
         all_y.extend(y)
         ax.plot(x, y, **style)
 
-    min_time = min(all_y)
+    if len(all_y) > 0:
+        min_time = min(all_y)
+    else:
+        min_time = 0
     ax.set_ylim(min_time + 20, min_time)
     ax.legend(fontsize='small')
     output_path: str = f"{images_path}/{filename}.png"
@@ -178,7 +183,7 @@ def plot_laptime(dicts: dict, filename: str, d: int):
     fig.savefig(output_path, bbox_inches='tight')
     log.info(f"Saved plot to {output_path}")
     plt.close(fig)
-    if all_y and range is not None:
+    if all_y and d is not None:
         threshold = min_time + d
         capped_max_time = max(v for v in all_y if v <= threshold)
         log.info(f"min: {min_time}, capped max: {capped_max_time}")
