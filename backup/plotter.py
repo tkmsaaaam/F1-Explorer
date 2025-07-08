@@ -5,7 +5,6 @@ import os
 from matplotlib import pyplot as plt
 
 import config
-import util
 
 logging.basicConfig(
     level=logging.INFO,
