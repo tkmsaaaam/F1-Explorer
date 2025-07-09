@@ -20,7 +20,7 @@ log = logging.getLogger(__name__)
 if config['Session'] == 'Q' or config['Session'] == 'SQ':
     fastf1.Cache.enable_cache('./cache')
     session = fastf1.get_session(config['Year'], config['Round'], config['Session'])
-    session.load()
+    session.load(messages=False)
 
     log.info(f"{config['Year']} Race {config['Round']} {session.event.EventName} {config['Session']}")
 

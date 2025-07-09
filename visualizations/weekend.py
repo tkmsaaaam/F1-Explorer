@@ -17,7 +17,7 @@ def plot_tyre(year: int, race_number: int, log: Logger):
         except ValueError:
             continue
         try:
-            session.load()
+            session.load(weather=False, messages=False, telemetry=False)
             laps = session.laps
         except DataNotLoadedError:
             continue

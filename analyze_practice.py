@@ -21,7 +21,7 @@ log = logging.getLogger(__name__)
 
 if config['Session'].startswith('FP'):
     session = fastf1.get_session(config['Year'], config['Round'], config['Session'])
-    session.load()
+    session.load(messages=False)
 
     log.info(f"{session.event.year} Race {session.event['RoundNumber']} {session.event.EventName} {config['Session']}")
 
