@@ -12,7 +12,6 @@ import plotly.graph_objects as go
 import plotly.io as pio
 from fastf1 import plotting
 from fastf1.core import Session
-from fastf1.mvapi import CircuitInfo
 from matplotlib import pyplot as plt
 from matplotlib.collections import LineCollection
 from matplotlib.colorbar import ColorbarBase
@@ -292,11 +291,11 @@ def compute_and_save_corner_tables_plotly(
     log.info(f"Gaps to fastest lap table saved to {filename_base}_gaps_to_fastest_lap.png")
 
 
-def plot_best_laptime(session: Session, driver_numbers: list[int], log: Logger, key: str):
+def plot_best_laptime(session: Session, log: Logger, key: str):
     data = []
     all_minimum = 100
     all_maximum = 0
-    for driver_number in driver_numbers:
+    for driver_number in session.drivers:
         minimum = 100
         laps = session.laps.pick_drivers(driver_number).sort_values(by='LapNumber')
         if laps.empty:
@@ -339,19 +338,18 @@ def plot_best_laptime(session: Session, driver_numbers: list[int], log: Logger, 
     log.info(f"Saved plot to {output_path}")
 
 
-def plot_best_speed(session: Session, driver_numbers: list[int], log: Logger, key: str):
+def plot_best_speed(session: Session, log: Logger, key: str):
     """
     key（セクター）ごとの最高速をプロットする
     Args:
         session: セッション
-        driver_numbers: ドライバーの車番一番
         log: ロガー
         key: セクター
     """
     data = []
     all_minimum = 1000
     all_maximum = 0
-    for driver_number in driver_numbers:
+    for driver_number in session.drivers:
         maximum = 0
         laps = session.laps.pick_drivers(driver_number).sort_values(by='LapNumber')
         if laps.empty:
@@ -434,17 +432,16 @@ def plot_flat_out(session: Session, log: Logger):
     plt.close(fig)
 
 
-def plot_ideal_best(session: Session, driver_numbers: list[int], log: Logger):
+def plot_ideal_best(session: Session, log: Logger):
     """
     y = 理論値
     x = ラップタイム
     Args:
         session: 分析対象のセッション
-        driver_numbers: セッションに参加している車番一覧
         log: ロガー
     """
     fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
-    for driver_number in driver_numbers:
+    for driver_number in session.drivers:
         laps = session.laps.pick_drivers(driver_number).sort_values(by='LapNumber')
         sec1 = 60
         sec2 = 60
@@ -478,17 +475,16 @@ def plot_ideal_best(session: Session, driver_numbers: list[int], log: Logger):
     plt.close(fig)
 
 
-def plot_ideal_best_diff(session: Session, driver_numbers: list[int], log: Logger):
+def plot_ideal_best_diff(session: Session, log: Logger):
     """
     y = ラップタイム - 理論値
     x = ラップタイム
     Args:
         session: 分析対象のセッション
-        driver_numbers: セッションに参加している車番一覧
         log: ロガー
     """
     fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
-    for driver_number in driver_numbers:
+    for driver_number in session.drivers:
         laps = session.laps.pick_drivers(driver_number).sort_values(by='LapNumber')
         sec1 = 60
         sec2 = 60
@@ -522,15 +518,14 @@ def plot_ideal_best_diff(session: Session, driver_numbers: list[int], log: Logge
     plt.close(fig)
 
 
-def plot_gear_shift_on_track(session: Session, driver_numbers: list[str], log: Logger):
+def plot_gear_shift_on_track(session: Session, log: Logger):
     """
     ドライバーごとに最速ラップのシフト変化をコースマップにプロットする
     Args:
         session: 分析対象のセッション
-        driver_numbers: セッションに参加している車番一覧
         log: ロガー
     """
-    for driver_number in driver_numbers:
+    for driver_number in session.drivers:
         fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
         lap = session.laps.pick_drivers(driver_number).pick_fastest()
         if lap is None:
@@ -563,20 +558,19 @@ def plot_gear_shift_on_track(session: Session, driver_numbers: list[str], log: L
         plt.close(fig)
 
 
-def plot_speed_and_laptime(session: Session, driver_numbers: list[int], log: Logger):
+def plot_speed_and_laptime(session: Session, log: Logger):
     """
     y = ラップタイム
     x = 最高速
     Args:
         session: 分析対象のセッション
-        driver_numbers: セッションに参加している車番一覧
         log: ロガー
     """
     lap_times = []
     top_speeds = []
     driver_colors = []
     fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
-    for driver_number in driver_numbers:
+    for driver_number in session.drivers:
         lap = session.laps.pick_drivers(driver_number).pick_fastest()
         if lap is None:
             continue
@@ -597,17 +591,16 @@ def plot_speed_and_laptime(session: Session, driver_numbers: list[int], log: Log
     plt.close(fig)
 
 
-def plot_speed_distance(session: Session, driver_numbers: list[str], circuit_info: CircuitInfo, log: Logger):
+def plot_speed_distance(session: Session, log: Logger):
     """
     y = スピード
     x = 距離
     Args:
         session: 分析対象のセッション
-        driver_numbers: セッションに参加している車番一覧
-        circuit_info: サーキット情報
         log: ロガー
     """
-    for driver_number in driver_numbers:
+    circuit_info = session.get_circuit_info()
+    for driver_number in session.drivers:
         fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
 
         laps = session.laps.pick_drivers(driver_number).pick_fastest()
@@ -636,18 +629,17 @@ def plot_speed_distance(session: Session, driver_numbers: list[str], circuit_inf
         plt.close(fig)
 
 
-def plot_speed_distance_comparison(session: Session, driver_numbers: list[str], circuit_info: CircuitInfo, log: Logger):
+def plot_speed_distance_comparison(session: Session, log: Logger):
     """
     スピードを比較
     Args:
         session: セッション
-        driver_numbers: ドライバーの車番一覧
-        circuit_info: サーキット
         log: ロガー
     """
     drivers_per_fig = 5
+    driver_numbers = session.drivers
     num_groups = math.ceil(len(driver_numbers) / drivers_per_fig)
-
+    circuit_info = session.get_circuit_info()
     for group_index in range(num_groups):
         fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
 
@@ -699,16 +691,15 @@ def plot_speed_distance_comparison(session: Session, driver_numbers: list[str], 
         plt.close(fig)
 
 
-def plot_speed_on_track(session, driver_numbers: list[str], log: Logger):
+def plot_speed_on_track(session: Session, log: Logger):
     """
     ドライバーごとに最速ラップのスピードをグラフにする
     Args:
         session: 分析対象のセッション
-        driver_numbers: セッションに参加している車番一覧
         log: ロガー
     """
     # Uncomparable
-    for driver_number in driver_numbers:
+    for driver_number in session.drivers:
         lap = session.laps.pick_drivers(driver_number).pick_fastest()
         if lap is None:
             continue
@@ -942,20 +933,19 @@ def plot_telemetry(session: Session, log: Logger,
     plt.close(fig)
 
 
-def plot_tyre_age_and_laptime(session: Session, driver_numbers: list[int], log: Logger):
+def plot_tyre_age_and_laptime(session: Session, log: Logger):
     """
     y = ラップタイム
     x = タイヤ使用歴
     Args:
         session: 分析対象のセッション
-        driver_numbers: セッションに参加している車番一覧
         log: ロガー
     """
     lap_times = []
     tyre_life_list = []
     driver_colors = []
     fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
-    for driver_number in driver_numbers:
+    for driver_number in session.drivers:
         lap = session.laps.pick_drivers(driver_number).pick_fastest()
         if lap is None:
             continue

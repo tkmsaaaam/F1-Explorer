@@ -25,8 +25,6 @@ if config['Session'].startswith('FP'):
 
     log.info(f"{session.event.year} Race {session.event['RoundNumber']} {session.event.EventName} {config['Session']}")
 
-    drivers = list(map(int, session.drivers))
-
     weekend.plot_tyre(config['Year'], config['Round'], log)
 
     run_volume.plot_lap_number_by_timing(session, log)
@@ -36,15 +34,15 @@ if config['Session'].startswith('FP'):
 
     long_runs.plot_by_tyre_age_and_tyre(session, log)
 
-    short_runs.plot_best_laptime(session, drivers, log, 'Sector1Time')
-    short_runs.plot_best_laptime(session, drivers, log, 'Sector2Time')
-    short_runs.plot_best_laptime(session, drivers, log, 'Sector3Time')
-    short_runs.plot_best_laptime(session, drivers, log, 'LapTime')
+    short_runs.plot_best_laptime(session, log, 'Sector1Time')
+    short_runs.plot_best_laptime(session, log, 'Sector2Time')
+    short_runs.plot_best_laptime(session, log, 'Sector3Time')
+    short_runs.plot_best_laptime(session, log, 'LapTime')
 
-    short_runs.plot_best_speed(session, drivers, log, 'SpeedFL')
-    short_runs.plot_best_speed(session, drivers, log, 'SpeedI1')
-    short_runs.plot_best_speed(session, drivers, log, 'SpeedI2')
-    short_runs.plot_best_speed(session, drivers, log, 'SpeedST')
+    short_runs.plot_best_speed(session, log, 'SpeedFL')
+    short_runs.plot_best_speed(session, log, 'SpeedI1')
+    short_runs.plot_best_speed(session, log, 'SpeedI2')
+    short_runs.plot_best_speed(session, log, 'SpeedST')
 
     short_runs.compute_and_save_corner_tables_plotly(session,
                                                      f"./images/{session.event.year}/{session.event['RoundNumber']}_{session.event.Location}/{session.name.replace(' ', '')}/corner_table",
@@ -56,14 +54,14 @@ if config['Session'].startswith('FP'):
                                                       segments,
                                                       log)
     short_runs.plot_flat_out(session, log)
-    short_runs.plot_ideal_best(session, drivers, log)
-    short_runs.plot_ideal_best_diff(session, drivers, log)
-    short_runs.plot_gear_shift_on_track(session, session.drivers, log)
-    short_runs.plot_speed_and_laptime(session, drivers, log)
-    short_runs.plot_speed_distance(session, session.drivers, session.get_circuit_info(), log)
-    short_runs.plot_speed_distance_comparison(session, session.drivers, session.get_circuit_info(), log)
-    short_runs.plot_speed_on_track(session, session.drivers, log)
-    short_runs.plot_tyre_age_and_laptime(session, drivers, log)
+    short_runs.plot_ideal_best(session, log)
+    short_runs.plot_ideal_best_diff(session, log)
+    short_runs.plot_gear_shift_on_track(session, log)
+    short_runs.plot_speed_and_laptime(session, log)
+    short_runs.plot_speed_distance(session, log)
+    short_runs.plot_speed_distance_comparison(session, log)
+    short_runs.plot_speed_on_track(session, log)
+    short_runs.plot_tyre_age_and_laptime(session, log)
     short_runs.plot_drs(session, log)
     short_runs.plot_brake(session, log)
     short_runs.plot_throttle(session, log)
