@@ -38,3 +38,5 @@ if config['Session'] == 'SR' or config['Session'] == 'R':
     race.execute(session, log, path, path, None, None, None)
 
     weather.execute(session, log, path)
+else:
+    log.warning(f"{config['Session']} is not R or SR")

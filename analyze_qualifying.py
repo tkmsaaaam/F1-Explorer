@@ -85,3 +85,5 @@ if config['Session'] == 'Q' or config['Session'] == 'SQ':
 
     weather.execute(session, log,
                     f"./images/{session.event.year}/{session.event['RoundNumber']}_{session.event.Location}/{session.name.replace(' ', '')}")
+else:
+    log.warning(f"{config['Session']} is not Q or SQ")
