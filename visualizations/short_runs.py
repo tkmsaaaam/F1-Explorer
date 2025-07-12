@@ -742,6 +742,71 @@ def plot_speed_on_track(session: Session, log: Logger):
         plt.close(fig)
 
 
+def plot_time_distance_comparison(session: Session, log: Logger):
+    """
+    以下を比較
+    y = ラップタイム
+    x = 距離
+    Args:
+        session: セッション
+        log: ロガー
+    """
+    drivers_per_fig = 5
+    driver_numbers = session.drivers
+    num_groups = math.ceil(len(driver_numbers) / drivers_per_fig)
+    circuit_info = session.get_circuit_info()
+    for group_index in range(num_groups):
+        fig, ax = plt.subplots(figsize=(7.2, 12.8), dpi=150, layout='tight')
+
+        start = group_index * drivers_per_fig
+        end = start + drivers_per_fig
+        driver_group = driver_numbers[start:end]
+
+        for driver_number in driver_group:
+            laps = session.laps.pick_drivers(driver_number).pick_fastest()
+            if laps is None:
+                continue
+            car_data = laps.get_car_data().add_distance()
+
+            team_color = fastf1.plotting.get_team_color(laps.Team, session)
+            style = "solid" if config.camera_info_2025.get(int(driver_number), 'black') == "black" else "dashed"
+
+            y = [d.total_seconds() for d in car_data.Time]
+            ax.plot(car_data.Distance, y,
+                    color=team_color, label=laps.Driver, linestyle=style)
+
+        v_min = float('inf')
+        v_max = float('-inf')
+
+        for driver_number in driver_group:
+            laps = session.laps.pick_drivers(driver_number).pick_fastest()
+            if laps is None:
+                continue
+            car_data = laps.get_car_data()
+            v_min = min(v_min, car_data.Time.min().total_seconds())
+            v_max = max(v_max, car_data.Time.max().total_seconds())
+
+        ax.vlines(x=circuit_info.corners.Distance, ymin=v_min, ymax=v_max,
+                  linestyles='dotted', colors='grey')
+
+        for _, corner in circuit_info.corners.iterrows():
+            txt = f"{corner.Number}{corner.Letter}"
+            ax.text(corner.Distance, v_min, txt,
+                    va='center_baseline', ha='center', size='small')
+
+        ax.set_ylim(v_min, v_max)
+        ax.legend(fontsize='small')
+        ax.grid(True)
+        output_path = (
+            f"./images/{session.event.year}/{session.event.RoundNumber}_{session.event.Location}/"
+            f"{session.name.replace(' ', '')}/time_distance/comparison/{start + 1}_{min(end, len(driver_numbers))}.png"
+        )
+        os.makedirs(os.path.dirname(output_path), exist_ok=True)
+        fig.savefig(output_path, bbox_inches='tight')
+        log.info(f"Saved plot to {output_path}")
+        plt.close(fig)
+
+
 def _plot_driver_telemetry(session: Session, log: Logger,
                            driver_numbers: list[int], key: str, label, value_func):
     group_size = 5

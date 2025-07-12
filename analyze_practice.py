@@ -61,6 +61,7 @@ if config['Session'].startswith('FP'):
     short_runs.plot_speed_distance(session, log)
     short_runs.plot_speed_distance_comparison(session, log)
     short_runs.plot_speed_on_track(session, log)
+    short_runs.plot_time_distance_comparison(session, log)
     short_runs.plot_tyre_age_and_laptime(session, log)
     short_runs.plot_drs(session, log)
     short_runs.plot_brake(session, log)
