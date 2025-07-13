@@ -861,6 +861,12 @@ def _plot_driver_telemetry(session: Session, log: Logger,
 
 def plot_mini_segment(session: Session, log: Logger, corner_map: dict[str: list[int]], separators: list[int]) -> list[
     int]:
+    """
+    ミニセグメントをプロットする
+    Args:
+        session: 分析対象のセッション
+        log: ロガー
+    """
     # ベストタイムを記録したドライバーのベストラップを取得
     fastest_lap = session.laps.pick_fastest()
     driver = fastest_lap.Driver
@@ -916,6 +922,13 @@ def plot_mini_segment(session: Session, log: Logger, corner_map: dict[str: list[
 
 
 def plot_throttle(session: Session, log: Logger):
+    """
+    y = スロットル
+    x = 距離
+    Args:
+        session: 分析対象のセッション
+        log: ロガー
+    """
     driver_numbers = session.laps['DriverNumber'].unique()
     _plot_driver_telemetry(
         session, log,
@@ -927,6 +940,13 @@ def plot_throttle(session: Session, log: Logger):
 
 
 def plot_brake(session: Session, log: Logger):
+    """
+    y = ブレーキ
+    x = 距離
+    Args:
+        session: 分析対象のセッション
+        log: ロガー
+    """
     driver_numbers = session.laps['DriverNumber'].unique()
     _plot_driver_telemetry(
         session, log,
@@ -938,6 +958,13 @@ def plot_brake(session: Session, log: Logger):
 
 
 def plot_drs(session: Session, log: Logger):
+    """
+    y = DRS
+    x = 距離
+    Args:
+        session: 分析対象のセッション
+        log: ロガー
+    """
     driver_numbers = session.laps['DriverNumber'].unique()
     _plot_driver_telemetry(session, log,
                            driver_numbers,
@@ -949,6 +976,15 @@ def plot_drs(session: Session, log: Logger):
 
 def plot_telemetry(session: Session, log: Logger,
                    driver_numbers: list[int], key: str, label, value_func):
+    """
+    y = key
+    x = 距離
+    Args:
+        session: 分析対象のセッション
+        log: ロガー
+        driver_numbers: 車番一覧
+        key: プロットするテレメトリーのキー
+    """
     fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
 
     v_min, v_max = float('inf'), float('-inf')
