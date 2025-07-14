@@ -26,6 +26,14 @@ def compute_and_save_segment_tables_plotly(
         segment_boundaries: list[float],
         log: Logger
 ):
+    """
+    mini segmentごとのタイムをプロットする
+    Args:
+        session: セッション
+        filename_base: ファイル名のprefix
+        segment_boundaries: セグメントの境界値一覧
+        log: ロガー
+    """
     segment_boundaries = sorted(segment_boundaries)
     driver_times = {}
     abbreviations = [session.get_driver(d).Abbreviation for d in session.drivers]
@@ -155,6 +163,13 @@ def compute_and_save_corner_tables_plotly(
         filename_base: str,
         log: Logger
 ):
+    """
+    コーナー間のタイムをプロットする
+    Args:
+        session: セッション
+        filename_base: ファイル名のprefix
+        log: ロガー
+    """
     corners_df = session.get_circuit_info().corners
     corners = list(zip(
         corners_df['Number'].astype(str) + corners_df['Letter'].fillna(''),
@@ -292,6 +307,13 @@ def compute_and_save_corner_tables_plotly(
 
 
 def plot_best_laptime(session: Session, log: Logger, key: str):
+    """
+    keyを順位で並べる
+    Args:
+        session: セッション
+        log: ロガー
+        key: 並べる対象
+    """
     data = []
     all_minimum = 100
     all_maximum = 0
@@ -393,6 +415,12 @@ def plot_best_speed(session: Session, log: Logger, key: str):
 
 
 def plot_flat_out(session: Session, log: Logger):
+    """
+    全壊率をプロットする
+    Args:
+        session: セッション
+        log: ロガー
+    """
     driver_numbers = session.laps['DriverNumber'].unique()
     driver_numbers.sort()
     fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
