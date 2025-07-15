@@ -42,9 +42,15 @@ if config['Session'] == 'Q' or config['Session'] == 'SQ':
     short_runs.plot_best_speed(session, log, 'SpeedST')
 
     n = [1, 4, 16, 81]
-    short_runs.compute_and_save_corner_tables_plotly(session,
-                                                     f"./images/{session.event.year}/{session.event['RoundNumber']}_{session.event.Location}/{session.name.replace(' ', '')}/corner_table",
-                                                     log)
+    corners_df = session.get_circuit_info().corners
+    corners = list(
+        corners_df['Distance']
+    )
+    corners.sort()
+    short_runs.compute_and_save_segment_tables_plotly(session,
+                                                      f"./images/{session.event.year}/{session.event['RoundNumber']}_{session.event.Location}/{session.name.replace(' ', '')}/courners_table",
+                                                      corners,
+                                                      log)
 
     corner_map: dict[str: list[int]] = config["corners"]
     segments = short_runs.plot_mini_segment(session, log, corner_map, config["separator"])
