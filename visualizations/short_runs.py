@@ -739,19 +739,16 @@ def _plot_driver_telemetry(session: Session, log: Logger,
         plt.close(fig)
 
 
-def plot_mini_segment(session: Session, log: Logger, corner_map: dict[str: list[int]], separators: list[int]) -> list[
+def make_mini_segment(session: Session, log: Logger, corner_map: dict[str: list[int]], separators: list[int]) -> list[
     int]:
     """
-    ミニセグメントをプロットする
+    ミニセグメント作成する
     Args:
         session: 分析対象のセッション
         log: ロガー
     """
-    # ベストタイムを記録したドライバーのベストラップを取得
     fastest_lap = session.laps.pick_fastest()
-    driver = fastest_lap.Driver
     car_data = fastest_lap.get_telemetry().add_distance()
-
     segment_boundaries = [0.0, car_data['Distance'].iloc[-1]]
 
     corners_df = session.get_circuit_info().corners
@@ -766,6 +763,20 @@ def plot_mini_segment(session: Session, log: Logger, corner_map: dict[str: list[
     for s in separators:
         segment_boundaries.append(s)
     log.info(f"{corner_map} {separators} corners_list: {corners_df}, segment_list: {segment_boundaries}")
+    return segment_boundaries
+
+
+def plot_mini_segment_on_circuit(session: Session, log: Logger, segment_boundaries: list[int]):
+    """
+    ミニセグメントをプロットする
+    Args:
+        session: 分析対象のセッション
+        log: ロガー
+    """
+    # ベストタイムを記録したドライバーのベストラップを取得
+    fastest_lap = session.laps.pick_fastest()
+    driver = fastest_lap.Driver
+    car_data = fastest_lap.get_telemetry().add_distance()
 
     segment_boundaries.sort()
     # プロット
@@ -798,7 +809,6 @@ def plot_mini_segment(session: Session, log: Logger, corner_map: dict[str: list[
     fig.savefig(output_path, bbox_inches='tight')
     log.info(f"Saved plot to {output_path}")
     plt.close(fig)
-    return segment_boundaries
 
 
 def plot_throttle(session: Session, log: Logger):

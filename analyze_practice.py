@@ -54,7 +54,8 @@ if config['Session'].startswith('FP'):
                                                       corners,
                                                       log)
     corner_map: dict[str: list[int]] = config["corners"]
-    segments = short_runs.plot_mini_segment(session, log, corner_map, config["separator"])
+    segments = short_runs.make_mini_segment(session, log, corner_map, config["separator"])
+    short_runs.plot_mini_segment_on_circuit(session, log, segments)
     short_runs.compute_and_save_segment_tables_plotly(session,
                                                       f"./images/{session.event.year}/{session.event['RoundNumber']}_{session.event.Location}/{session.name.replace(' ', '')}/table",
                                                       segments,
