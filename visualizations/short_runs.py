@@ -766,7 +766,7 @@ def make_mini_segment(session: Session, log: Logger, corner_map: dict[str: list[
     return segment_boundaries
 
 
-def plot_mini_segment_on_circuit(session: Session, log: Logger, segment_boundaries: list[int]):
+def plot_mini_segment_on_circuit(session: Session, log: Logger, segment_boundaries: list[int], image_name: str):
     """
     ミニセグメントをプロットする
     Args:
@@ -804,7 +804,7 @@ def plot_mini_segment_on_circuit(session: Session, log: Logger, segment_boundari
     ax.set_title(f"Mini Segments of Best Lap - {driver}")
     ax.axis('off')
 
-    output_path = f"./images/{session.event.year}/{session.event.RoundNumber}_{session.event.Location}/{session.name.replace(' ', '')}/mini_segments.png"
+    output_path = f"./images/{session.event.year}/{session.event.RoundNumber}_{session.event.Location}/{session.name.replace(' ', '')}/{image_name}.png"
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     fig.savefig(output_path, bbox_inches='tight')
     log.info(f"Saved plot to {output_path}")
