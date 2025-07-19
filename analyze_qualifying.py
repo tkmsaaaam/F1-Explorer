@@ -46,6 +46,7 @@ if config['Session'] == 'Q' or config['Session'] == 'SQ':
     corners = list(
         corners_df['Distance']
     )
+    corners.append(0)
     corners.sort()
     short_runs.plot_mini_segment_on_circuit(session, log, corners, 'corners')
     short_runs.compute_and_save_segment_tables_plotly(session,
