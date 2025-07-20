@@ -49,7 +49,7 @@ if config['Session'].startswith('FP'):
         corners_df['Distance']
     )
     corners.append(0)
-    corners.sort()
+    corners.append(session.laps.pick_fastest().get_telemetry().add_distance()['Distance'].iloc[-1])
     short_runs.plot_mini_segment_on_circuit(session, log, corners, 'corners')
     short_runs.compute_and_save_segment_tables_plotly(session,
                                                       f"./images/{session.event.year}/{session.event['RoundNumber']}_{session.event.Location}/{session.name.replace(' ', '')}/courners_table",
