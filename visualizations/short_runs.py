@@ -746,6 +746,8 @@ def make_mini_segment(session: Session, log: Logger, corner_map: dict[str: list[
     Args:
         session: 分析対象のセッション
         log: ロガー
+        corner_map: コーナー
+        separators: コーナー以外の境界
     """
     fastest_lap = session.laps.pick_fastest()
     car_data = fastest_lap.get_telemetry().add_distance()
@@ -772,6 +774,8 @@ def plot_mini_segment_on_circuit(session: Session, log: Logger, segment_boundari
     Args:
         session: 分析対象のセッション
         log: ロガー
+        segment_boundaries: セグメントの境界
+        image_name: 画像名
     """
     # ベストタイムを記録したドライバーのベストラップを取得
     fastest_lap = session.laps.pick_fastest()
@@ -874,6 +878,8 @@ def plot_telemetry(session: Session, log: Logger,
         log: ロガー
         driver_numbers: 車番一覧
         key: プロットするテレメトリーのキー
+        label: プロットするテレメトリーのラベル
+        value_func: プロットするテレメトリー
     """
     fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
 
