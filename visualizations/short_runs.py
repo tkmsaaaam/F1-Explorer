@@ -91,17 +91,12 @@ def compute_and_save_segment_tables_plotly(
         time_with_driver = [(t, d) for t, d in zip(times, session.drivers) if t is not None]
         sorted_times = sorted(time_with_driver)
         time_to_rank = {d: rank + 1 for rank, (_, d) in enumerate(sorted_times)}
-
-        corners_df = session.get_circuit_info().corners
-        filtered = corners_df[
-            (corners_df['Distance'] >= segment_boundaries[i - 1]) & (corners_df['Distance'] <= segment_boundaries[i])
-            ]
-        rank_row = [name, dist, filtered['Number'].tolist()]
+        rank_row = [name, dist]
         for d in session.drivers:
             rank_row.append(time_to_rank.get(d, None))
         segment_rank_rows.append(rank_row)
 
-    rank_header = ["segment", "distance", "corners"] + abbreviations
+    rank_header = ["segment", "distance"] + abbreviations
     rank_data = list(zip(*segment_rank_rows))
 
     fig_ranks = go.Figure(data=[go.Table(
