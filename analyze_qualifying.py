@@ -47,7 +47,7 @@ if config['Session'] == 'Q' or config['Session'] == 'SQ':
     ) + [session.laps.pick_fastest().get_telemetry().add_distance()['Distance'].iloc[-1]]
     short_runs.plot_mini_segment_on_circuit(session, log, corners, 'corners')
     short_runs.compute_and_save_segment_tables_plotly(session,
-                                                      f"./images/{session.event.year}/{session.event['RoundNumber']}_{session.event.Location}/{session.name.replace(' ', '')}/corners_table",
+                                                      f"./images/{session.event.year}/{session.event['RoundNumber']}_{session.event.Location}/{session.name.replace(' ', '')}/corners",
                                                       corners,
                                                       log)
 
@@ -55,7 +55,7 @@ if config['Session'] == 'Q' or config['Session'] == 'SQ':
     segments = short_runs.make_mini_segment(session, log, corner_map, config["separator"])
     short_runs.plot_mini_segment_on_circuit(session, log, segments, 'mini_segments')
     short_runs.compute_and_save_segment_tables_plotly(session,
-                                                      f"./images/{session.event.year}/{session.event['RoundNumber']}_{session.event.Location}/{session.name.replace(' ', '')}/table",
+                                                      f"./images/{session.event.year}/{session.event['RoundNumber']}_{session.event.Location}/{session.name.replace(' ', '')}/mini_segments",
                                                       segments,
                                                       log)
     short_runs.plot_flat_out(session, log)

@@ -80,8 +80,8 @@ def compute_and_save_segment_tables_plotly(
         header=dict(values=segment_header, fill_color='lightgrey', align='center'),
         cells=dict(values=segment_data, align='center')
     )])
-    pio.write_image(fig_segment, f"{filename_base}_segments.png", width=1920, height=1080)
-    log.info(f"Segment table saved to {filename_base}_segments.png")
+    pio.write_image(fig_segment, f"{filename_base}_durations.png", width=1920, height=1080)
+    log.info(f"Segment table saved to {filename_base}_durations.png")
 
     # ランク表
     segment_rank_rows = []
@@ -103,8 +103,8 @@ def compute_and_save_segment_tables_plotly(
         header=dict(values=rank_header, fill_color='lightgrey', align='center'),
         cells=dict(values=rank_data, align='center')
     )])
-    pio.write_image(fig_ranks, f"{filename_base}_segment_ranks.png", width=1920, height=1080)
-    log.info(f"Segment rank table saved to {filename_base}_segment_ranks.png")
+    pio.write_image(fig_ranks, f"{filename_base}_ranks.png", width=1920, height=1080)
+    log.info(f"Segment rank table saved to {filename_base}_ranks.png")
 
     # セッション最速ラップのドライバー
     best_driver_number = session.laps.pick_fastest().DriverNumber
@@ -149,8 +149,8 @@ def compute_and_save_segment_tables_plotly(
         header=dict(values=gap_header, fill_color='lightgrey', align='center'),
         cells=dict(values=gap_data, align='center')
     )])
-    pio.write_image(fig_gap, f"{filename_base}_segment_gaps_to_best.png", width=1920, height=1080)
-    log.info(f"Gap table saved to {filename_base}_segment_gaps_to_best.png")
+    pio.write_image(fig_gap, f"{filename_base}_gaps_to_best.png", width=1920, height=1080)
+    log.info(f"Gap table saved to {filename_base}_gaps_to_best.png")
 
 
 def plot_best_laptime(session: Session, log: Logger, key: str):
