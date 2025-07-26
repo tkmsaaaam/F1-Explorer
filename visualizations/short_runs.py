@@ -188,6 +188,8 @@ def plot_best_laptime(session: Session, log: Logger, key: str):
             key: minimum,
             'Color': color
         })
+    if len(data) == 0:
+        return
     df = pandas.DataFrame(data).sort_values(key)
     fig = px.bar(
         df,
