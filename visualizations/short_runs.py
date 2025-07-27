@@ -162,10 +162,10 @@ def plot_best_laptime(session: Session, log: Logger, key: str):
         key: 並べる対象
     """
     data = []
-    all_minimum = 100
+    all_minimum = 135
     all_maximum = 0
     for driver_number in session.drivers:
-        minimum = 100
+        minimum = 135
         laps = session.laps.pick_drivers(driver_number).sort_values(by='LapNumber')
         if laps.empty:
             continue
@@ -177,7 +177,7 @@ def plot_best_laptime(session: Session, log: Logger, key: str):
                 continue
             if minimum > lap[key].total_seconds():
                 minimum = lap[key].total_seconds()
-        if minimum == 100:
+        if minimum == 135:
             continue
         if all_minimum > minimum:
             all_minimum = minimum
