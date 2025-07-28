@@ -152,6 +152,7 @@ def compute_and_save_segment_tables_plotly(
     pio.write_image(fig_gap, f"{filename_base}_gaps_to_best.png", width=1920, height=1080)
     log.info(f"Gap table saved to {filename_base}_gaps_to_best.png")
 
+MINIMUM_LAPTIME = 135
 
 def plot_best_laptime(session: Session, log: Logger, key: str):
     """
@@ -162,10 +163,10 @@ def plot_best_laptime(session: Session, log: Logger, key: str):
         key: 並べる対象
     """
     data = []
-    all_minimum = 135
+    all_minimum = MINIMUM_LAPTIME
     all_maximum = 0
     for driver_number in session.drivers:
-        minimum = 135
+        minimum = MINIMUM_LAPTIME
         laps = session.laps.pick_drivers(driver_number).sort_values(by='LapNumber')
         if laps.empty:
             continue
@@ -177,7 +178,7 @@ def plot_best_laptime(session: Session, log: Logger, key: str):
                 continue
             if minimum > lap[key].total_seconds():
                 minimum = lap[key].total_seconds()
-        if minimum == 135:
+        if minimum == MINIMUM_LAPTIME:
             continue
         if all_minimum > minimum:
             all_minimum = minimum
