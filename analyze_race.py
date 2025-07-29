@@ -19,8 +19,8 @@ logging.basicConfig(
 )
 log = logging.getLogger(__name__)
 
-if config['Session'] == 'SR' or config['Session'] == 'R':
-    session = fastf1.get_session(config['Year'], config['Round'], 'Race')
+if config['Session'] == 'S' or config['Session'] == 'R':
+    session = fastf1.get_session(config['Year'], config['Round'], config['Session'])
     session.load(telemetry=False)
 
     log.info(f"{session.event.year} Race {session.event.RoundNumber} {session.event.EventName} Race")
