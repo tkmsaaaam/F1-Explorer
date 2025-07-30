@@ -38,4 +38,4 @@ if config['Session'] == 'S' or config['Session'] == 'R':
 
     weather.execute(session, log, path)
 else:
-    log.warning(f"{config['Session']} is not R or SR")
+    log.warning(f"{config['Session']} is not S or SR")
