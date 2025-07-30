@@ -29,7 +29,6 @@ if config['Session'] == 'S' or config['Session'] == 'R':
 
     weekend.plot_tyre(config['Year'], config['Round'], log)
 
-    run_volume.plot_lap_number_by_timing(session, log)
     run_volume.plot_laptime(session, log)
     run_volume.plot_laptime_by_timing(session, log)
     run_volume.plot_laptime_by_lap_number(session, log)
