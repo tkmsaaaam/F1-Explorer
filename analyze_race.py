@@ -19,7 +19,7 @@ logging.basicConfig(
 )
 log = logging.getLogger(__name__)
 
-if config['Session'] == 'S' or config['Session'] == 'R':
+if config['Session'] == 'S' or 'R':
     session = fastf1.get_session(config['Year'], config['Round'], config['Session'])
     session.load(telemetry=False)
 
