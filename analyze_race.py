@@ -20,6 +20,9 @@ logging.basicConfig(
 log = logging.getLogger(__name__)
 
 if config['Session'] == 'S' or 'R':
+    fastf1.logger.LoggingManager.debug = False
+    fastf1.logger.LoggingManager.set_level(logging.WARNING)
+    fastf1.logger.set_log_level(logging.WARNING)
     session = fastf1.get_session(config['Year'], config['Round'], config['Session'])
     session.load(telemetry=False)
 
