@@ -44,7 +44,6 @@ if config['Session'] == 'Q' or 'SQ':
     short_runs.plot_best_speed(session, log, 'SpeedI2')
     short_runs.plot_best_speed(session, log, 'SpeedST')
 
-    n = [1, 4, 16, 81]
     corners = [0] + list(
         session.get_circuit_info().corners['Distance']
     ) + [session.laps.pick_fastest().get_telemetry().add_distance()['Distance'].iloc[-1]]
@@ -74,6 +73,15 @@ if config['Session'] == 'Q' or 'SQ':
     short_runs.plot_drs(session, log)
     short_runs.plot_brake(session, log)
     short_runs.plot_throttle(session, log)
+    n = []
+    teams = set()
+    for driver_number in session.drivers:
+        driver = session.get_driver(driver_number)
+        if driver['TeamName'] not in teams:
+            n.append(driver['DriverNumber'])
+            teams.add(driver['TeamName'])
+        if len(n) > 3:
+            break
     short_runs.plot_telemetry(session, log,
                               n,
                               key='drs',
