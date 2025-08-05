@@ -80,7 +80,7 @@ if config['Session'] == 'Q' or 'SQ':
         if driver['TeamName'] not in teams:
             n.append(driver['DriverNumber'])
             teams.add(driver['TeamName'])
-            log.info(f"{len(n)+1}: {driver['DriverName']}")
+            log.info(f"{len(n)}: {driver['Abbreviation']}")
         if len(n) > 3:
             break
     short_runs.plot_telemetry(session, log,
