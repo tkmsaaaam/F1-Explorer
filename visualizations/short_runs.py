@@ -20,6 +20,19 @@ from matplotlib.pyplot import colormaps
 import config
 
 
+def compute_competitive_drivers(session: Session, log: Logger) -> list[int]:
+    n = []
+    teams = set()
+    for driver_number in session.drivers:
+        driver = session.get_driver(driver_number)
+        if driver['TeamName'] not in teams:
+            n.append(driver['DriverNumber'])
+            teams.add(driver['TeamName'])
+            log.info(f"{len(n)}: {driver['Abbreviation']}")
+        if len(n) > 3:
+            break
+    return n
+
 def compute_and_save_segment_tables_plotly(
         session: Session,
         filename_base: str,

@@ -73,16 +73,8 @@ if config['Session'] == 'Q' or 'SQ':
     short_runs.plot_drs(session, log)
     short_runs.plot_brake(session, log)
     short_runs.plot_throttle(session, log)
-    n = []
-    teams = set()
-    for driver_number in session.drivers:
-        driver = session.get_driver(driver_number)
-        if driver['TeamName'] not in teams:
-            n.append(driver['DriverNumber'])
-            teams.add(driver['TeamName'])
-            log.info(f"{len(n)}: {driver['Abbreviation']}")
-        if len(n) > 3:
-            break
+
+    n = short_runs.compute_competitive_drivers(session, log)
     short_runs.plot_telemetry(session, log,
                               n,
                               key='drs',
