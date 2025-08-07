@@ -21,6 +21,15 @@ import config
 
 
 def compute_competitive_drivers(session: Session, log: Logger) -> list[int]:
+    """
+    トップ4チームの早い方のドライバーの車番を算出する
+    Args:
+        session: セッション
+        log: ログ
+
+    Returns:
+        最速ラップ順に並べた際にトップ4チームの早い方のドライバーの車番
+    """
     n = list[int]
     teams = set()
     for driver_number in session.drivers:
@@ -32,6 +41,7 @@ def compute_competitive_drivers(session: Session, log: Logger) -> list[int]:
         if len(n) > 3:
             break
     return n
+
 
 def compute_and_save_segment_tables_plotly(
         session: Session,
@@ -165,7 +175,9 @@ def compute_and_save_segment_tables_plotly(
     pio.write_image(fig_gap, f"{filename_base}_gaps_to_best.png", width=1920, height=1080)
     log.info(f"Gap table saved to {filename_base}_gaps_to_best.png")
 
+
 MINIMUM_LAPTIME = 135
+
 
 def plot_best_laptime(session: Session, log: Logger, key: str):
     """
