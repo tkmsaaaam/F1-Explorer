@@ -21,7 +21,7 @@ import config
 
 
 def compute_competitive_drivers(session: Session, log: Logger) -> list[int]:
-    n = []
+    n = list[int]
     teams = set()
     for driver_number in session.drivers:
         driver = session.get_driver(driver_number)
