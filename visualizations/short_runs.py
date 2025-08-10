@@ -30,7 +30,7 @@ def compute_competitive_drivers(session: Session, log: Logger) -> list[int]:
     Returns:
         最速ラップ順に並べた際にトップ4チームの早い方のドライバーの車番
     """
-    n = list[int]
+    n = list()
     teams = set()
     for driver_number in session.drivers:
         driver = session.get_driver(driver_number)
