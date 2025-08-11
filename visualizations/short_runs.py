@@ -20,12 +20,13 @@ from matplotlib.pyplot import colormaps
 import config
 
 
-def compute_competitive_drivers(session: Session, log: Logger) -> list[int]:
+def compute_competitive_drivers(session: Session, log: Logger, c: int) -> list[int]:
     """
-    トップ4チームの早い方のドライバーの車番を算出する
+    トップcチームの早い方のドライバーの車番を算出する
     Args:
         session: セッション
         log: ログ
+        c: 何チームのドライバーを比較するか
 
     Returns:
         最速ラップ順に並べた際にトップ4チームの早い方のドライバーの車番
@@ -38,7 +39,7 @@ def compute_competitive_drivers(session: Session, log: Logger) -> list[int]:
             n.append(driver['DriverNumber'])
             teams.add(driver['TeamName'])
             log.info(f"{len(n)}: {driver['TeamName']}'s fastest {driver['Abbreviation']}")
-        if len(n) > 3:
+        if len(n) > c-1:
             break
     return n
 

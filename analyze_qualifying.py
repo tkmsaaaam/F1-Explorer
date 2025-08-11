@@ -74,7 +74,7 @@ if config['Session'] == 'Q' or 'SQ':
     short_runs.plot_brake(session, log)
     short_runs.plot_throttle(session, log)
 
-    n = short_runs.compute_competitive_drivers(session, log)
+    n = short_runs.compute_competitive_drivers(session, log, 4)
     short_runs.plot_telemetry(session, log,
                               n,
                               key='drs',
