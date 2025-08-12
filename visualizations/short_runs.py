@@ -39,7 +39,7 @@ def compute_competitive_drivers(session: Session, log: Logger, c: int) -> list[i
             n.append(driver['DriverNumber'])
             teams.add(driver['TeamName'])
             log.info(f"{len(n)}: {driver['TeamName']}'s fastest {driver['Abbreviation']}")
-        if len(n) > c-1:
+        if len(n) > c - 1:
             break
     return n
 
