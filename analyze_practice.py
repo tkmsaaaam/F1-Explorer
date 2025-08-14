@@ -47,19 +47,20 @@ if config['Session'].startswith('FP'):
     short_runs.plot_best_speed(session, log, 'SpeedI2')
     short_runs.plot_best_speed(session, log, 'SpeedST')
 
+    base_path = f"./images/{session.event.year}/{session.event['RoundNumber']}_{session.event.Location}/{session.name.replace(' ', '')}"
     corners = [0] + list(
         session.get_circuit_info().corners['Distance']
     ) + [session.laps.pick_fastest().get_telemetry().add_distance()['Distance'].iloc[-1]]
     short_runs.plot_mini_segment_on_circuit(session, log, corners, 'corners')
     short_runs.compute_and_save_segment_tables_plotly(session,
-                                                      f"./images/{session.event.year}/{session.event['RoundNumber']}_{session.event.Location}/{session.name.replace(' ', '')}/corners",
+                                                      base_path + "/corners",
                                                       corners,
                                                       log)
     corner_map: dict[str: list[int]] = config["corners"]
     segments = short_runs.make_mini_segment(session, log, corner_map, config["separator"])
     short_runs.plot_mini_segment_on_circuit(session, log, segments, 'mini_segments')
     short_runs.compute_and_save_segment_tables_plotly(session,
-                                                      f"./images/{session.event.year}/{session.event['RoundNumber']}_{session.event.Location}/{session.name.replace(' ', '')}/mini_segments",
+                                                      base_path + "/mini_segments",
                                                       segments,
                                                       log)
     short_runs.plot_flat_out(session, log)
@@ -76,7 +77,6 @@ if config['Session'].startswith('FP'):
     short_runs.plot_brake(session, log)
     short_runs.plot_throttle(session, log)
 
-    weather.execute(session, log,
-                    f"./images/{session.event.year}/{session.event['RoundNumber']}_{session.event.Location}/{session.name.replace(' ', '')}")
+    weather.execute(session, log, base_path)
 else:
     log.warning(f"{config['Session']} is not FP")
