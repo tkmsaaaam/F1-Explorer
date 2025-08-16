@@ -53,7 +53,7 @@ if config['Session'].startswith('FP'):
     ) + [session.laps.pick_fastest().get_telemetry().add_distance()['Distance'].iloc[-1]]
     short_runs.plot_mini_segment_on_circuit(session, log, corners, 'corners')
     short_runs.compute_and_save_segment_tables_plotly(session, base_path + "/corners", corners, log)
-    corner_map: dict[str: list[int]] = config["corners"]
+    corner_map = config["corners"]
     segments = short_runs.make_mini_segment(session, log, corner_map, config["separator"])
     short_runs.plot_mini_segment_on_circuit(session, log, segments, 'mini_segments')
     short_runs.compute_and_save_segment_tables_plotly(session, base_path + "/mini_segments", segments, log)
