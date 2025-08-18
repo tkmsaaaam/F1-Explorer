@@ -8,6 +8,7 @@ schedule = fastf1.get_event_schedule(season, include_testing=False)
 
 standings = {}
 short_event_names = []
+colors = {}
 
 for _, event in schedule.iterrows():
     event_name, round_number = event["EventName"], event["RoundNumber"]
@@ -28,6 +29,9 @@ for _, event in schedule.iterrows():
             driver_row["Position"],
             driver_row["DriverNumber"],
         )
+
+        if driver_number not in colors:
+            colors[driver_number] = race.get_driver(abbreviation).TeamColor
 
         sprint_points = 0
         if sprint is not None:
@@ -52,7 +56,7 @@ for k, v in standings.items():
     for n in v:
         total += n
         y.append(total)
-    ax.plot(x, y, label=k, linewidth=1)
+    ax.plot(x, y, label=k, color='#' + colors.get(k, '000000'), linewidth=1)
 ax.legend(fontsize='small')
 ax.grid(True)
 output_path = f"../images/{season}/standings.png"
@@ -63,7 +67,7 @@ print(f"Saved plot to {output_path}")
 fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
 for k, v in standings.items():
     x = [i for i in range(1, len(v) + 1)]
-    ax.plot(x, v, label=k, linewidth=1)
+    ax.plot(x, v, label=k, color='#' + colors.get(k, '000000'), linewidth=1)
 ax.legend(fontsize='small')
 ax.grid(True)
 output_path = f"../images/{season}/results.png"
