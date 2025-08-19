@@ -23,10 +23,9 @@ for _, event in schedule.iterrows():
         sprint.load(laps=False, telemetry=False, weather=False, messages=False)
 
     for _, driver_row in race.results.iterrows():
-        abbreviation, race_points, race_position, driver_number = (
+        abbreviation, race_points, driver_number = (
             driver_row["Abbreviation"],
             driver_row["Points"],
-            driver_row["Position"],
             driver_row["DriverNumber"],
         )
 
