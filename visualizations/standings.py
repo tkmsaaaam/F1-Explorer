@@ -74,3 +74,33 @@ os.makedirs(os.path.dirname(output_path), exist_ok=True)
 fig.savefig(output_path, bbox_inches='tight')
 plt.close(fig)
 print(f"Saved plot to {output_path}")
+
+champion_number = 0
+champion_point = 0
+for k, v in standings.items():
+    p = 0
+    for i in v:
+        p += i
+    if p > champion_point:
+        champion_point = p
+        champion_number = k
+fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
+for k, v in standings.items():
+    if champion_number == k:
+        continue
+    x = [i for i in range(1, len(v) + 1)]
+    y = []
+    total = 0
+    champion_total = 0
+    for n in range(0, len(v)):
+        total += v[n]
+        champion_total += standings[champion_number][n]
+        y.append(total - champion_total)
+    ax.plot(x, y, label=k, color='#' + colors.get(k, '000000'), linewidth=1)
+ax.legend(fontsize='small')
+ax.grid(True)
+output_path = f"../images/{season}/diffs.png"
+os.makedirs(os.path.dirname(output_path), exist_ok=True)
+fig.savefig(output_path, bbox_inches='tight')
+plt.close(fig)
+print(f"Saved plot to {output_path}")
