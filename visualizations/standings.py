@@ -23,19 +23,18 @@ for _, event in schedule.iterrows():
         sprint.load(laps=False, telemetry=False, weather=False, messages=False)
 
     for _, driver_row in race.results.iterrows():
-        abbreviation, race_points, driver_number = (
-            driver_row["Abbreviation"],
+        race_points, driver_number = (
             driver_row["Points"],
             driver_row["DriverNumber"],
         )
 
         if driver_number not in colors:
-            colors[driver_number] = race.get_driver(abbreviation).TeamColor
+            colors[driver_number] = race.get_driver(driver_number).TeamColor
 
         sprint_points = 0
         if sprint is not None:
             driver_row = sprint.results[
-                sprint.results["Abbreviation"] == abbreviation
+                sprint.results["DriverNumber"] == driver_number
                 ]
             if not driver_row.empty:
                 sprint_points = driver_row["Points"].values[0]
