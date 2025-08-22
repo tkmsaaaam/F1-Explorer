@@ -40,7 +40,7 @@ for _, event in schedule.iterrows():
                 sprint_points = driver_row["Points"].values[0]
 
         if abbreviation not in standings:
-            standings[abbreviation] = [0 for i in range(0, round_number - 1)]
+            standings[abbreviation] = [0] * (round_number - 1)
         standings[abbreviation].append(race_points + sprint_points)
     for k, v in standings.items():
         if len(v) != round_number:
