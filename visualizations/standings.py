@@ -1,7 +1,18 @@
+import logging
 import os
 
 import fastf1.plotting
 from matplotlib import pyplot as plt
+
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(message)s",
+    handlers=[
+        logging.StreamHandler(),
+    ],
+)
+log = logging.getLogger(__name__)
 
 season = 2025
 schedule = fastf1.get_event_schedule(season, include_testing=False)
@@ -61,7 +72,7 @@ output_path = f"../images/{season}/standings.png"
 os.makedirs(os.path.dirname(output_path), exist_ok=True)
 fig.savefig(output_path, bbox_inches='tight')
 plt.close(fig)
-print(f"Saved plot to {output_path}")
+log.info(f"Saved plot to {output_path}")
 fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
 for k, v in standings.items():
     x = [i for i in range(1, len(v) + 1)]
@@ -72,7 +83,7 @@ output_path = f"../images/{season}/results.png"
 os.makedirs(os.path.dirname(output_path), exist_ok=True)
 fig.savefig(output_path, bbox_inches='tight')
 plt.close(fig)
-print(f"Saved plot to {output_path}")
+log.info(f"Saved plot to {output_path}")
 
 champion_number = 0
 champion_point = 0
@@ -102,4 +113,4 @@ output_path = f"../images/{season}/diffs.png"
 os.makedirs(os.path.dirname(output_path), exist_ok=True)
 fig.savefig(output_path, bbox_inches='tight')
 plt.close(fig)
-print(f"Saved plot to {output_path}")
+log.info(f"Saved plot to {output_path}")
