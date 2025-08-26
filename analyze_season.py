@@ -18,12 +18,10 @@ season = 2025
 schedule = fastf1.get_event_schedule(season, include_testing=False)
 
 standings = {}
-short_event_names = []
 colors = {}
 
 for _, event in schedule.iterrows():
     event_name, round_number = event["EventName"], event["RoundNumber"]
-    short_event_names.append(event_name.replace("Grand Prix", "").strip())
 
     race = fastf1.get_session(season, event_name, "R")
     race.load(laps=False, telemetry=False, weather=False, messages=False)
