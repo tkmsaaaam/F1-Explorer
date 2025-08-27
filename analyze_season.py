@@ -4,7 +4,6 @@ import os
 import fastf1.plotting
 from matplotlib import pyplot as plt
 
-
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(levelname)s - %(message)s",
@@ -32,7 +31,8 @@ for _, event in schedule.iterrows():
         sprint.load(laps=False, telemetry=False, weather=False, messages=False)
 
     for _, driver_row in race.results.iterrows():
-        race_points, abbreviation = (
+        driver_number, race_points, abbreviation = (
+            driver_row["DriverNumber"],
             driver_row["Points"],
             driver_row["Abbreviation"],
         )
@@ -42,11 +42,7 @@ for _, event in schedule.iterrows():
 
         sprint_points = 0
         if sprint is not None:
-            driver_row = sprint.results[
-                sprint.results["Abbreviation"] == abbreviation
-                ]
-            if not driver_row.empty:
-                sprint_points = driver_row["Points"].values[0]
+            sprint_points = sprint.results.Points.get(driver_number, 0)
 
         if abbreviation not in standings:
             standings[abbreviation] = [0] * (round_number - 1)
