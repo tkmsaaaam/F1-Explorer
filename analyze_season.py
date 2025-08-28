@@ -53,13 +53,8 @@ for _, event in schedule.iterrows():
 
 fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
 for k, v in standings.items():
-    x = [i for i in range(1, len(v) + 1)]
-    y = []
-    total = 0
-    for n in v:
-        total += n
-        y.append(total)
-    ax.plot(x, y, label=k, color='#' + colors.get(k, '000000'), linewidth=1)
+    ax.plot([i for i in range(1, len(v) + 1)], [sum(v[:i + 1]) for i in range(len(v))], label=k,
+            color='#' + colors.get(k, '000000'), linewidth=1)
 ax.legend(fontsize='small')
 ax.grid(True)
 output_path = f"../images/{season}/standings.png"
