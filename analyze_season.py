@@ -1,5 +1,6 @@
 import logging
 import os
+from itertools import accumulate
 
 import fastf1.plotting
 from matplotlib import pyplot as plt
@@ -74,28 +75,18 @@ fig.savefig(output_path, bbox_inches='tight')
 plt.close(fig)
 log.info(f"Saved plot to {output_path}")
 
-champion_number = 0
-champion_point = 0
+champion_number, champion_point = max(
+    ((k, sum(v)) for k, v in standings.items()),
+    key=lambda item: item[1]
+)
+fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout="tight")
+champion_sum = list(accumulate(standings[champion_number]))
 for k, v in standings.items():
-    p = 0
-    for i in v:
-        p += i
-    if p > champion_point:
-        champion_point = p
-        champion_number = k
-fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
-for k, v in standings.items():
-    if champion_number == k:
+    if k == champion_number:
         continue
-    x = [i for i in range(1, len(v) + 1)]
-    y = []
-    total = 0
-    champion_total = 0
-    for n in range(0, len(v)):
-        total += v[n]
-        champion_total += standings[champion_number][n]
-        y.append(total - champion_total)
-    ax.plot(x, y, label=k, color='#' + colors.get(k, '000000'), linewidth=1)
+    x = range(1, len(v) + 1)
+    diff = [a - b for a, b in zip(accumulate(v), champion_sum)]
+    ax.plot(x, diff, label=k, color="#" + colors.get(k, "000000"), linewidth=1)
 ax.legend(fontsize='small')
 ax.grid(True)
 output_path = f"../images/{season}/diffs.png"
