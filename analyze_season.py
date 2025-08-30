@@ -48,9 +48,8 @@ for _, event in schedule.iterrows():
         if abbreviation not in standings:
             standings[abbreviation] = [0] * (round_number - 1)
         standings[abbreviation].append(race_points + sprint_points)
-    for k, v in standings.items():
-        if len(v) != round_number:
-            v.append(0)
+    for v in standings.values():
+        v.extend([0] * (round_number - len(v)))
 
 fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
 for k, v in standings.items():
