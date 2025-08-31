@@ -57,7 +57,7 @@ for k, v in standings.items():
             color='#' + colors.get(k, '000000'), linewidth=1)
 ax.legend(fontsize='small')
 ax.grid(True)
-output_path = f"../images/{season}/standings.png"
+output_path = f"./images/{season}/standings.png"
 os.makedirs(os.path.dirname(output_path), exist_ok=True)
 fig.savefig(output_path, bbox_inches='tight')
 plt.close(fig)
@@ -68,7 +68,7 @@ for k, v in standings.items():
     ax.plot(x, v, label=k, color='#' + colors.get(k, '000000'), linewidth=1)
 ax.legend(fontsize='small')
 ax.grid(True)
-output_path = f"../images/{season}/results.png"
+output_path = f"./images/{season}/results.png"
 os.makedirs(os.path.dirname(output_path), exist_ok=True)
 fig.savefig(output_path, bbox_inches='tight')
 plt.close(fig)
@@ -88,7 +88,7 @@ for k, v in standings.items():
     ax.plot(x, diff, label=k, color="#" + colors.get(k, "000000"), linewidth=1)
 ax.legend(fontsize='small')
 ax.grid(True)
-output_path = f"../images/{season}/diffs.png"
+output_path = f"./images/{season}/diffs.png"
 os.makedirs(os.path.dirname(output_path), exist_ok=True)
 fig.savefig(output_path, bbox_inches='tight')
 plt.close(fig)
