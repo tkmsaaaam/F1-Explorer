@@ -113,7 +113,7 @@ def plot_laptime_by_lap_number(session: Session, log: Logger):
         lap_times = stint_laps['LapTime'].dt.total_seconds().tolist()
         lap_numbers = stint_laps['LapNumber']
         ax.plot(lap_numbers, lap_times, color=color,
-                linestyle="solid" if config.camera_info_2025.get(stint_laps.DriverNumber.iloc[0],
+                linestyle="solid" if config.camera_info_2025.get(int(stint_laps.DriverNumber.iloc[0]),
                                                                  'black') == "black" else "dashed",
                 label=driver_name)
     minimum = session.laps.LapTime.min().total_seconds()
