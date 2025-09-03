@@ -90,7 +90,7 @@ def plot_laptime(session: Session, log: Logger):
 
     output_path = f"./images/{session.event.year}/{session.event.RoundNumber}_{session.event.Location}/{session.name.replace(' ', '')}/laptimes.png"
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
-    fig.write_image(output_path, width=1920, height=1620)
+    fig.write_image(output_path, width=1920, height=2160)
     log.info(f"Saved plot to {output_path}")
 
 
