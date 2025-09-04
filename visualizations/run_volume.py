@@ -2,6 +2,7 @@ import os
 from logging import Logger
 
 import fastf1.plotting
+import pandas
 from fastf1.core import Session
 from matplotlib import pyplot as plt
 from plotly import graph_objects
@@ -144,7 +145,12 @@ def plot_laptime_by_timing(session: Session, log: Logger):
         color = fastf1.plotting.get_team_color(stint_laps.Team.iloc[0], session)
         stint_laps = stint_laps.sort_values(by='LapNumber')
         lap_times = stint_laps['LapTime'].dt.total_seconds().tolist()
-        lap_starts = stint_laps['LapStartDate']
+        if not len(stint_laps['LapStartDate']) > 0:
+            continue
+        if not pandas.isna(stint_laps['LapStartDate'].values[0]):
+            lap_starts = stint_laps['LapStartDate'].values
+        else:
+            lap_starts = stint_laps['LapStartTime'].values
         ax.plot(lap_starts, lap_times, color=color,
                 linestyle="solid" if config.camera_info_2025.get(stint_laps.DriverNumber.iloc[0],
                                                                  'black') == "black" else "dashed",
