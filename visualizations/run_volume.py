@@ -151,6 +151,8 @@ def plot_laptime_by_timing(session: Session, log: Logger):
             lap_starts = stint_laps['LapStartDate'].values
         else:
             lap_starts = stint_laps['LapStartTime'].values
+        if not len(lap_times) > 0:
+            continue
         ax.plot(lap_starts, lap_times, color=color,
                 linestyle="solid" if config.camera_info_2025.get(stint_laps.DriverNumber.iloc[0],
                                                                  'black') == "black" else "dashed",
