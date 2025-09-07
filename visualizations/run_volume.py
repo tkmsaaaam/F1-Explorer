@@ -5,6 +5,7 @@ import fastf1.plotting
 import pandas
 from fastf1.core import Session
 from matplotlib import pyplot as plt
+from numpy import datetime64
 from plotly import graph_objects
 
 import config
@@ -147,7 +148,8 @@ def plot_laptime_by_timing(session: Session, log: Logger):
         lap_times = stint_laps['LapTime'].dt.total_seconds().tolist()
         if not len(stint_laps['LapStartDate']) > 0:
             continue
-        if not pandas.isna(stint_laps['LapStartDate'].values[0]):
+        d: datetime64 = stint_laps['LapStartDate'].values[0]
+        if not pandas.isna(d):
             lap_starts = stint_laps['LapStartDate'].values
         else:
             lap_starts = stint_laps['LapStartTime'].values
