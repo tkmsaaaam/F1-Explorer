@@ -20,6 +20,7 @@ schedule = fastf1.get_event_schedule(season, include_testing=False)
 standings = {}
 colors = {}
 
+schedule = schedule.sort_values(by='RoundNumber')
 for _, event in schedule.iterrows():
     event_name, round_number = event["EventName"], event["RoundNumber"]
 
