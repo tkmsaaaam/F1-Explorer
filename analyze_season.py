@@ -22,7 +22,7 @@ colors = {}
 
 schedule = schedule.sort_values(by='RoundNumber')
 for _, event in schedule.iterrows():
-    event_name, round_number = event["EventName"], event["RoundNumber"]
+    event_name, round_number = event.EventName, event.RoundNumber
 
     race = fastf1.get_session(season, event_name, "R")
     race.load(laps=False, telemetry=False, weather=False, messages=False)
@@ -34,9 +34,9 @@ for _, event in schedule.iterrows():
 
     for _, driver_row in race.results.iterrows():
         driver_number, race_points, abbreviation = (
-            driver_row["DriverNumber"],
-            driver_row["Points"],
-            driver_row["Abbreviation"],
+            driver_row.DriverNumber,
+            driver_row.Points,
+            driver_row.Abbreviation,
         )
 
         if abbreviation not in colors:
