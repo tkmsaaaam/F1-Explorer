@@ -96,3 +96,35 @@ os.makedirs(os.path.dirname(output_path), exist_ok=True)
 fig.savefig(output_path, bbox_inches='tight')
 plt.close(fig)
 log.info(f"Saved plot to {output_path}")
+
+
+grid_positions = {}
+
+for _, event in schedule.iterrows():
+    event_name, round_number = event.EventName, event.RoundNumber
+    qualify = fastf1.get_session(season, event_name, "Q")
+    qualify.load(laps=False, telemetry=False, weather=False, messages=False)
+    for _, driver_row in qualify.results.iterrows():
+        position, abbreviation = (
+            driver_row.Position,
+            driver_row.Abbreviation,
+        )
+
+        if abbreviation not in grid_positions:
+            grid_positions[abbreviation] = [21] * (round_number - 1)
+        grid_positions[abbreviation].append(position)
+    for v in standings.values():
+        v.extend([21] * (round_number - len(v)))
+
+fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
+for k, v in grid_positions.items():
+    ax.plot([i for i in range(1, len(v) + 1)], v, label=k,
+            color='#' + colors.get(k, '000000'), linewidth=1)
+ax.legend(fontsize='small')
+ax.grid(True)
+ax.invert_yaxis()
+output_path = f"{base_dir}/grid_positions.png"
+os.makedirs(os.path.dirname(output_path), exist_ok=True)
+fig.savefig(output_path, bbox_inches='tight')
+plt.close(fig)
+log.info(f"Saved plot to {output_path}")
