@@ -97,7 +97,6 @@ fig.savefig(output_path, bbox_inches='tight')
 plt.close(fig)
 log.info(f"Saved plot to {output_path}")
 
-
 grid_positions = {}
 
 for _, event in schedule.iterrows():
@@ -118,7 +117,7 @@ for _, event in schedule.iterrows():
 
 fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
 for k, v in grid_positions.items():
-    log.info(f"{k}: {sum(v)/len(v)}")
+    log.info(f"{k}: {sum(v) / len(v)}")
     ax.plot([i for i in range(1, len(v) + 1)], v, label=k,
             color='#' + colors.get(k, '000000'), linewidth=1)
 ax.legend(fontsize='small')
