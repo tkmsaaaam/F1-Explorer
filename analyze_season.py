@@ -128,3 +128,33 @@ os.makedirs(os.path.dirname(output_path), exist_ok=True)
 fig.savefig(output_path, bbox_inches='tight')
 plt.close(fig)
 log.info(f"Saved plot to {output_path}")
+
+results = {}
+
+for _, event in schedule.iterrows():
+    event_name, round_number = event.EventName, event.RoundNumber
+    race = fastf1.get_session(season, event_name, "R")
+    race.load(laps=False, telemetry=False, weather=False, messages=False)
+    for _, driver_row in race.results.iterrows():
+        position, grid_position, abbreviation = (
+            driver_row.Position,
+            driver_row.GridPosition,
+            driver_row.Abbreviation,
+        )
+
+        if abbreviation not in results:
+            results[abbreviation] = [0] * (round_number - 1)
+        results[abbreviation].append(grid_position - position)
+    for v in standings.values():
+        v.extend([] * (round_number - len(v)))
+
+fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
+for k, v in results.items():
+    ax.plot([i for i in range(1, len(v) + 1)], v, label=k, color='#' + colors.get(k, '000000'), linewidth=1)
+ax.legend(fontsize='small')
+ax.grid(True)
+output_path = f"{base_dir}/grid_to_results.png"
+os.makedirs(os.path.dirname(output_path), exist_ok=True)
+fig.savefig(output_path, bbox_inches='tight')
+plt.close(fig)
+log.info(f"Saved plot to {output_path}")
