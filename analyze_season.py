@@ -150,11 +150,10 @@ plt.close(fig)
 log.info(f"Saved plot to {output_path}")
 
 fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
+x = [i for i in range(1, latest + 1)]
 for v in drivers:
-    y = []
-    for i in range(1, latest + 1):
-        y.append(results[i]["grid_position"].get(v, 21))
-    ax.plot([i for i in range(1, latest + 1)], y, label=v, color='#' + colors.get(v, '000000'), linewidth=1)
+    y = [results[i]["grid_position"].get(v, 21) for i in range(1, latest + 1)]
+    ax.plot(x, y, label=v, color='#' + colors.get(v, '000000'), linewidth=1)
 ax.legend(fontsize='small')
 ax.grid(True)
 ax.invert_yaxis()
@@ -166,10 +165,8 @@ log.info(f"Saved plot to {output_path}")
 
 fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
 for v in drivers:
-    y = []
-    for i in range(1, latest + 1):
-        y.append(results[i]["grid_position"].get(v, 21) - results[i]["position"].get(v, 21))
-    ax.plot([i for i in range(1, latest + 1)], y, label=v, color='#' + colors.get(v, '000000'), linewidth=1)
+    y = [results[i]["grid_position"].get(v, 21) - results[i]["position"].get(v, 21) for i in range(1, latest + 1)]
+    ax.plot(x, y, label=v, color='#' + colors.get(v, '000000'), linewidth=1)
 ax.legend(fontsize='small')
 ax.grid(True)
 output_path = f"{base_dir}/grid_to_results.png"
