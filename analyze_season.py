@@ -88,13 +88,11 @@ for v in drivers:
     y = []
     s = 0
     for i in range(1, latest + 1):
-        p = results[i]["point"].get(v, 0)
+        sum_point = results[i]["point"].get(v, 0)
         if results[i]["sprint"]:
-            y.append(p + results[i]["sprint_point"].get(v, 0))
-            s += p + results[i]["sprint_point"].get(v, 0)
-        else:
-            y.append(p)
-            s += p
+            sum_point += results[i]["sprint_point"].get(v, 0)
+        y.append(sum_point)
+        s += sum_point
     if s > champion_sum:
         champion_sum = s
         champion = v
@@ -114,9 +112,8 @@ for v in drivers:
     for i in range(1, latest + 1):
         p = results[i]["point"].get(v, 0)
         if results[i]["sprint"]:
-            y.append(p + results[i]["sprint_point"].get(v, 0))
-        else:
-            y.append(p)
+            p += results[i]["sprint_point"].get(v, 0)
+        y.append(p)
     ax.plot([i for i in range(1, latest + 1)], y, label=v, color='#' + colors.get(v, '000000'), linewidth=1)
     if v == champion:
         champion_points = y
@@ -136,9 +133,8 @@ for v in drivers:
     for i in range(1, latest + 1):
         p = results[i]["point"].get(v, 0)
         if results[i]["sprint"]:
-            y.append(p + results[i]["sprint_point"].get(v, 0))
-        else:
-            y.append(p)
+            p += results[i]["sprint_point"].get(v, 0)
+        y.append(p)
     diff = [a - b for a, b in zip(accumulate(y), accumulate(champion_points))]
     ax.plot([i for i in range(1, latest + 1)], diff, label=v, color="#" + colors.get(v, "000000"), linewidth=1)
 ax.legend(fontsize='small')
