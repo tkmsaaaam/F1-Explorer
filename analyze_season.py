@@ -83,19 +83,17 @@ base_dir = f"./images/{season}"
 
 fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
 champion_sum = 0
-champion = ""
+champion_points = []
 for v in drivers:
     y = []
-    s = 0
     for i in range(1, latest + 1):
         sum_point = results[i]["point"].get(v, 0)
         if results[i]["sprint"]:
             sum_point += results[i]["sprint_point"].get(v, 0)
         y.append(sum_point)
-        s += sum_point
-    if s > champion_sum:
-        champion_sum = s
-        champion = v
+    if sum(y) > champion_sum:
+        champion_points = y
+        champion_sum = sum(y)
     ax.plot([i for i in range(1, latest + 1)], [sum(y[:i + 1]) for i in range(len(y))], label=v,
             color='#' + colors.get(v, '000000'), linewidth=1)
 ax.legend(fontsize='small')
@@ -105,8 +103,8 @@ os.makedirs(os.path.dirname(output_path), exist_ok=True)
 fig.savefig(output_path, bbox_inches='tight')
 plt.close(fig)
 log.info(f"Saved plot to {output_path}")
+
 fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
-champion_points = []
 for v in drivers:
     y = []
     for i in range(1, latest + 1):
@@ -115,8 +113,6 @@ for v in drivers:
             p += results[i]["sprint_point"].get(v, 0)
         y.append(p)
     ax.plot([i for i in range(1, latest + 1)], y, label=v, color='#' + colors.get(v, '000000'), linewidth=1)
-    if v == champion:
-        champion_points = y
 ax.legend(fontsize='small')
 ax.grid(True)
 output_path = f"{base_dir}/results.png"
@@ -127,8 +123,6 @@ log.info(f"Saved plot to {output_path}")
 
 fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout="tight")
 for v in drivers:
-    if v == champion:
-        continue
     y = []
     for i in range(1, latest + 1):
         p = results[i]["point"].get(v, 0)
