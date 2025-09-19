@@ -32,9 +32,9 @@ for _, event in schedule.iterrows():
     if round_number not in results:
         results[round_number] = {}
 
-    round = results[round_number]
-    round["name"] = event_name
-    round["date"] = event.EventDate
+    gp = results[round_number]
+    gp["name"] = event_name
+    gp["date"] = event.EventDate
 
     race = fastf1.get_session(season, event_name, "R")
     race.load(laps=False, telemetry=False, weather=False, messages=False)
@@ -43,28 +43,28 @@ for _, event in schedule.iterrows():
     if event["EventFormat"] == "sprint_qualifying":
         sprint = fastf1.get_session(season, event_name, "S")
         sprint.load(laps=False, telemetry=False, weather=False, messages=False)
-        round["sprint"] = True
-        if "sprint_position" not in round:
-            round["sprint_position"] = {}
-        if "sprint_point" not in round:
-            round["sprint_point"] = {}
+        gp["sprint"] = True
+        if "sprint_position" not in gp:
+            gp["sprint_position"] = {}
+        if "sprint_point" not in gp:
+            gp["sprint_point"] = {}
         for _, driver_row in sprint.results.iterrows():
-            round["sprint_position"][driver_row.Abbreviation] = driver_row.Position
-            round["sprint_point"][driver_row.Abbreviation] = driver_row.Points
+            gp["sprint_position"][driver_row.Abbreviation] = driver_row.Position
+            gp["sprint_point"][driver_row.Abbreviation] = driver_row.Points
     else:
-        round["sprint"] = False
+        gp["sprint"] = False
 
-    if "grid_position" not in round:
-        round["grid_position"] = {}
-    if "position" not in round:
-        round["position"] = {}
-    if "point" not in round:
-        round["point"] = {}
+    if "grid_position" not in gp:
+        gp["grid_position"] = {}
+    if "position" not in gp:
+        gp["position"] = {}
+    if "point" not in gp:
+        gp["point"] = {}
     for _, driver_row in race.results.iterrows():
         abbreviation = driver_row.Abbreviation
-        round["grid_position"][abbreviation] = driver_row.GridPosition
-        round["position"][abbreviation] = driver_row.Position
-        round["point"][abbreviation] = driver_row.Points
+        gp["grid_position"][abbreviation] = driver_row.GridPosition
+        gp["position"][abbreviation] = driver_row.Position
+        gp["point"][abbreviation] = driver_row.Points
 
         if abbreviation not in drivers:
             drivers.append(abbreviation)
@@ -82,7 +82,6 @@ for i in range(1, 53):
 base_dir = f"./images/{season}"
 
 fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
-champion_sum = 0
 champion_points = []
 for v in drivers:
     y = []
@@ -91,9 +90,8 @@ for v in drivers:
         if results[i]["sprint"]:
             sum_point += results[i]["sprint_point"].get(v, 0)
         y.append(sum_point)
-    if sum(y) > champion_sum:
+    if sum(y) > sum(champion_points):
         champion_points = y
-        champion_sum = sum(y)
     ax.plot([i for i in range(1, latest + 1)], [sum(y[:i + 1]) for i in range(len(y))], label=v,
             color='#' + colors.get(v, '000000'), linewidth=1)
 ax.legend(fontsize='small')
