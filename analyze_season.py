@@ -27,21 +27,12 @@ results = {}
 
 schedule = schedule.sort_values(by='RoundNumber')
 for _, event in schedule.iterrows():
-    event_name, round_number = event.EventName, event.RoundNumber
+    if event.RoundNumber not in results:
+        results[event.RoundNumber] = {"name": event.EventName, "date": event.EventDate}
 
-    if round_number not in results:
-        results[round_number] = {}
-
-    gp = results[round_number]
-    gp["name"] = event_name
-    gp["date"] = event.EventDate
-
-    race = fastf1.get_session(season, event_name, "R")
-    race.load(laps=False, telemetry=False, weather=False, messages=False)
-
-    sprint = None
+    gp = results[event.RoundNumber]
     if event["EventFormat"] == "sprint_qualifying":
-        sprint = fastf1.get_session(season, event_name, "S")
+        sprint = fastf1.get_session(season, event.EventName, "S")
         sprint.load(laps=False, telemetry=False, weather=False, messages=False)
         gp["sprint"] = True
         if "sprint_position" not in gp:
@@ -60,6 +51,9 @@ for _, event in schedule.iterrows():
         gp["position"] = {}
     if "point" not in gp:
         gp["point"] = {}
+
+    race = fastf1.get_session(season, event.EventName, "R")
+    race.load(laps=False, telemetry=False, weather=False, messages=False)
     for _, driver_row in race.results.iterrows():
         abbreviation = driver_row.Abbreviation
         gp["grid_position"][abbreviation] = driver_row.GridPosition
