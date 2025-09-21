@@ -1,4 +1,5 @@
 import datetime
+import json
 import logging
 import os
 from itertools import accumulate
@@ -15,7 +16,10 @@ logging.basicConfig(
 )
 log = logging.getLogger(__name__)
 
-season = 2025
+with open('./config.json', 'r', encoding='utf-8') as file:
+    config = json.load(file)
+
+season = config["Year"]
 schedule = fastf1.get_event_schedule(season, include_testing=False)
 
 drivers = []
