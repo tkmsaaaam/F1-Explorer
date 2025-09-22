@@ -32,7 +32,7 @@ results = {}
 schedule = schedule.sort_values(by='RoundNumber')
 for _, event in schedule.iterrows():
     if event.RoundNumber not in results:
-        results[event.RoundNumber] = {"name": event.EventName, "date": event.EventDate}
+        results[event.RoundNumber] = {"name": event.EventName, "date": event.EventDate, "grid_position": {}, "position": {}, "point": {}}
 
     gp = results[event.RoundNumber]
     if event["EventFormat"] == "sprint_qualifying":
@@ -48,13 +48,6 @@ for _, event in schedule.iterrows():
             gp["sprint_point"][driver_row.Abbreviation] = driver_row.Points
     else:
         gp["sprint"] = False
-
-    if "grid_position" not in gp:
-        gp["grid_position"] = {}
-    if "position" not in gp:
-        gp["position"] = {}
-    if "point" not in gp:
-        gp["point"] = {}
 
     race = fastf1.get_session(season, event.EventName, "R")
     race.load(laps=False, telemetry=False, weather=False, messages=False)
