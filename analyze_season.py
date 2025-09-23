@@ -23,7 +23,6 @@ season = config["Year"]
 schedule = fastf1.get_event_schedule(season, include_testing=False)
 
 drivers = []
-standings = {}
 colors = {}
 
 # {"round_number": {"name": "Japan", "sprint": true, "sprint_position": {"abbreviation": 1},"grid_position": {"abbreviation": 1}, "position": {"abbreviation": 1}}}
@@ -32,7 +31,8 @@ results = {}
 schedule = schedule.sort_values(by='RoundNumber')
 for _, event in schedule.iterrows():
     if event.RoundNumber not in results:
-        results[event.RoundNumber] = {"name": event.EventName, "date": event.EventDate, "grid_position": {}, "position": {}, "point": {}}
+        results[event.RoundNumber] = {"name": event.EventName, "date": event.EventDate, "grid_position": {},
+                                      "position": {}, "point": {}}
 
     gp = results[event.RoundNumber]
     if event["EventFormat"] == "sprint_qualifying":
