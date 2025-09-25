@@ -72,6 +72,9 @@ def main():
             break
         latest = i
 
+    if latest == 0:
+        return
+
     base_dir = f"./images/{season}"
 
     fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
