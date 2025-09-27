@@ -74,7 +74,7 @@ def main():
 
     fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
     champion_points = []
-    for k, _ in colors.items():
+    for k, v in colors.items():
         y = []
         for i in range(1, latest + 1):
             sum_point = results[i]["point"].get(k, 0)
@@ -84,7 +84,7 @@ def main():
         if sum(y) > sum(champion_points):
             champion_points = y
         ax.plot([i for i in range(1, latest + 1)], [sum(y[:i + 1]) for i in range(len(y))], label=k,
-                color='#' + colors.get(k, '000000'), linewidth=1)
+                color='#' + v, linewidth=1)
     ax.legend(fontsize='small')
     ax.grid(True)
     output_path = f"{base_dir}/standings.png"
@@ -94,14 +94,14 @@ def main():
     log.info(f"Saved plot to {output_path}")
 
     fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
-    for k, _ in colors.items():
+    for k, v in colors.items():
         y = []
         for i in range(1, latest + 1):
             p = results[i]["point"].get(k, 0)
             if results[i]["sprint"]:
                 p += results[i]["sprint_point"].get(k, 0)
             y.append(p)
-        ax.plot([i for i in range(1, latest + 1)], y, label=k, color='#' + colors.get(k, '000000'), linewidth=1)
+        ax.plot([i for i in range(1, latest + 1)], y, label=k, color='#' + v, linewidth=1)
     ax.legend(fontsize='small')
     ax.grid(True)
     output_path = f"{base_dir}/results.png"
@@ -111,7 +111,7 @@ def main():
     log.info(f"Saved plot to {output_path}")
 
     fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout="tight")
-    for k, _ in colors.items():
+    for k, v in colors.items():
         y = []
         for i in range(1, latest + 1):
             p = results[i]["point"].get(k, 0)
@@ -119,7 +119,7 @@ def main():
                 p += results[i]["sprint_point"].get(k, 0)
             y.append(p)
         diff = [a - b for a, b in zip(accumulate(y), accumulate(champion_points))]
-        ax.plot([i for i in range(1, latest + 1)], diff, label=k, color="#" + colors.get(k, "000000"), linewidth=1)
+        ax.plot([i for i in range(1, latest + 1)], diff, label=k, color="#" + v, linewidth=1)
     ax.legend(fontsize='small')
     ax.grid(True)
     output_path = f"{base_dir}/diffs.png"
@@ -130,9 +130,9 @@ def main():
 
     fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
     x = [i for i in range(1, latest + 1)]
-    for k, _ in colors.items():
+    for k, v in colors.items():
         y = [results[i]["grid_position"].get(k, 21) for i in range(1, latest + 1)]
-        ax.plot(x, y, label=k, color='#' + colors.get(k, '000000'), linewidth=1)
+        ax.plot(x, y, label=k, color='#' + v, linewidth=1)
     ax.legend(fontsize='small')
     ax.grid(True)
     ax.invert_yaxis()
@@ -143,9 +143,9 @@ def main():
     log.info(f"Saved plot to {output_path}")
 
     fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
-    for k, _ in colors.items():
+    for k, v in colors.items():
         y = [results[i]["grid_position"].get(k, 21) - results[i]["position"].get(k, 21) for i in range(1, latest + 1)]
-        ax.plot(x, y, label=k, color='#' + colors.get(k, '000000'), linewidth=1)
+        ax.plot(x, y, label=k, color='#' + v, linewidth=1)
     ax.legend(fontsize='small')
     ax.grid(True)
     output_path = f"{base_dir}/grid_to_results.png"
