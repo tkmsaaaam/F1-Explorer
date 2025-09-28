@@ -5,11 +5,6 @@ import fastf1
 
 from visualizations import run_volume, long_runs, short_runs, weather, weekend
 
-with open('./config.json', 'r', encoding='utf-8') as file:
-    config = json.load(file)
-
-fastf1.Cache.enable_cache('./cache')
-
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(levelname)s - %(message)s",  # Log format
@@ -19,7 +14,15 @@ logging.basicConfig(
 )
 log = logging.getLogger(__name__)
 
-if config['Session'].startswith('FP'):
+
+def main():
+    with open('./config.json', 'r', encoding='utf-8') as file:
+        config = json.load(file)
+
+    fastf1.Cache.enable_cache('./cache')
+    if not config['Session'].startswith('FP'):
+        log.warning(f"{config['Session']} is not FP")
+        return
     fastf1.logger.LoggingManager.debug = False
     fastf1.logger.LoggingManager.set_level(logging.WARNING)
     fastf1.logger.set_log_level(logging.WARNING)
@@ -72,5 +75,7 @@ if config['Session'].startswith('FP'):
     short_runs.plot_throttle(session, log)
 
     weather.execute(session, log, base_path)
-else:
-    log.warning(f"{config['Session']} is not FP")
+
+
+if __name__ == "__main__":
+    main()
