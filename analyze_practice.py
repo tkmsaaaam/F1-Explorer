@@ -21,7 +21,7 @@ def main():
 
     fastf1.Cache.enable_cache('./cache')
     if not config['Session'].startswith('FP'):
-        log.warning(f"{config['Session']} is not FP")
+        log.warning(f"{config['Session']} is not FP.  \"Session\" needs to be set to FP.")
         return
     fastf1.logger.LoggingManager.debug = False
     fastf1.logger.LoggingManager.set_level(logging.WARNING)
