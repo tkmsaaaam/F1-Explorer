@@ -5,9 +5,6 @@ import fastf1.plotting
 
 from visualizations import run_volume, short_runs, weather, weekend
 
-with open('./config.json', 'r', encoding='utf-8') as file:
-    config = json.load(file)
-
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(levelname)s - %(message)s",
@@ -17,7 +14,13 @@ logging.basicConfig(
 )
 log = logging.getLogger(__name__)
 
-if config['Session'] == 'Q' or 'SQ':
+
+def main():
+    with open('./config.json', 'r', encoding='utf-8') as file:
+        config = json.load(file)
+    if config['Session'] != 'Q' or 'SQ':
+        log.warning(f"{config['Session']} is not Q or SQ.  \"Session\" needs to be set to Q or SQ.")
+        return
     fastf1.logger.LoggingManager.debug = False
     fastf1.logger.LoggingManager.set_level(logging.WARNING)
     fastf1.logger.set_log_level(logging.WARNING)
@@ -90,5 +93,7 @@ if config['Session'] == 'Q' or 'SQ':
                               )
 
     weather.execute(session, log, base_path)
-else:
-    log.warning(f"{config['Session']} is not Q or SQ")
+
+
+if __name__ == "__main__":
+    main()
