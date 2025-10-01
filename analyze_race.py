@@ -1,34 +1,26 @@
 import json
-import logging
 
 import fastf1
 
+import setup
 from visualizations import weekend, run_volume, weather, race
 
-with open('./config.json', 'r', encoding='utf-8') as file:
-    config = json.load(file)
 
-fastf1.Cache.enable_cache('./cache')
+def main():
+    with open('./config.json', 'r', encoding='utf-8') as file:
+        config = json.load(file)
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(levelname)s - %(message)s",
-    handlers=[
-        logging.StreamHandler(),
-    ],
-)
-log = logging.getLogger(__name__)
+    log = setup.log()
 
-if config['Session'] == 'S' or 'R':
-    fastf1.logger.LoggingManager.debug = False
-    fastf1.logger.LoggingManager.set_level(logging.WARNING)
-    fastf1.logger.set_log_level(logging.WARNING)
+    if config['Session'] != 'S' or 'R':
+        log.warning(f"{config['Session']} is not S or SR")
+        return
+
+    setup.fast_f1()
     session = fastf1.get_session(config['Year'], config['Round'], config['Session'])
     session.load(telemetry=False)
 
     log.info(f"{session.event.year} Race {session.event.RoundNumber} {session.event.EventName} Race")
-
-    drivers = list(map(int, session.drivers))
 
     weekend.plot_tyre(config['Year'], config['Round'], log)
 
@@ -40,5 +32,3 @@ if config['Session'] == 'S' or 'R':
     race.execute(session, log, path, path, None, None, None)
 
     weather.execute(session, log, path)
-else:
-    log.warning(f"{config['Session']} is not S or SR")
