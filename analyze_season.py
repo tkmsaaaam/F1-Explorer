@@ -1,29 +1,23 @@
 import datetime
 import json
-import logging
 import os
 from itertools import accumulate
 
 import fastf1.plotting
 from matplotlib import pyplot as plt
 
+import setup
+
 
 def main():
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s - %(levelname)s - %(message)s",
-        handlers=[
-            logging.StreamHandler(),
-        ],
-    )
-    log = logging.getLogger(__name__)
-
     with open('./config.json', 'r', encoding='utf-8') as file:
         config = json.load(file)
 
     season = config["Year"]
+    setup.fast_f1()
     schedule = fastf1.get_event_schedule(season, include_testing=False)
 
+    log = setup.log()
     colors = {}
 
     # {"round_number": {"name": "Japan", "sprint": true, "sprint_position": {"abbreviation": 1},"grid_position": {"abbreviation": 1}, "position": {"abbreviation": 1}}}

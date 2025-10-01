@@ -1,30 +1,19 @@
 import json
-import logging
 
 import fastf1.plotting
 
+import setup
 from visualizations import run_volume, short_runs, weather, weekend
-
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(levelname)s - %(message)s",
-    handlers=[
-        logging.StreamHandler(),
-    ],
-)
-log = logging.getLogger(__name__)
 
 
 def main():
     with open('./config.json', 'r', encoding='utf-8') as file:
         config = json.load(file)
+    log = setup.log()
     if config['Session'] != 'Q' or 'SQ':
         log.warning(f"{config['Session']} is not Q or SQ.  \"Session\" needs to be set to Q or SQ.")
         return
-    fastf1.logger.LoggingManager.debug = False
-    fastf1.logger.LoggingManager.set_level(logging.WARNING)
-    fastf1.logger.set_log_level(logging.WARNING)
-    fastf1.Cache.enable_cache('./cache')
+    setup.fast_f1()
     session = fastf1.get_session(config['Year'], config['Round'], config['Session'])
     session.load(messages=False)
 
