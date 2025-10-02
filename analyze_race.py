@@ -13,7 +13,7 @@ def main():
     log = setup.log()
 
     if config['Session'] != 'S' or 'R':
-        log.warning(f"{config['Session']} is not S or SR")
+        log.warning(f"{config['Session']} is not S or SR. \"Session\" needs to be set to S or SR.")
         return
 
     setup.fast_f1()
