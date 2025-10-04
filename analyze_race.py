@@ -1,5 +1,3 @@
-import json
-
 import fastf1
 
 import setup
@@ -7,8 +5,7 @@ from visualizations import weekend, run_volume, weather, race
 
 
 def main():
-    with open('./config.json', 'r', encoding='utf-8') as file:
-        config = json.load(file)
+    config = setup.load_config()
 
     log = setup.log()
 

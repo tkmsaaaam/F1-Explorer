@@ -1,5 +1,3 @@
-import json
-
 import fastf1.plotting
 
 import setup
@@ -7,8 +5,7 @@ from visualizations import run_volume, short_runs, weather, weekend
 
 
 def main():
-    with open('./config.json', 'r', encoding='utf-8') as file:
-        config = json.load(file)
+    config = setup.load_config()
     log = setup.log()
     if config['Session'] != 'Q' or 'SQ':
         log.warning(f"{config['Session']} is not Q or SQ.  \"Session\" needs to be set to Q or SQ.")
