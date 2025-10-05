@@ -8,6 +8,10 @@ def main():
     config = setup.load_config()
 
     log = setup.log()
+    if config is None:
+        log.warning("no config")
+        return
+
     if not config['Session'].startswith('FP'):
         log.warning(f"{config['Session']} is not FP.  \"Session\" needs to be set to FP.")
         return

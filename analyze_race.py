@@ -8,6 +8,9 @@ def main():
     config = setup.load_config()
 
     log = setup.log()
+    if config is None:
+        log.warning("no config")
+        return
 
     if config['Session'] != 'S' or 'R':
         log.warning(f"{config['Session']} is not S or SR. \"Session\" needs to be set to S or SR.")

@@ -1,5 +1,4 @@
 import datetime
-import json
 import os
 from itertools import accumulate
 
@@ -10,14 +9,17 @@ import setup
 
 
 def main():
-    with open('./config.json', 'r', encoding='utf-8') as file:
-        config = json.load(file)
+    config = setup.load_config()
+
+    log = setup.log()
+    if config is None:
+        log.warning("no config")
+        return
 
     season = config["Year"]
     setup.fast_f1()
     schedule = fastf1.get_event_schedule(season, include_testing=False)
 
-    log = setup.log()
     colors = {}
 
     # {"round_number": {"name": "Japan", "sprint": true, "sprint_position": {"abbreviation": 1},"grid_position": {"abbreviation": 1}, "position": {"abbreviation": 1}}}

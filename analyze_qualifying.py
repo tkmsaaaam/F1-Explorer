@@ -6,7 +6,12 @@ from visualizations import run_volume, short_runs, weather, weekend
 
 def main():
     config = setup.load_config()
+
     log = setup.log()
+    if config is None:
+        log.warning("no config")
+        return
+
     if config['Session'] != 'Q' or 'SQ':
         log.warning(f"{config['Session']} is not Q or SQ.  \"Session\" needs to be set to Q or SQ.")
         return
