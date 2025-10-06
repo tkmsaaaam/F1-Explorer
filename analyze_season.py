@@ -26,7 +26,10 @@ def main():
     results = {}
 
     schedule = schedule.sort_values(by='RoundNumber')
+    now = datetime.datetime.now()
     for _, event in schedule.iterrows():
+        if now < event.EventDate:
+            continue
         if event.RoundNumber not in results:
             results[event.RoundNumber] = {"name": event.EventName, "date": event.EventDate, "grid_position": {},
                                           "position": {}, "point": {}, "sprint": False}
@@ -55,13 +58,7 @@ def main():
             if abbreviation not in colors:
                 colors[abbreviation] = race.get_driver(abbreviation).TeamColor
 
-    now = datetime.datetime.now()
-    latest = 0
-
-    for i in range(1, 53):
-        if now < results[i]["date"]:
-            break
-        latest = i
+    latest = len(results)
 
     if latest == 0:
         return
