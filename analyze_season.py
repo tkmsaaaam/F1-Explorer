@@ -58,9 +58,9 @@ def main():
             if abbreviation not in colors:
                 colors[abbreviation] = race.get_driver(abbreviation).TeamColor
 
-    latest = len(results)
+    latest = len(results) + 1
 
-    if latest == 0:
+    if latest == 1:
         return
 
     base_dir = f"./images/{season}"
@@ -69,14 +69,14 @@ def main():
     champion_points = []
     for k, v in colors.items():
         y = []
-        for i in range(1, latest + 1):
+        for i in range(1, latest):
             sum_point = results[i]["point"].get(k, 0)
             if results[i]["sprint"]:
                 sum_point += results[i]["sprint_point"].get(k, 0)
             y.append(sum_point)
         if sum(y) > sum(champion_points):
             champion_points = y
-        ax.plot([i for i in range(1, latest + 1)], [sum(y[:i + 1]) for i in range(len(y))], label=k,
+        ax.plot([i for i in range(1, latest)], [sum(y[:i + 1]) for i in range(len(y))], label=k,
                 color='#' + v, linewidth=1)
     ax.legend(fontsize='small')
     ax.grid(True)
@@ -89,12 +89,12 @@ def main():
     fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
     for k, v in colors.items():
         y = []
-        for i in range(1, latest + 1):
+        for i in range(1, latest):
             p = results[i]["point"].get(k, 0)
             if results[i]["sprint"]:
                 p += results[i]["sprint_point"].get(k, 0)
             y.append(p)
-        ax.plot([i for i in range(1, latest + 1)], y, label=k, color='#' + v, linewidth=1)
+        ax.plot([i for i in range(1, latest)], y, label=k, color='#' + v, linewidth=1)
     ax.legend(fontsize='small')
     ax.grid(True)
     output_path = f"{base_dir}/results.png"
@@ -106,13 +106,13 @@ def main():
     fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout="tight")
     for k, v in colors.items():
         y = []
-        for i in range(1, latest + 1):
+        for i in range(1, latest):
             p = results[i]["point"].get(k, 0)
             if results[i]["sprint"]:
                 p += results[i]["sprint_point"].get(k, 0)
             y.append(p)
         diff = [a - b for a, b in zip(accumulate(y), accumulate(champion_points))]
-        ax.plot([i for i in range(1, latest + 1)], diff, label=k, color="#" + v, linewidth=1)
+        ax.plot([i for i in range(1, latest)], diff, label=k, color="#" + v, linewidth=1)
     ax.legend(fontsize='small')
     ax.grid(True)
     output_path = f"{base_dir}/diffs.png"
@@ -122,9 +122,9 @@ def main():
     log.info(f"Saved plot to {output_path}")
 
     fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
-    x = [i for i in range(1, latest + 1)]
+    x = [i for i in range(1, latest)]
     for k, v in colors.items():
-        y = [results[i]["grid_position"].get(k, 21) for i in range(1, latest + 1)]
+        y = [results[i]["grid_position"].get(k, 21) for i in range(1, latest)]
         ax.plot(x, y, label=k, color='#' + v, linewidth=1)
     ax.legend(fontsize='small')
     ax.grid(True)
@@ -137,7 +137,7 @@ def main():
 
     fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
     for k, v in colors.items():
-        y = [results[i]["grid_position"].get(k, 21) - results[i]["position"].get(k, 21) for i in range(1, latest + 1)]
+        y = [results[i]["grid_position"].get(k, 21) - results[i]["position"].get(k, 21) for i in range(1, latest)]
         ax.plot(x, y, label=k, color='#' + v, linewidth=1)
     ax.legend(fontsize='small')
     ax.grid(True)
