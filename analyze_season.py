@@ -4,6 +4,7 @@ from itertools import accumulate
 
 import fastf1.plotting
 from matplotlib import pyplot as plt
+from plotly import graph_objects
 
 import setup
 
@@ -25,9 +26,14 @@ def main():
     # {"round_number": {"name": "Japan", "sprint": true, "sprint_position": {"abbreviation": 1},"grid_position": {"abbreviation": 1}, "position": {"abbreviation": 1}}}
     results = {}
 
+    events = []
     schedule = schedule.sort_values(by='RoundNumber')
     now = datetime.datetime.now()
+    row_colors = []
     for _, event in schedule.iterrows():
+        events.append([event.RoundNumber, event.EventName, event.EventDate])
+        color = "white" if event.RoundNumber % 2 == 0 else "#f2f2f2"  # グレーと白を交互
+        row_colors.append(color)
         if now < event.EventDate:
             continue
         if event.RoundNumber not in results:
@@ -145,6 +151,21 @@ def main():
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     fig.savefig(output_path, bbox_inches='tight')
     plt.close(fig)
+    log.info(f"Saved plot to {output_path}")
+
+    # テーブル描画
+    fig = graph_objects.Figure(data=[graph_objects.Table(
+        header=dict(values=["number", "name", "date"], fill_color='lightgrey', align='center'),
+        cells=dict(values=list(zip(*events)), fill_color=[row_colors], align='center')
+    )])
+    fig.update_layout(
+        autosize=True,
+        margin=dict(autoexpand=True)
+    )
+
+    output_path = f"{base_dir}/events.png"
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+    fig.write_image(output_path, width=1920, height=2160)
     log.info(f"Saved plot to {output_path}")
 
 
