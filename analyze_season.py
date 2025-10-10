@@ -157,7 +157,10 @@ def main():
     plt.close(fig)
     log.info(f"Saved plot to {output_path}")
 
-    # テーブル描画
+    output_path = f"{base_dir}/events.png"
+    if os.path.exists(output_path):
+        return
+        # テーブル描画
     fig = graph_objects.Figure(data=[graph_objects.Table(
         header=dict(values=["number", "name", "date"], fill_color='lightgrey', align='center'),
         cells=dict(values=[numbers, names, dates], fill_color=[row_colors], align='center')
@@ -167,7 +170,6 @@ def main():
         margin=dict(autoexpand=True)
     )
 
-    output_path = f"{base_dir}/events.png"
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     fig.write_image(output_path, width=1920, height=2160)
     log.info(f"Saved plot to {output_path}")
