@@ -31,13 +31,10 @@ def main():
     dates = []
     schedule = schedule.sort_values(by='RoundNumber')
     now = datetime.datetime.now()
-    row_colors = []
     for _, event in schedule.iterrows():
         numbers.append(event.RoundNumber)
         names.append(event.EventName)
         dates.append(event.EventDate)
-        color = "white" if event.RoundNumber % 2 == 0 else "#f2f2f2"  # グレーと白を交互
-        row_colors.append(color)
         if now < event.EventDate:
             continue
         if event.RoundNumber not in results:
@@ -160,10 +157,11 @@ def main():
     output_path = f"{base_dir}/events.png"
     if os.path.exists(output_path):
         return
-        # テーブル描画
     fig = graph_objects.Figure(data=[graph_objects.Table(
         header=dict(values=["number", "name", "date"], fill_color='lightgrey', align='center'),
-        cells=dict(values=[numbers, names, dates], fill_color=[row_colors], align='center')
+        cells=dict(values=[numbers, names, dates],
+                   fill_color=[["white" if i % 2 == 0 else "#f2f2f2" for i in range(1, len(numbers) + 1)]],
+                   align='center')
     )])
     fig.update_layout(
         autosize=True,
