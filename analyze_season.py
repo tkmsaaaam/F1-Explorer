@@ -21,7 +21,7 @@ def main():
     setup.fast_f1()
     schedule = fastf1.get_event_schedule(season, include_testing=False)
 
-    colors = {}
+    driver_colors = {}
 
     # {"round_number": {"name": "Japan", "sprint": true, "sprint_position": {"abbreviation": 1},"grid_position": {"abbreviation": 1}, "position": {"abbreviation": 1}}}
     results = {}
@@ -61,9 +61,7 @@ def main():
             gp["grid_position"][abbreviation] = driver_row.GridPosition
             gp["position"][abbreviation] = driver_row.Position
             gp["point"][abbreviation] = driver_row.Points
-
-            if abbreviation not in colors:
-                colors[abbreviation] = race.get_driver(abbreviation).TeamColor
+            driver_colors[abbreviation] = race.get_driver(abbreviation).TeamColor
 
     latest = len(results) + 1
 
@@ -74,7 +72,7 @@ def main():
 
     fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
     champion_points = []
-    for k, v in colors.items():
+    for k, v in driver_colors.items():
         y = []
         for i in range(1, latest):
             sum_point = results[i]["point"].get(k, 0)
@@ -94,7 +92,7 @@ def main():
     log.info(f"Saved plot to {output_path}")
 
     fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
-    for k, v in colors.items():
+    for k, v in driver_colors.items():
         y = []
         for i in range(1, latest):
             p = results[i]["point"].get(k, 0)
@@ -111,7 +109,7 @@ def main():
     log.info(f"Saved plot to {output_path}")
 
     fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout="tight")
-    for k, v in colors.items():
+    for k, v in driver_colors.items():
         y = []
         for i in range(1, latest):
             p = results[i]["point"].get(k, 0)
@@ -130,7 +128,7 @@ def main():
 
     fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
     x = [i for i in range(1, latest)]
-    for k, v in colors.items():
+    for k, v in driver_colors.items():
         y = [results[i]["grid_position"].get(k, 21) for i in range(1, latest)]
         ax.plot(x, y, label=k, color='#' + v, linewidth=1)
     ax.legend(fontsize='small')
@@ -143,7 +141,7 @@ def main():
     log.info(f"Saved plot to {output_path}")
 
     fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
-    for k, v in colors.items():
+    for k, v in driver_colors.items():
         y = [results[i]["grid_position"].get(k, 21) - results[i]["position"].get(k, 21) for i in range(1, latest)]
         ax.plot(x, y, label=k, color='#' + v, linewidth=1)
     ax.legend(fontsize='small')
