@@ -29,12 +29,14 @@ def main():
     numbers = []
     names = []
     dates = []
+    sprints = []
     schedule = schedule.sort_values(by='RoundNumber')
     now = datetime.datetime.now()
     for _, event in schedule.iterrows():
         numbers.append(event.RoundNumber)
         names.append(event.EventName)
         dates.append(event.EventDate)
+        sprints.append(event["EventFormat"] == "sprint_qualifying")
         if now < event.EventDate:
             continue
         if event.RoundNumber not in results:
@@ -156,8 +158,8 @@ def main():
     if os.path.exists(output_path):
         return
     fig = graph_objects.Figure(data=[graph_objects.Table(
-        header=dict(values=["number", "name", "date"], fill_color='lightgrey', align='center'),
-        cells=dict(values=[numbers, names, dates],
+        header=dict(values=["number", "name", "sprint", "date"], fill_color='lightgrey', align='center'),
+        cells=dict(values=[numbers, names, sprints, dates],
                    fill_color=[["white" if i % 2 == 0 else "#f2f2f2" for i in range(1, len(numbers) + 1)]],
                    align='center')
     )])
