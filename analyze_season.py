@@ -26,25 +26,17 @@ def main():
     # {"round_number": {"name": "Japan", "sprint": true, "sprint_position": {"abbreviation": 1},"grid_position": {"abbreviation": 1}, "position": {"abbreviation": 1}}}
     results = {}
 
-    numbers = []
-    names = []
-    dates = []
-    sprints = []
     schedule = schedule.sort_values(by='RoundNumber')
     now = datetime.datetime.now()
     for _, event in schedule.iterrows():
-        numbers.append(event.RoundNumber)
-        names.append(event.EventName)
-        dates.append(event.EventDate)
-        sprints.append(event["EventFormat"] == "sprint_qualifying")
         if now < event.EventDate:
-            continue
+            break
         if event.RoundNumber not in results:
             results[event.RoundNumber] = {"name": event.EventName, "date": event.EventDate, "grid_position": {},
                                           "position": {}, "point": {}, "sprint": False}
 
         gp = results[event.RoundNumber]
-        if event["EventFormat"] == "sprint_qualifying":
+        if event.EventFormat == "sprint_qualifying":
             sprint = fastf1.get_session(season, event.EventName, "S")
             sprint.load(laps=False, telemetry=False, weather=False, messages=False)
             gp["sprint"] = True
@@ -157,9 +149,13 @@ def main():
     output_path = f"{base_dir}/events.png"
     if os.path.exists(output_path):
         return
+    numbers = [event.RoundNumber for _, event in schedule.iterrows()]
     fig = graph_objects.Figure(data=[graph_objects.Table(
         header=dict(values=["number", "name", "sprint", "date"], fill_color='lightgrey', align='center'),
-        cells=dict(values=[numbers, names, sprints, dates],
+        cells=dict(values=[numbers,
+                           [event.EventName for _, event in schedule.iterrows()],
+                           [event.EventFormat == "sprint_qualifying" for _, event in schedule.iterrows()],
+                           [event.EventDate for _, event in schedule.iterrows()]],
                    fill_color=[["white" if i % 2 == 0 else "#f2f2f2" for i in range(1, len(numbers) + 1)]],
                    align='center')
     )])
