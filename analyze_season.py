@@ -146,10 +146,36 @@ def main():
     plt.close(fig)
     log.info(f"Saved plot to {output_path}")
 
+    numbers = [event.RoundNumber for _, event in schedule.iterrows()]
+
+    output_path = f"{base_dir}/points.png"
+    res = [[event.RoundNumber for _, event in schedule.iterrows()]]
+    headers = ["name"]
+    for k, v in driver_colors.items():
+        headers.append(k)
+        r = []
+        for i in numbers:
+            if i not in results:
+                r.append(0)
+                continue
+            r.append(results[i]["position"].get(k, 0))
+        res.append(r)
+    fig = graph_objects.Figure(data=[graph_objects.Table(
+        header=dict(values=headers, fill_color='lightgrey', align='center'),
+        cells=dict(values=res, align='center')
+    )])
+    fig.update_layout(
+        autosize=True,
+        margin=dict(autoexpand=True)
+    )
+
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+    fig.write_image(output_path, width=1920, height=2160)
+    log.info(f"Saved plot to {output_path}")
+
     output_path = f"{base_dir}/events.png"
     if os.path.exists(output_path):
         return
-    numbers = [event.RoundNumber for _, event in schedule.iterrows()]
     fig = graph_objects.Figure(data=[graph_objects.Table(
         header=dict(values=["number", "name", "sprint", "date"], fill_color='lightgrey', align='center'),
         cells=dict(values=[numbers,
