@@ -149,7 +149,7 @@ def main():
     numbers = [event.RoundNumber for _, event in schedule.iterrows()]
 
     output_path = f"{base_dir}/points.png"
-    res = [[event.RoundNumber for _, event in schedule.iterrows()]]
+    res = [[event.RoundNumber for _, event in schedule.iterrows()] + ["sum", "average"]]
     headers = ["name"]
     for k, v in driver_colors.items():
         headers.append(k)
@@ -159,6 +159,9 @@ def main():
                 r.append(0)
                 continue
             r.append(results[i]["position"].get(k, 0))
+        s = sum(r)
+        r.append(s)
+        r.append("{:.2f}".format(s / (latest - 1)))
         res.append(r)
     fig = graph_objects.Figure(data=[graph_objects.Table(
         header=dict(values=headers, fill_color='lightgrey', align='center'),
