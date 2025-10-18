@@ -173,12 +173,8 @@ def main():
             c.append(color)
             r.append(results[i]["position"].get(k, 0))
         s = sum(r)
-        c.append('white')
-        r.append(s)
-        c.append('white')
-        r.append("{:.2f}".format(s / (latest - 1)))
-        colors.append(c)
-        res.append(r)
+        colors.append(c + ['white', 'white'])
+        res.append(r + [sum(r), "{:.2f}".format(s / (latest - 1))])
     fig = graph_objects.Figure(data=[graph_objects.Table(
         header=dict(values=headers, fill_color='lightgrey', align='center'),
         cells=dict(values=res, fill_color=colors, align='center')
