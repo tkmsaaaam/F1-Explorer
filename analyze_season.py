@@ -149,11 +149,10 @@ def main():
     numbers = [event.RoundNumber for _, event in schedule.iterrows()]
 
     output_path = f"{base_dir}/points.png"
-    res = [[event.RoundNumber for _, event in schedule.iterrows()] + ["sum", "average"]]
-    headers = ["name"]
-    colors = [['lightgrey' for _ in range(1, len(schedule) + 2)]]
+    color_map = {}
+    sum_map = {}
+    res_map = {}
     for k, v in driver_colors.items():
-        headers.append(k)
         r = []
         c = []
         for i in numbers:
@@ -173,11 +172,17 @@ def main():
             c.append(color)
             r.append(results[i]["position"].get(k, 0))
         s = sum(r)
-        colors.append(c + ['white', 'white'])
-        res.append(r + [sum(r), "{:.2f}".format(s / (latest - 1))])
+        color_map[k] = c + ['white', 'white']
+        sum_map[k] = s
+        res_map[k] = r + [sum(r), "{:.2f}".format(s / (latest - 1))]
+    sum_map = sorted(sum_map.items(), key=lambda x: x[1])
     fig = graph_objects.Figure(data=[graph_objects.Table(
-        header=dict(values=headers, fill_color='lightgrey', align='center'),
-        cells=dict(values=res, fill_color=colors, align='center')
+        header=dict(values=["name"] + [k[0] for k in sum_map], fill_color='lightgrey', align='center'),
+        cells=dict(
+            values=[[event.RoundNumber for _, event in schedule.iterrows()] + ["sum", "average"]] + [res_map[k[0]] for k
+                                                                                                     in sum_map],
+            fill_color=[['lightgrey' for _ in range(1, len(schedule) + 2)]] + [color_map[k[0]] for k in sum_map],
+            align='center')
     )])
     fig.update_layout(
         autosize=True,
