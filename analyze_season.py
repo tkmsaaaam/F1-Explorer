@@ -167,6 +167,20 @@ def main():
                 color = 'silver'
             elif results[i]["position"].get(k, 0) == 3:
                 color = 'darkgoldenrod'
+            elif results[i]["position"].get(k, 0) == 4:
+                color = '#4B0000'
+            elif results[i]["position"].get(k, 0) == 5:
+                color = '#660000'
+            elif results[i]["position"].get(k, 0) == 6:
+                color = '#800000'
+            elif results[i]["position"].get(k, 0) == 7:
+                color = '#990000'
+            elif results[i]["position"].get(k, 0) == 8:
+                color = '#B20000'
+            elif results[i]["position"].get(k, 0) == 9:
+                color = '#CC0000'
+            elif results[i]["position"].get(k, 0) == 10:
+                color = '#E60000'
             elif results[i]["position"].get(k, 0) < 11 and results[i]["position"].get(k, 0) != 0:
                 color = 'yellow'
             c.append(color)
