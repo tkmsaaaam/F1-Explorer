@@ -181,8 +181,6 @@ def main():
                 color = '#CC0000'
             elif results[i]["position"].get(k, 0) == 10:
                 color = '#E60000'
-            elif results[i]["position"].get(k, 0) < 11 and results[i]["position"].get(k, 0) != 0:
-                color = 'yellow'
             c.append(color)
             r.append(results[i]["position"].get(k, 0))
         s = sum(r)
@@ -196,7 +194,7 @@ def main():
             values=[[event.RoundNumber for _, event in schedule.iterrows()] + ["sum", "average"]] + [res_map[k[0]] for k
                                                                                                      in sum_map],
             fill_color=[['lightgrey' for _ in range(1, len(schedule) + 2)]] + [color_map[k[0]] for k in sum_map],
-            align='center')
+            align='center', font_color='darkgrey')
     )])
     fig.update_layout(
         autosize=True,
