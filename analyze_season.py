@@ -155,6 +155,8 @@ def main():
     for k, v in driver_colors.items():
         r = []
         c = []
+        point_finish = 0
+        point = 0
         for i in numbers:
             if i not in results:
                 c.append('white')
@@ -163,36 +165,51 @@ def main():
             color = 'white'
             if results[i]["position"].get(k, 0) == 1:
                 color = 'gold'
+                point += 25
             elif results[i]["position"].get(k, 0) == 2:
                 color = 'silver'
+                point += 18
             elif results[i]["position"].get(k, 0) == 3:
                 color = 'darkgoldenrod'
+                point += 15
             elif results[i]["position"].get(k, 0) == 4:
                 color = '#4B0000'
+                point += 12
             elif results[i]["position"].get(k, 0) == 5:
                 color = '#660000'
+                point += 10
             elif results[i]["position"].get(k, 0) == 6:
                 color = '#800000'
+                point += 8
             elif results[i]["position"].get(k, 0) == 7:
                 color = '#990000'
+                point += 6
             elif results[i]["position"].get(k, 0) == 8:
                 color = '#B20000'
+                point += 4
             elif results[i]["position"].get(k, 0) == 9:
                 color = '#CC0000'
+                point += 2
             elif results[i]["position"].get(k, 0) == 10:
                 color = '#E60000'
+                point += 1
+            if 0 < results[i]["position"].get(k, 0) < 11:
+                point_finish += 1
             c.append(color)
             r.append(results[i]["position"].get(k, 0))
         s = sum(r)
-        color_map[k] = c + ['white', 'white']
+        color_map[k] = c + ['white', 'white', 'white', 'white', 'white']
         sum_map[k] = s
-        res_map[k] = r + [sum(r), "{:.2f}".format(s / (latest - 1))]
+        res_map[k] = r + [sum(r), "{:.2f}".format(s / (latest - 1)), point_finish, point,
+                          "{:.2f}".format(point / (latest - 1))]
     sum_map = sorted(sum_map.items(), key=lambda x: x[1])
     fig = graph_objects.Figure(data=[graph_objects.Table(
         header=dict(values=["name"] + [k[0] for k in sum_map], fill_color='lightgrey', align='center'),
         cells=dict(
-            values=[[event.RoundNumber for _, event in schedule.iterrows()] + ["sum", "average"]] + [res_map[k[0]] for k
-                                                                                                     in sum_map],
+            values=[[event.RoundNumber for _, event in schedule.iterrows()] + ["sum", "order", "top10",
+                                                                               "point", "point avg"]] + [
+                       res_map[k[0]] for k
+                       in sum_map],
             fill_color=[['lightgrey' for _ in range(1, len(schedule) + 2)]] + [color_map[k[0]] for k in sum_map],
             align='center', font_color='darkgrey')
     )])
