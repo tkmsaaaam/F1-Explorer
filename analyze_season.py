@@ -163,40 +163,41 @@ def main():
                 r.append(0)
                 continue
             color = 'white'
-            if results[i]["position"].get(k, 0) == 1:
+            position = results[i]["position"].get(k, 0)
+            if position == 1:
                 color = 'gold'
                 point += 25
-            elif results[i]["position"].get(k, 0) == 2:
+            elif position == 2:
                 color = 'silver'
                 point += 18
-            elif results[i]["position"].get(k, 0) == 3:
+            elif position == 3:
                 color = 'darkgoldenrod'
                 point += 15
-            elif results[i]["position"].get(k, 0) == 4:
+            elif position == 4:
                 color = '#4B0000'
                 point += 12
-            elif results[i]["position"].get(k, 0) == 5:
+            elif position == 5:
                 color = '#660000'
                 point += 10
-            elif results[i]["position"].get(k, 0) == 6:
+            elif position == 6:
                 color = '#800000'
                 point += 8
-            elif results[i]["position"].get(k, 0) == 7:
+            elif position == 7:
                 color = '#990000'
                 point += 6
-            elif results[i]["position"].get(k, 0) == 8:
+            elif position == 8:
                 color = '#B20000'
                 point += 4
-            elif results[i]["position"].get(k, 0) == 9:
+            elif position == 9:
                 color = '#CC0000'
                 point += 2
-            elif results[i]["position"].get(k, 0) == 10:
+            elif position == 10:
                 color = '#E60000'
                 point += 1
-            if 0 < results[i]["position"].get(k, 0) < 11:
+            if 0 < position < 11:
                 point_finish += 1
             c.append(color)
-            r.append(results[i]["position"].get(k, 0))
+            r.append(position)
         s = sum(r)
         color_map[k] = c + ['white', 'white', 'white', 'white', 'white']
         sum_map[k] = s
