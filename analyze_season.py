@@ -150,6 +150,9 @@ def main():
 
     output_path = f"{base_dir}/points.png"
     color_map = {}
+    color_master_map = {1: 'gold', 2: 'silver', 3: 'darkgoldenrod', 4: '#4B0000', 5: '#660000', 6: '#800000',
+                        7: '#990000', 8: '#B20000', 9: '#CC0000', 10: '#E60000'}
+    point_master_map = {1: 25, 2: 18, 3: 15, 4: 12, 5: 10, 6: 8, 7: 6, 8: 4, 9: 2, 10: 1}
     sum_map = {}
     res_map = {}
     for k, v in driver_colors.items():
@@ -162,41 +165,15 @@ def main():
                 c.append('white')
                 r.append(0)
                 continue
-            color = 'white'
             position = results[i]["position"].get(k, 0)
-            if position == 1:
-                color = 'gold'
-                point += 25
-            elif position == 2:
-                color = 'silver'
-                point += 18
-            elif position == 3:
-                color = 'darkgoldenrod'
-                point += 15
-            elif position == 4:
-                color = '#4B0000'
-                point += 12
-            elif position == 5:
-                color = '#660000'
-                point += 10
-            elif position == 6:
-                color = '#800000'
-                point += 8
-            elif position == 7:
-                color = '#990000'
-                point += 6
-            elif position == 8:
-                color = '#B20000'
-                point += 4
-            elif position == 9:
-                color = '#CC0000'
-                point += 2
-            elif position == 10:
-                color = '#E60000'
-                point += 1
+            if position in color_master_map:
+                c.append(color_master_map[position])
+            else:
+                c.append('white')
+            if position in point_master_map:
+                point += point_master_map[position]
             if 0 < position < 11:
                 point_finish += 1
-            c.append(color)
             r.append(position)
         s = sum(r)
         color_map[k] = c + ['white', 'white', 'white', 'white', 'white']
