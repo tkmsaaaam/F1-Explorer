@@ -12,7 +12,7 @@ def main():
         log.warning("no config")
         return
 
-    if config['Session'] != 'Q' or 'SQ':
+    if config['Session'] != 'Q' and 'SQ':
         log.warning(f"{config['Session']} is not Q or SQ.  \"Session\" needs to be set to Q or SQ.")
         return
     setup.fast_f1()
