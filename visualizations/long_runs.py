@@ -5,10 +5,14 @@ import fastf1
 import fastf1.plotting
 from fastf1.core import Session, Laps
 from matplotlib import pyplot as plt
+from opentelemetry import trace
 
 import config
 
+tracer = trace.get_tracer("f1Explorer.visualizations.long_runs")
 
+
+@tracer.start_as_current_span("plot_by_tyre_age_and_tyre")
 def plot_by_tyre_age_and_tyre(session: Session, log: Logger):
     """
     タイヤ別のファイルにロングランのラップタイム(y)推移をタイヤエイジ(x)でプロットする

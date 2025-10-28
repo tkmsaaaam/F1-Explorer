@@ -6,11 +6,15 @@ import pandas
 from fastf1.core import Session
 from matplotlib import pyplot as plt
 from numpy import datetime64
+from opentelemetry import trace
 from plotly import graph_objects
 
 import config
 
+tracer = trace.get_tracer("f1Explorer.visualizations.run_volume")
 
+
+@tracer.start_as_current_span("plot_lap_number_by_timing")
 def plot_lap_number_by_timing(session: Session, log: Logger):
     """
     y = ラップ番号
@@ -47,6 +51,7 @@ def plot_lap_number_by_timing(session: Session, log: Logger):
     plt.close(fig)
 
 
+@tracer.start_as_current_span("plot_laptime")
 def plot_laptime(session: Session, log: Logger):
     """
     ラップごとのタイムの一覧を作成する
@@ -96,6 +101,7 @@ def plot_laptime(session: Session, log: Logger):
     log.info(f"Saved plot to {output_path}")
 
 
+@tracer.start_as_current_span("plot_laptime_by_lap_number")
 def plot_laptime_by_lap_number(session: Session, log: Logger):
     """
     y = ラップタイム
@@ -129,6 +135,7 @@ def plot_laptime_by_lap_number(session: Session, log: Logger):
     plt.close(fig)
 
 
+@tracer.start_as_current_span("plot_laptime_by_timing")
 def plot_laptime_by_timing(session: Session, log: Logger):
     """
     y = ラップタイム
