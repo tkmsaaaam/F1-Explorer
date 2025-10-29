@@ -141,7 +141,11 @@ def plot_positions(map_by_timedelta: dict, target_map: dict, filename: str):
     fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
     current_positon_map = {}
     for no, laps in lap_end_positions.items():
-        current_positon_map[laps[len(laps) + 1]] = no
+        j = len(laps) + 1
+        if j not in laps.keys():
+            current_positon_map[max(laps.keys())] = no
+        else:
+            current_positon_map[laps[j]] = no
 
     for p in range(1, len(current_positon_map) + 1):
         if not p in current_positon_map:
