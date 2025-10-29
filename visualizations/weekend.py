@@ -3,11 +3,15 @@ from logging import Logger
 
 import fastf1
 from fastf1.core import DataNotLoadedError
+from opentelemetry import trace
 from plotly import graph_objects
 
 import config
 
+tracer = trace.get_tracer("f1Explorer.visualizations.weekend")
 
+
+@tracer.start_as_current_span("plot_tyre")
 def plot_tyre(year: int, race_number: int, log: Logger):
     drivers = {}
     sessions = ['FP1', 'FP2', 'FP3', 'SQ', 'SR', 'Q', 'R']
