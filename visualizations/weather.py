@@ -3,8 +3,12 @@ from logging import Logger
 
 from fastf1.core import Session
 from matplotlib import pyplot as plt
+from opentelemetry import trace
+
+tracer = trace.get_tracer("f1Explorer.visualizations")
 
 
+@tracer.start_as_current_span("execute")
 def execute(session: Session, log: Logger, dir_path: str):
     plot_weather(session, log, 'AirTemp', f"{dir_path}/air_temp.png")
     plot_weather(session, log, 'TrackTemp', f"{dir_path}/track_temp.png")
@@ -12,6 +16,7 @@ def execute(session: Session, log: Logger, dir_path: str):
     plot_weather(session, log, 'Rainfall', f"{dir_path}/rainfall.png")
 
 
+@tracer.start_as_current_span("plot_weather")
 def plot_weather(session: Session, log: Logger, key: str, filepath: str):
     """
     気象情報をプロット
