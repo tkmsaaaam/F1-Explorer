@@ -8,12 +8,16 @@ from fastf1 import plotting
 from fastf1.core import Session
 from matplotlib import pyplot as plt
 from matplotlib.patches import Patch
+from opentelemetry import trace
 from plotly import graph_objects
 
 import config
 import util
 
+tracer = trace.get_tracer("f1Explorer.visualizations.race")
 
+
+@tracer.start_as_current_span("execute")
 def execute(session: Session, log: Logger, images_path: str, logs_path: str, lap_time_range: int | None,
             gap_top_range: int | None,
             gap_ahead_range: int | None):
@@ -33,6 +37,7 @@ def execute(session: Session, log: Logger, images_path: str, logs_path: str, lap
     util.write_to_file_top(f"{logs_path}/timestamp.txt", str(datetime.datetime.now()))
 
 
+@tracer.start_as_current_span("laptime")
 def laptime(log: Logger, filepath: str, filename: str, session: Session, r: int):
     """
     x = ラップ番号, y = ラップタイムのドライバーごとの推移
@@ -111,6 +116,7 @@ def laptime_diff(log: Logger, filepath: str, session: Session):
     plt.close(fig)
 
 
+@tracer.start_as_current_span("gap")
 def gap(log: Logger, filepath: str, session: Session):
     """
     ラップごとのギャップの一覧を作成する
@@ -163,6 +169,7 @@ def gap(log: Logger, filepath: str, session: Session):
     log.info(f"Saved plot to {filepath}")
 
 
+@tracer.start_as_current_span("gap_to_ahead")
 def gap_to_ahead(log: Logger, filepath: str, filename: str, session: Session, r: int):
     """
     x = ラップ番号, y = 前走とのギャップのドライバーごとの推移
@@ -212,6 +219,7 @@ def gap_to_ahead(log: Logger, filepath: str, filename: str, session: Session, r:
         plt.close(fig)
 
 
+@tracer.start_as_current_span("gap_to_top")
 def gap_to_top(log: Logger, filepath: str, filename: str, session: Session, r: int):
     """
     x = ラップ番号, y = トップとのギャップのドライバーごとの推移
@@ -266,6 +274,7 @@ def gap_to_top(log: Logger, filepath: str, filename: str, session: Session, r: i
         plt.close(fig)
 
 
+@tracer.start_as_current_span("positions")
 def positions(log: Logger, filepath: str, session: Session):
     """
     x = ラップ番号, y = ポジションのドライバーごとの推移
@@ -302,6 +311,7 @@ def positions(log: Logger, filepath: str, session: Session):
     plt.close(fig)
 
 
+@tracer.start_as_current_span("tyres")
 def tyres(session: Session, log: Logger, filepath: str):
     """
     x = ラップ番号, y = 使用タイヤのドライバーごとの推移
@@ -368,6 +378,7 @@ def tyres(session: Session, log: Logger, filepath: str):
     plt.close(fig)
 
 
+@tracer.start_as_current_span("write_messages")
 def write_messages(session: Session, logs_path: str):
     try:
         os.remove(f"{logs_path}/race_control.txt")
@@ -386,6 +397,7 @@ def write_messages(session: Session, logs_path: str):
         util.write_to_file_top(f"{logs_path}/race_control.txt", message)
 
 
+@tracer.start_as_current_span("write_track_status")
 def write_track_status(session: Session, logs_path: str):
     try:
         os.remove(f"{logs_path}/track_status.txt")
