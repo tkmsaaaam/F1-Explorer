@@ -1,9 +1,13 @@
 import fastf1
+from opentelemetry import trace
 
 import setup
 from visualizations import weekend, run_volume, weather, race
 
+tracer = trace.get_tracer("f1Explorer.analyze.practice")
 
+
+@tracer.start_as_current_span("main")
 def main():
     config = setup.load_config()
 
