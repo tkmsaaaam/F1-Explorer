@@ -4,11 +4,15 @@ from itertools import accumulate
 
 import fastf1.plotting
 from matplotlib import pyplot as plt
+from opentelemetry import trace
 from plotly import graph_objects
 
 import setup
 
+tracer = trace.get_tracer("f1Explorer.analyze.season")
 
+
+@tracer.start_as_current_span("main")
 def main():
     config = setup.load_config()
 
