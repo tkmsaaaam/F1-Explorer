@@ -9,7 +9,7 @@ from plotly import graph_objects
 
 import setup
 
-tracer = trace.get_tracer("f1Explorer.analyze.season")
+tracer = trace.get_tracer(__name__)
 
 
 @tracer.start_as_current_span("main")

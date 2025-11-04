@@ -4,7 +4,7 @@ from opentelemetry import trace
 import setup
 from visualizations import run_volume, long_runs, short_runs, weather, weekend
 
-tracer = trace.get_tracer("f1Explorer.analyze.practice")
+tracer = trace.get_tracer(__name__)
 
 
 @tracer.start_as_current_span("main")

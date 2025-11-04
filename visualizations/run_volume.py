@@ -11,7 +11,7 @@ from plotly import graph_objects
 
 import config
 
-tracer = trace.get_tracer("f1Explorer.visualizations.run_volume")
+tracer = trace.get_tracer(__name__)
 
 
 @tracer.start_as_current_span("plot_lap_number_by_timing")

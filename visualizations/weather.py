@@ -5,7 +5,7 @@ from fastf1.core import Session
 from matplotlib import pyplot as plt
 from opentelemetry import trace
 
-tracer = trace.get_tracer("f1Explorer.visualizations")
+tracer = trace.get_tracer(__name__)
 
 
 @tracer.start_as_current_span("execute")

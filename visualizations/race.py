@@ -14,7 +14,7 @@ from plotly import graph_objects
 import config
 import util
 
-tracer = trace.get_tracer("f1Explorer.visualizations.race")
+tracer = trace.get_tracer(__name__)
 
 
 @tracer.start_as_current_span("execute")

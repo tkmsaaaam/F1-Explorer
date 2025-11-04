@@ -8,7 +8,7 @@ from plotly import graph_objects
 
 import config
 
-tracer = trace.get_tracer("f1Explorer.visualizations.weekend")
+tracer = trace.get_tracer(__name__)
 
 
 @tracer.start_as_current_span("plot_tyre")

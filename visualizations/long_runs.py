@@ -9,7 +9,7 @@ from opentelemetry import trace
 
 import config
 
-tracer = trace.get_tracer("f1Explorer.visualizations.long_runs")
+tracer = trace.get_tracer(__name__)
 
 
 @tracer.start_as_current_span("plot_by_tyre_age_and_tyre")

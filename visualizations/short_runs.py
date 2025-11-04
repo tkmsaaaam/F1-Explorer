@@ -20,7 +20,7 @@ from opentelemetry import trace
 
 import config
 
-tracer = trace.get_tracer("f1Explorer.visualizations.short_runs")
+tracer = trace.get_tracer(__name__)
 
 
 @tracer.start_as_current_span("compute_competitive_drivers")
