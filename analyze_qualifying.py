@@ -19,6 +19,8 @@ def main():
     if config['Session'] != 'Q' and 'SQ':
         log.warning(f"{config['Session']} is not Q or SQ.  \"Session\" needs to be set to Q or SQ.")
         return
+    trace.get_current_span().set_attributes(
+        {"year": config['Year'], "round": config['Round'], "session": config['Session']})
     setup.fast_f1()
     session = fastf1.get_session(config['Year'], config['Round'], config['Session'])
     session.load(messages=False)
