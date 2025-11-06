@@ -9,7 +9,6 @@ import numpy as np
 import pandas
 import plotly.express as px
 import plotly.graph_objects as go
-import plotly.io as pio
 from fastf1 import plotting
 from fastf1.core import Session
 from matplotlib import pyplot as plt
@@ -109,7 +108,7 @@ def compute_and_save_segment_tables_plotly(
         header=dict(values=segment_header, fill_color='lightgrey', align='center'),
         cells=dict(values=segment_data, align='center')
     )])
-    pio.write_image(fig_segment, f"{filename_base}_durations.png", width=1920, height=1080)
+    fig_segment.write_image(f"{filename_base}_durations.png", width=1920, height=1080)
     log.info(f"Segment table saved to {filename_base}_durations.png")
 
     # ランク表
@@ -132,7 +131,7 @@ def compute_and_save_segment_tables_plotly(
         header=dict(values=rank_header, fill_color='lightgrey', align='center'),
         cells=dict(values=rank_data, align='center')
     )])
-    pio.write_image(fig_ranks, f"{filename_base}_ranks.png", width=1920, height=1080)
+    fig_ranks.write_image(f"{filename_base}_ranks.png", width=1920, height=1080)
     log.info(f"Segment rank table saved to {filename_base}_ranks.png")
 
     # セッション最速ラップのドライバー
@@ -178,7 +177,7 @@ def compute_and_save_segment_tables_plotly(
         header=dict(values=gap_header, fill_color='lightgrey', align='center'),
         cells=dict(values=gap_data, align='center')
     )])
-    pio.write_image(fig_gap, f"{filename_base}_gaps_to_best.png", width=1920, height=1080)
+    fig_gap.write_image(f"{filename_base}_gaps_to_best.png", width=1920, height=1080)
     log.info(f"Gap table saved to {filename_base}_gaps_to_best.png")
 
 
