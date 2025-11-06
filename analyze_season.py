@@ -20,7 +20,8 @@ def main():
     if config is None:
         log.warning("no config")
         return
-
+    trace.get_current_span().set_attributes(
+        {"year": config['Year'], "round": config['Round'], "session": config['Session']})
     season = config["Year"]
     setup.fast_f1()
     schedule = fastf1.get_event_schedule(season, include_testing=False)

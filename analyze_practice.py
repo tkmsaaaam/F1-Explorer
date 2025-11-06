@@ -19,6 +19,8 @@ def main():
     if not config['Session'].startswith('FP'):
         log.warning(f"{config['Session']} is not FP.  \"Session\" needs to be set to FP.")
         return
+    trace.get_current_span().set_attributes(
+        {"year": config['Year'], "round": config['Round'], "session": config['Session']})
     setup.fast_f1()
     session = fastf1.get_session(config['Year'], config['Round'], config['Session'])
     session.load(messages=False)

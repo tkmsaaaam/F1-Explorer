@@ -19,7 +19,8 @@ def main():
     if config['Session'] != 'S' or 'R':
         log.warning(f"{config['Session']} is not S or SR. \"Session\" needs to be set to S or SR.")
         return
-
+    trace.get_current_span().set_attributes(
+        {"year": config['Year'], "round": config['Round'], "session": config['Session']})
     setup.fast_f1()
     session = fastf1.get_session(config['Year'], config['Round'], config['Session'])
     session.load(telemetry=False)
