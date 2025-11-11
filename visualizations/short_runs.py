@@ -233,7 +233,7 @@ def plot_best_laptime(session: Session, log: Logger, key: str):
     )
     fig.update_yaxes(
         range=[all_minimum - 0.1, all_maximum + 0.1],
-        tickformat=".3f"  # 小数点1桁で表示
+        tickformat=".3f"
     )
     output_path = f"./images/{session.event.year}/{session.event.RoundNumber}_{session.event.Location}/{session.name.replace(' ', '')}/{key}.png"
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
