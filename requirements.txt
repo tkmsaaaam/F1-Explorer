@@ -1,4 +1,7 @@
-fastf1==3.6.0
-matplotlib==3.10.5
-pandas==2.3.1
-plotly==6.3.0
+fastf1==3.6.1 # https://pypi.org/project/fastf1/
+kaleido==1.2.0 # https://pypi.org/project/kaleido/
+matplotlib==3.10.7 # https://pypi.org/project/matplotlib/
+opentelemetry-api==1.38.0 # https://pypi.org/project/opentelemetry-api/
+opentelemetry-sdk==1.38.0 # https://pypi.org/project/opentelemetry-sdk/
+pandas==2.3.3 # https://pypi.org/project/pandas/
+plotly==6.4.0 # https://pypi.org/project/plotly/
