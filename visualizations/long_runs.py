@@ -12,6 +12,40 @@ import config
 tracer = trace.get_tracer(__name__)
 
 
+class Driver:
+    def __init__(self, number: int, name: str, team_name: str):
+        self.number: int = number
+        self.name: str = name
+        self.team_name: str = team_name
+
+
+class Stint:
+    def __init__(self, compound: str, laps: dict[int, float], driver: Driver):
+        self.compound: str = compound
+        self.laps: dict[int, float] = laps
+        self.driver: Driver = driver
+
+
+def make_stint_set(min_consecutive_laps: int, all_laps: Laps, compound: str) -> set[Stint]:
+    stints = set()
+    laps: Laps = all_laps[all_laps.Compound == compound]
+    grouped_by_driver = laps.sort_values(by='TyreLife').groupby(['DriverNumber', 'Stint'])
+    for (driver_number_str, _), stint_laps in grouped_by_driver:
+        driver_number = int(driver_number_str)
+        if len(stint_laps) < min_consecutive_laps:
+            continue
+        first_lap = stint_laps.iloc[0]
+        lap_map: dict[int, float] = {}
+        for i in range(0, len(stint_laps)):
+            if stint_laps.iloc[i].LapTime.total_seconds() > all_laps.LapTime.min().total_seconds() * 1.2:
+                continue
+            lap_map[stint_laps.iloc[i].TyreLife] = stint_laps.iloc[i].LapTime.total_seconds()
+        driver: Driver = Driver(driver_number, first_lap.Driver, first_lap.Team)
+        stint: Stint = Stint(compound, lap_map, driver)
+        stints.add(stint)
+    return stints
+
+
 @tracer.start_as_current_span("plot_by_tyre_age_and_tyre")
 def plot_by_tyre_age_and_tyre(session: Session, log: Logger):
     """
@@ -27,31 +61,20 @@ def plot_by_tyre_age_and_tyre(session: Session, log: Logger):
 
     compounds = all_laps.Compound.unique()
     for compound in compounds:
-        # プロット準備
         fastf1.plotting.setup_mpl(mpl_timedelta_support=True, misc_mpl_mods=False, color_scheme='light')
         fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
-        laps: Laps = all_laps[all_laps.Compound == compound]
-        grouped_by_driver = laps.sort_values(by='TyreLife').groupby(['DriverNumber', 'Stint'])
+        stint_set = make_stint_set(min_consecutive_laps, all_laps, compound)
         legends = set()
-        for (driver_number_str, stint_num), stint_laps in grouped_by_driver:
-            driver_number = int(driver_number_str)
-            if len(stint_laps) < min_consecutive_laps:
-                continue
-            first_lap = stint_laps.iloc[0]
-            color = fastf1.plotting.get_team_color(first_lap.Team, session)
-            y = []
-            x = []
-            for i in range(0, len(stint_laps)):
-                if stint_laps.iloc[i].LapTime.total_seconds() > all_laps.LapTime.min().total_seconds() * 1.2:
-                    continue
-                x.append(stint_laps.iloc[i].TyreLife)
-                y.append(stint_laps.iloc[i].LapTime.total_seconds())
-            line_style = "solid" if config.camera_info_2025.get(driver_number, 'black') == "black" else "dashed"
-            if driver_number in legends:
+        for stint in stint_set:
+            color = fastf1.plotting.get_team_color(stint.driver.team_name, session)
+            x = sorted(stint.laps.keys())
+            y = [stint.laps.get(i) for i in x]
+            line_style = "solid" if config.camera_info_2025.get(stint.driver.number, 'black') == "black" else "dashed"
+            if stint.driver.number in legends:
                 ax.plot(x, y, linewidth=1, color=color, linestyle=line_style)
             else:
-                ax.plot(x, y, linewidth=1, color=color, label=first_lap.Driver, linestyle=line_style)
-                legends.add(driver_number)
+                ax.plot(x, y, linewidth=1, color=color, label=stint.driver.name, linestyle=line_style)
+                legends.add(stint.driver.number)
         ax.legend(fontsize='small')
         ax.invert_yaxis()
         ax.grid(True)
