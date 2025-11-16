@@ -1,3 +1,4 @@
+coverage==7.11.3 # https://pypi.org/project/coverage/
 fastf1==3.6.1 # https://pypi.org/project/fastf1/
 kaleido==1.2.0 # https://pypi.org/project/kaleido/
 matplotlib==3.10.7 # https://pypi.org/project/matplotlib/
