@@ -8,22 +8,10 @@ from matplotlib import pyplot as plt
 from opentelemetry import trace
 
 import config
+from visualizations.domain.driver import Driver
+from visualizations.domain.stint import Stint
 
 tracer = trace.get_tracer(__name__)
-
-
-class Driver:
-    def __init__(self, number: int, name: str, team_name: str):
-        self.number: int = number
-        self.name: str = name
-        self.team_name: str = team_name
-
-
-class Stint:
-    def __init__(self, compound: str, laps: dict[int, float], driver: Driver):
-        self.compound: str = compound
-        self.laps: dict[int, float] = laps
-        self.driver: Driver = driver
 
 
 def make_stint_set(min_consecutive_laps: int, all_laps: Laps, compound: str) -> set[Stint]:
