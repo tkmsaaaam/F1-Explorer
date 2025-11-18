@@ -5,7 +5,7 @@ from logging import Logger
 import fastf1
 import pandas as pd
 from fastf1 import plotting
-from fastf1.core import Session
+from fastf1.core import Session, Laps
 from matplotlib import pyplot as plt
 from matplotlib.patches import Patch
 from opentelemetry import trace
@@ -13,6 +13,7 @@ from plotly import graph_objects
 
 import config
 import util
+from visualizations.domain.driver import Driver
 
 tracer = trace.get_tracer(__name__)
 
@@ -22,7 +23,6 @@ def execute(session: Session, log: Logger, images_path: str, logs_path: str, lap
             gap_top_range: int | None,
             gap_ahead_range: int | None):
     laptime(log, images_path, "laptime", session, lap_time_range)
-    laptime_diff(log, f"{images_path}/laptime_diffs.png", session)
     gap(log, f"{images_path}/gap.png", session)
     gap_to_ahead(log, images_path, "gap_ahead", session, gap_ahead_range)
     gap_to_top(log, images_path, "gap_top", session, gap_top_range)
@@ -37,6 +37,27 @@ def execute(session: Session, log: Logger, images_path: str, logs_path: str, lap
     util.write_to_file_top(f"{logs_path}/timestamp.txt", str(datetime.datetime.now()))
 
 
+class DriverLaps:
+    def __init__(self, driver: Driver, laps: dict[int, float]):
+        self.driver = driver
+        self.laps = laps
+
+
+def make_lap_log(laps: Laps) -> set[DriverLaps]:
+    result = set()
+    grouped = laps.groupby(['DriverNumber'])
+    for _, stint_laps in grouped:
+        if stint_laps.empty:
+            continue
+        driver: Driver = Driver(int(stint_laps.DriverNumber.iloc[0]), stint_laps.Driver.iloc[0],
+                                stint_laps.Team.iloc[0])
+        laps: dict[int, float] = {}
+        for i in range(0, len(stint_laps)):
+            laps[stint_laps.LapNumber.iloc[i]] = stint_laps.LapTime.iloc[i].total_seconds()
+        result.add(DriverLaps(driver, laps))
+    return result
+
+
 @tracer.start_as_current_span("laptime")
 def laptime(log: Logger, filepath: str, filename: str, session: Session, r: int):
     """
@@ -48,21 +69,17 @@ def laptime(log: Logger, filepath: str, filename: str, session: Session, r: int)
         session: セッション
         r: y軸の幅
     """
-    minimum = session.laps.sort_values(by='LapTime').iloc[0].LapTime.total_seconds()
     fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
-    grouped = session.laps.groupby(['DriverNumber'])
-    for _, stint_laps in grouped:
-        if stint_laps.empty:
-            continue
-        driver_name = stint_laps.Driver.iloc[0]
-        color = fastf1.plotting.get_team_color(stint_laps.Team.iloc[0], session)
-        stint_laps = stint_laps.sort_values(by='LapNumber')
-        lap_times = stint_laps['LapTime'].dt.total_seconds().tolist()
-        lap_numbers = stint_laps['LapNumber']
+    lap_logs = make_lap_log(session.laps)
+    for lap_log in lap_logs:
+        lap_numbers = sorted(lap_log.laps.keys())
+        lap_times = [lap_log.laps.get(i) for i in lap_numbers]
+        color = fastf1.plotting.get_team_color(lap_log.driver.team_name, session)
         ax.plot(lap_numbers, lap_times, color=color,
-                linestyle="solid" if config.camera_info_2025.get(int(stint_laps.DriverNumber.iloc[0]),
+                linestyle="solid" if config.camera_info_2025.get(lap_log.driver.number,
                                                                  'black') == "black" else "dashed",
-                label=driver_name)
+                label=lap_log.driver.name)
+    minimum = session.laps.sort_values(by='LapTime').iloc[0].LapTime.total_seconds()
     ax.legend(fontsize='small')
     ax.set_ylim(top=minimum, bottom=minimum + 15)
     ax.grid(True)
@@ -79,41 +96,6 @@ def laptime(log: Logger, filepath: str, filename: str, session: Session, r: int)
         fig.savefig(output_path, bbox_inches='tight')
         log.info(f"Saved plot to {output_path}")
         plt.close(fig)
-
-
-def laptime_diff(log: Logger, filepath: str, session: Session):
-    """
-    x = ラップ番号, y = ラップタイム-前のラップタイムのドライバーごとの推移
-    Args:
-        log: ロガー
-        filepath: 画像を保存する先のpathとファイル名
-        session: セッション
-    """
-    fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
-    grouped = session.laps.groupby(['DriverNumber'])
-    for _, stint_laps in grouped:
-        if stint_laps.empty:
-            continue
-        driver_name = stint_laps.Driver.iloc[0]
-        color = fastf1.plotting.get_team_color(stint_laps.Team.iloc[0], session)
-        stint_laps = stint_laps.sort_values(by='LapNumber')
-        lap_times = [
-            stint_laps.LapTime.iloc[i].total_seconds() - stint_laps.LapTime.iloc[i - 1].total_seconds()
-            for i in range(1, len(stint_laps) - 1)
-        ]
-        lap_numbers = [stint_laps.LapNumber.iloc[i] for i in range(1, len(stint_laps) - 1)]
-        ax.plot(lap_numbers, lap_times, color=color,
-                linestyle="solid" if config.camera_info_2025.get(stint_laps.DriverNumber.iloc[0],
-                                                                 'black') == "black" else "dashed",
-                label=driver_name)
-    ax.legend(fontsize='small')
-    ax.invert_yaxis()
-    ax.set_ylim(bottom=-0.3, top=0.3)
-    ax.grid(True)
-    os.makedirs(os.path.dirname(filepath), exist_ok=True)
-    fig.savefig(filepath, bbox_inches='tight')
-    log.info(f"Saved plot to {filepath}")
-    plt.close(fig)
 
 
 @tracer.start_as_current_span("gap")
