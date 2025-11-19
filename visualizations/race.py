@@ -14,6 +14,7 @@ from plotly import graph_objects
 import config
 import util
 from visualizations.domain.driver import Driver
+from visualizations.domain.lap import Lap
 
 tracer = trace.get_tracer(__name__)
 
@@ -22,10 +23,11 @@ tracer = trace.get_tracer(__name__)
 def execute(session: Session, log: Logger, images_path: str, logs_path: str, lap_time_range: int | None,
             gap_top_range: int | None,
             gap_ahead_range: int | None):
-    laptime(log, images_path, "laptime", session, lap_time_range)
-    gap(log, f"{images_path}/gap.png", session)
+    lap_logs = make_lap_log(session.laps)
+    laptime(log, images_path, "laptime", session, lap_time_range, lap_logs)
+    gap(log, f"{images_path}/gap.png", session, lap_logs)
     gap_to_ahead(log, images_path, "gap_ahead", session, gap_ahead_range)
-    gap_to_top(log, images_path, "gap_top", session, gap_top_range)
+    gap_to_top(log, images_path, "gap_top", session, gap_top_range, lap_logs)
     positions(log, f"{images_path}/position.png", session)
     tyres(session, log, f"{images_path}/tyres.png")
     write_messages(session, logs_path)
@@ -38,7 +40,7 @@ def execute(session: Session, log: Logger, images_path: str, logs_path: str, lap
 
 
 class DriverLaps:
-    def __init__(self, driver: Driver, laps: dict[int, float]):
+    def __init__(self, driver: Driver, laps: dict[int, Lap]):
         self.driver = driver
         self.laps = laps
 
@@ -51,15 +53,16 @@ def make_lap_log(laps: Laps) -> set[DriverLaps]:
             continue
         driver: Driver = Driver(int(stint_laps.DriverNumber.iloc[0]), stint_laps.Driver.iloc[0],
                                 stint_laps.Team.iloc[0])
-        laps: dict[int, float] = {}
+        laps: dict[int, Lap] = {}
         for i in range(0, len(stint_laps)):
-            laps[stint_laps.LapNumber.iloc[i]] = stint_laps.LapTime.iloc[i].total_seconds()
+            lap: Lap = Lap(stint_laps.LapTime.iloc[i].total_seconds(), stint_laps.Time.iloc[i])
+            laps[stint_laps.LapNumber.iloc[i]] = lap
         result.add(DriverLaps(driver, laps))
     return result
 
 
 @tracer.start_as_current_span("laptime")
-def laptime(log: Logger, filepath: str, filename: str, session: Session, r: int):
+def laptime(log: Logger, filepath: str, filename: str, session: Session, r: int, lap_logs: set[DriverLaps]):
     """
     x = ラップ番号, y = ラップタイムのドライバーごとの推移
     Args:
@@ -68,12 +71,12 @@ def laptime(log: Logger, filepath: str, filename: str, session: Session, r: int)
         filename: ファイル名
         session: セッション
         r: y軸の幅
+        lap_logs: ドライバーごとのラップ
     """
     fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
-    lap_logs = make_lap_log(session.laps)
     for lap_log in lap_logs:
         lap_numbers = sorted(lap_log.laps.keys())
-        lap_times = [lap_log.laps.get(i) for i in lap_numbers]
+        lap_times = [lap_log.laps.get(i).time for i in lap_numbers]
         color = fastf1.plotting.get_team_color(lap_log.driver.team_name, session)
         ax.plot(lap_numbers, lap_times, color=color,
                 linestyle="solid" if config.camera_info_2025.get(lap_log.driver.number,
@@ -96,6 +99,15 @@ def laptime(log: Logger, filepath: str, filename: str, session: Session, r: int)
         fig.savefig(output_path, bbox_inches='tight')
         log.info(f"Saved plot to {output_path}")
         plt.close(fig)
+
+
+def make_top_time_map(all_laps: Laps) -> dict[int, datetime.datetime]:
+    fastest = {}
+    for i in range(0, len(all_laps)):
+        if all_laps.Position.iloc[i] != 1:
+            continue
+        fastest[all_laps.LapNumber.iloc[i]] = all_laps.Time.iloc[i]
+    return fastest
 
 
 @tracer.start_as_current_span("gap")
@@ -202,7 +214,7 @@ def gap_to_ahead(log: Logger, filepath: str, filename: str, session: Session, r:
 
 
 @tracer.start_as_current_span("gap_to_top")
-def gap_to_top(log: Logger, filepath: str, filename: str, session: Session, r: int):
+def gap_to_top(log: Logger, filepath: str, filename: str, session: Session, r: int, lap_logs: set[DriverLaps]):
     """
     x = ラップ番号, y = トップとのギャップのドライバーごとの推移
     Args:
@@ -211,32 +223,18 @@ def gap_to_top(log: Logger, filepath: str, filename: str, session: Session, r: i
         filename: ファイル名
         session: セッション
         r: y軸の幅
+        lap_logs: ドライバーごとのラップ
     """
-    mapping = {}
-    for lap_number in session.laps.sort_values(by=['LapNumber', 'Position']).LapNumber.unique():
-        lap_data = session.laps[session.laps.LapNumber == lap_number].sort_values(by='Position')
-
-        for i in range(1, len(lap_data)):
-            current = lap_data.iloc[i]
-            top = lap_data.iloc[0]
-
-            diff = current.Time - top.Time
-
-            driver_number = int(current.DriverNumber)
-            if driver_number not in mapping:
-                mapping[driver_number] = {}
-            mapping[driver_number][lap_number] = diff.total_seconds()
+    top_time_map = make_top_time_map(session.laps)
+    legends = set()
     fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
-    for no, laps in mapping.items():
-        if len(laps) < 1:
-            continue
-        driver = session.get_driver(str(no))
-        line_style = "solid" if config.camera_info_2025.get(no, 'black') == "black" else "dashed"
-        x = sorted(laps.keys())
-        y = [laps[lap] for lap in x]
-        ax.plot(x, y, color=fastf1.plotting.get_team_color(driver.TeamName, session), label=driver.Abbreviation,
-                linestyle=line_style, linewidth=1)
-
+    for lap_log in lap_logs:
+        color = fastf1.plotting.get_team_color(lap_log.driver.team_name, session)
+        x = sorted(lap_log.laps.keys())
+        y = [(lap_log.laps.get(i).at - top_time_map.get(i)).total_seconds() for i in x]
+        line_style = "solid" if config.camera_info_2025.get(lap_log.driver.number, 'black') == "black" else "dashed"
+        ax.plot(x, y, linewidth=1, color=color, label=lap_log.driver.name, linestyle=line_style)
+        legends.add(lap_log.driver.number)
     ax.legend(fontsize='small')
     ax.invert_yaxis()
     ax.set_ylim(top=0, bottom=60)
