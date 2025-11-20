@@ -3,6 +3,7 @@ import os
 from logging import Logger
 
 import fastf1
+import pandas
 from fastf1 import plotting
 from fastf1.core import Session, Laps
 from matplotlib import pyplot as plt
@@ -14,6 +15,7 @@ import config
 import util
 from visualizations.domain.driver import Driver
 from visualizations.domain.lap import Lap
+from visualizations.domain.tyre import Tyre
 
 tracer = trace.get_tracer(__name__)
 
@@ -29,7 +31,7 @@ def execute(session: Session, log: Logger, images_path: str, logs_path: str, lap
     gap_to_ahead(log, images_path, "gap_ahead", session, gap_ahead_range, lap_logs, position_log)
     gap_to_top(log, images_path, "gap_top", session, gap_top_range, lap_logs)
     positions(log, f"{images_path}/position.png", session, lap_logs)
-    tyres(session, log, f"{images_path}/tyres.png")
+    tyres(session, log, f"{images_path}/tyres.png", lap_logs)
     write_messages(session, logs_path)
     write_track_status(session, logs_path)
     try:
@@ -56,7 +58,8 @@ def make_lap_log(laps: Laps) -> set[DriverLaps]:
         laps: dict[int, Lap] = {}
         for i in range(0, len(stint_laps)):
             lap: Lap = Lap(stint_laps.LapTime.iloc[i].total_seconds(), stint_laps.Time.iloc[i],
-                           stint_laps.Position.iloc[i])
+                           stint_laps.Position.iloc[i], pandas.isna(stint_laps.PitOutTime.iloc[i]),
+                           Tyre(stint_laps.Compound.iloc[i], stint_laps.FreshTyre.iloc[i]))
             laps[stint_laps.LapNumber.iloc[i]] = lap
         result.add(DriverLaps(driver, laps))
     return result
@@ -282,7 +285,7 @@ def positions(log: Logger, filepath: str, session: Session, lap_logs: set[Driver
 
 
 @tracer.start_as_current_span("tyres")
-def tyres(session: Session, log: Logger, filepath: str):
+def tyres(session: Session, log: Logger, filepath: str, lap_logs: set[DriverLaps]):
     """
     x = ラップ番号, y = 使用タイヤのドライバーごとの推移
     Args:
@@ -291,53 +294,26 @@ def tyres(session: Session, log: Logger, filepath: str):
         session: セッション
     """
     fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
-    driver_y = {}  # ドライバー → Y軸位置
-    for i, driver in enumerate(session.drivers):
-        driver_laps = session.laps.pick_drivers(driver)
-        driver_laps = driver_laps[~driver_laps.Compound.isnull()]  # Compoundがあるラップのみ
-
-        prev_compound = None
-        stint_start = None
-
-        driver_y[driver] = i
-        y = i
-
-        for _, lap in driver_laps.iterrows():
-            compound = lap.Compound
-            lap_number = lap.LapNumber
-
-            if prev_compound is None:
-                prev_compound = compound
-                stint_start = lap_number
-            elif compound != prev_compound:
-                # スティント終了、プロット
-                edge = 'gray'
-                if 'New' in lap and lap.New == True:
-                    edge = 'black'
-                ax.barh(y=y,
-                        width=lap_number - stint_start,
-                        left=stint_start,
-                        color=config.compound_colors.get(prev_compound, 'gray'),
-                        edgecolor=edge)
-                prev_compound = compound
-                stint_start = lap_number
-
-        # 最後のスティントを描画
-        if stint_start is not None:
-            edge = 'gray'
-            if 'New' in driver_laps.iloc[-1] and driver_laps.iloc[-1].New == True:
-                edge = 'black'
+    y = 0
+    for lap_log in lap_logs:
+        x = sorted(lap_log.laps.keys())
+        start = 0
+        for i in x:
+            if not lap_log.laps.get(i).pit_out and i != max(x):
+                continue
+            j = i - 1
+            if j < 1:
+                continue
             ax.barh(y=y,
-                    width=driver_laps.iloc[-1].LapNumber - stint_start + 1,
-                    left=stint_start,
-                    color=config.compound_colors.get(prev_compound, 'gray'),
-                    edgecolor=edge)
-
-    # 軸設定
-    ax.set_yticks(list(driver_y.values()))
-    ax.set_yticklabels(list(driver_y.keys()))
-
-    # 凡例
+                    width=j - start,
+                    left=start,
+                    color=config.compound_colors.get(lap_log.laps.get(j).tyre.compound, 'gray'),
+                    edgecolor='black' if lap_log.laps.get(j).tyre.new else 'gray'
+                    )
+            start = j
+        y += 1
+    ax.set_yticks([i for i in range(0, len(lap_logs))])
+    ax.set_yticklabels([str(driver.driver.number) for driver in lap_logs])
     legend_elements = [Patch(facecolor=color, edgecolor='black', label=compound)
                        for compound, color in config.compound_colors.items()]
     ax.legend(handles=legend_elements, title='Compound', loc='upper right', fontsize='small')
