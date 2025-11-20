@@ -3,7 +3,6 @@ import os
 from logging import Logger
 
 import fastf1
-import pandas as pd
 from fastf1 import plotting
 from fastf1.core import Session, Laps
 from matplotlib import pyplot as plt
@@ -24,11 +23,12 @@ def execute(session: Session, log: Logger, images_path: str, logs_path: str, lap
             gap_top_range: int | None,
             gap_ahead_range: int | None):
     lap_logs = make_lap_log(session.laps)
+    position_log = make_position_log(session.laps)
     laptime(log, images_path, "laptime", session, lap_time_range, lap_logs)
-    gap(log, f"{images_path}/gap.png", session, lap_logs)
-    gap_to_ahead(log, images_path, "gap_ahead", session, gap_ahead_range)
+    gap(log, f"{images_path}/gap.png", lap_logs, position_log)
+    gap_to_ahead(log, images_path, "gap_ahead", session, gap_ahead_range, lap_logs, position_log)
     gap_to_top(log, images_path, "gap_top", session, gap_top_range, lap_logs)
-    positions(log, f"{images_path}/position.png", session)
+    positions(log, f"{images_path}/position.png", session, lap_logs)
     tyres(session, log, f"{images_path}/tyres.png")
     write_messages(session, logs_path)
     write_track_status(session, logs_path)
@@ -55,9 +55,21 @@ def make_lap_log(laps: Laps) -> set[DriverLaps]:
                                 stint_laps.Team.iloc[0])
         laps: dict[int, Lap] = {}
         for i in range(0, len(stint_laps)):
-            lap: Lap = Lap(stint_laps.LapTime.iloc[i].total_seconds(), stint_laps.Time.iloc[i])
+            lap: Lap = Lap(stint_laps.LapTime.iloc[i].total_seconds(), stint_laps.Time.iloc[i],
+                           stint_laps.Position.iloc[i])
             laps[stint_laps.LapNumber.iloc[i]] = lap
         result.add(DriverLaps(driver, laps))
+    return result
+
+
+def make_position_log(laps: Laps) -> dict[int, dict[int, datetime.datetime]]:
+    result = {}
+    for i in range(0, len(laps)):
+        lap_number = laps.LapNumber.iloc[i]
+        if lap_number not in result:
+            result[lap_number] = {laps.Position.iloc[i]: laps.Time.iloc[i]}
+        else:
+            result[lap_number][laps.Position.iloc[i]] = laps.Time.iloc[i]
     return result
 
 
@@ -111,47 +123,47 @@ def make_top_time_map(all_laps: Laps) -> dict[int, datetime.datetime]:
 
 
 @tracer.start_as_current_span("gap")
-def gap(log: Logger, filepath: str, session: Session):
+def gap(log: Logger, filepath: str, lap_logs: set[DriverLaps],
+        position_logs: dict[int, dict[int, datetime.datetime]]):
     """
     ラップごとのギャップの一覧を作成する
     Args:
         log: ロガー
         filepath: 画像を保存する先のpathとファイル名
-        session: セッション
+        lap_logs: ドライバーごとのラップ
+        position_logs: ラップごとのポジション
     """
-    results = {}
-    for lap_number in session.laps.LapNumber.unique():
-        lap_data = session.laps[session.laps.LapNumber == lap_number].sort_values(by=['Position', 'LapNumber'])
-        for i in range(0, len(lap_data)):
-            current = lap_data.iloc[i]
-            driver_name = current.Driver
-            if driver_name not in results:
-                results[driver_name] = {'gap': [], 'color': []}
-            if current.Position == 1:
-                results[driver_name]['gap'].append("{:.3f}".format(0))
-                results[driver_name]['color'].append('#ffffff')
-                continue
-            ahead = lap_data.iloc[i - 1]
-            diff = (current.Time - ahead.Time).total_seconds()
-            results[driver_name]['gap'].append("{:.3f}".format(diff))
-            if diff < 3:
-                results[driver_name]['color'].append('#9966ff')
-            elif diff > 20:
-                results[driver_name]['color'].append('#e95464')
-            else:
-                results[driver_name]['color'].append('#ffffff')
-    max_laps = int(session.laps.LapNumber.max())
     header = ["Lap"]
-    lap_numbers = list(range(1, max_laps + 1))
-    data_rows = [lap_numbers]
-    fill_colors = [["#f0f0f0"] * max_laps]
-    for driver_name, l in results.items():
-        header.append(driver_name)
-        data_rows.append(l['gap'])
-        fill_colors.append(l['color'])
+    all_gaps = []
+    fill_colors = []
+    max_laps = 0
+    for driver_laps in lap_logs:
+        gaps = []
+        colors = []
+        for i in range(1, len(driver_laps.laps)):
+            lap = driver_laps.laps.get(i)
+            if lap.position == 1:
+                gaps.append("{:.3f}".format(0))
+                colors.append('#ffffff')
+                continue
+            diff = (lap.at - position_logs.get(i).get(lap.position - 1)).total_seconds()
+            gaps.append(diff)
+            if diff < 3:
+                colors.append('#9966ff')
+            elif diff > 20:
+                colors.append('#e95464')
+            else:
+                colors.append('#ffffff')
+        if len(gaps) > max_laps:
+            max_laps = len(gaps)
+        header.append(driver_laps.driver.name)
+        all_gaps.append(gaps)
+        fill_colors.append(colors)
+
     fig = graph_objects.Figure(data=[graph_objects.Table(
         header=dict(values=header, fill_color='lightgrey', align='center'),
-        cells=dict(values=data_rows, fill_color=fill_colors, align='center')
+        cells=dict(values=[list(range(1, max_laps + 1))] + all_gaps, fill_color=[["#f0f0f0"] * max_laps] + fill_colors,
+                   align='center')
     )])
     fig.update_layout(
         autosize=True,
@@ -164,7 +176,8 @@ def gap(log: Logger, filepath: str, session: Session):
 
 
 @tracer.start_as_current_span("gap_to_ahead")
-def gap_to_ahead(log: Logger, filepath: str, filename: str, session: Session, r: int):
+def gap_to_ahead(log: Logger, filepath: str, filename: str, session: Session, r: int, lap_logs: set[DriverLaps],
+                 position_logs: dict[int, dict[int, datetime.datetime]]):
     """
     x = ラップ番号, y = 前走とのギャップのドライバーごとの推移
     Args:
@@ -173,28 +186,17 @@ def gap_to_ahead(log: Logger, filepath: str, filename: str, session: Session, r:
         filename: 画像名
         session: セッション
         r: y軸の幅
+        lap_logs: ドライバーごとのラップ
+        position_logs: ラップごとのポジション
     """
-    mapping = {}
-    for lap_number in session.laps.sort_values(by=['LapNumber', 'Position']).LapNumber.unique():
-        lap_data = session.laps[session.laps.LapNumber == lap_number].sort_values(by='Position')
-
-        for i in range(1, len(lap_data)):
-            current = lap_data.iloc[i]
-            ahead = lap_data.iloc[i - 1]
-            diff = current.Time - ahead.Time
-            driver_number = int(current.DriverNumber)
-            if driver_number not in mapping:
-                mapping[driver_number] = {}
-            mapping[driver_number][lap_number] = diff.total_seconds()
     fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
-    for no, laps in mapping.items():
-        if len(laps) < 1:
-            continue
-        driver = session.get_driver(str(no))
-        line_style = "solid" if config.camera_info_2025.get(no, 'black') == "black" else "dashed"
-        x = sorted(laps.keys())
-        y = [laps[lap] for lap in x]
-        ax.plot(x, y, color=fastf1.plotting.get_team_color(driver.TeamName, session), label=driver.Abbreviation,
+    for driver_laps in lap_logs:
+        x = sorted(driver_laps.laps.keys())
+        y = [(driver_laps.laps.get(i).at - position_logs.get(i).get(
+            driver_laps.laps.get(i).position - 1)).total_seconds() for i in x]
+        line_style = "solid" if config.camera_info_2025.get(driver_laps.driver.number, 'black') == "black" else "dashed"
+        ax.plot(x, y, color=fastf1.plotting.get_team_color(driver_laps.driver.team_name, session),
+                label=driver_laps.driver.name,
                 linestyle=line_style, linewidth=1)
     ax.legend(fontsize='small')
     ax.set_ylim(top=0, bottom=30)
@@ -226,7 +228,6 @@ def gap_to_top(log: Logger, filepath: str, filename: str, session: Session, r: i
         lap_logs: ドライバーごとのラップ
     """
     top_time_map = make_top_time_map(session.laps)
-    legends = set()
     fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
     for lap_log in lap_logs:
         color = fastf1.plotting.get_team_color(lap_log.driver.team_name, session)
@@ -234,7 +235,6 @@ def gap_to_top(log: Logger, filepath: str, filename: str, session: Session, r: i
         y = [(lap_log.laps.get(i).at - top_time_map.get(i)).total_seconds() for i in x]
         line_style = "solid" if config.camera_info_2025.get(lap_log.driver.number, 'black') == "black" else "dashed"
         ax.plot(x, y, linewidth=1, color=color, label=lap_log.driver.name, linestyle=line_style)
-        legends.add(lap_log.driver.number)
     ax.legend(fontsize='small')
     ax.invert_yaxis()
     ax.set_ylim(top=0, bottom=60)
@@ -255,32 +255,22 @@ def gap_to_top(log: Logger, filepath: str, filename: str, session: Session, r: i
 
 
 @tracer.start_as_current_span("positions")
-def positions(log: Logger, filepath: str, session: Session):
+def positions(log: Logger, filepath: str, session: Session, lap_logs: set[DriverLaps]):
     """
     x = ラップ番号, y = ポジションのドライバーごとの推移
     Args:
         log: ロガー
         filepath: 画像を保存する先のpathとファイル名
         session: セッション
+        lap_logs: ドライバーごとのラップ
     """
-    position_map = {}
-    for drv in session.laps.DriverNumber.unique():
-        driver_laps = session.laps[session.laps.DriverNumber == drv]
-        position_map[int(drv)] = {
-            int(row.LapNumber): int(row.Position)
-            for _, row in driver_laps.iterrows()
-            if not pd.isna(row.Position)
-        }
     fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
-    for no, laps in position_map.items():
-        if len(laps) < 1:
-            continue
-        driver = session.get_driver(str(no))
-        line_style = "solid" if config.camera_info_2025.get(no, 'black') == "black" else "dashed"
-        x = sorted(laps.keys())
-        y = [laps[lap] for lap in x]
-        ax.plot(x, y, color=fastf1.plotting.get_team_color(driver.TeamName, session), label=driver.Abbreviation,
-                linestyle=line_style, linewidth=1)
+    for lap_log in lap_logs:
+        color = fastf1.plotting.get_team_color(lap_log.driver.team_name, session)
+        x = sorted(lap_log.laps.keys())
+        y = [lap_log.laps.get(i).position for i in x]
+        line_style = "solid" if config.camera_info_2025.get(lap_log.driver.number, 'black') == "black" else "dashed"
+        ax.plot(x, y, linewidth=1, color=color, label=lap_log.driver.name, linestyle=line_style)
 
     ax.legend(fontsize='small')
     ax.invert_yaxis()
