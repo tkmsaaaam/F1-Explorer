@@ -31,7 +31,7 @@ def execute(session: Session, log: Logger, images_path: str, logs_path: str, lap
     gap_to_ahead(log, images_path, "gap_ahead", session, gap_ahead_range, lap_logs, position_log)
     gap_to_top(log, images_path, "gap_top", session, gap_top_range, lap_logs)
     positions(log, f"{images_path}/position.png", session, lap_logs)
-    tyres(session, log, f"{images_path}/tyres.png", lap_logs)
+    tyres(log, f"{images_path}/tyres.png", lap_logs)
     write_messages(session, logs_path)
     write_track_status(session, logs_path)
     try:
@@ -285,13 +285,13 @@ def positions(log: Logger, filepath: str, session: Session, lap_logs: set[Driver
 
 
 @tracer.start_as_current_span("tyres")
-def tyres(session: Session, log: Logger, filepath: str, lap_logs: set[DriverLaps]):
+def tyres(log: Logger, filepath: str, lap_logs: set[DriverLaps]):
     """
     x = ラップ番号, y = 使用タイヤのドライバーごとの推移
     Args:
         log: ロガー
-        filepath: 画像を保存する先のpathとファイル名
-        session: セッション
+        filepath:
+        lap_logs: ドライバーごとのラップ
     """
     fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
     y = 0
