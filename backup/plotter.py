@@ -5,6 +5,7 @@ import os
 from matplotlib import pyplot as plt
 
 import config
+from backup.domain.Stint import Stint
 
 logging.basicConfig(
     level=logging.INFO,
@@ -27,43 +28,37 @@ def set_style(no: int) -> dict[str, str]:
     return style
 
 
-def plot_tyres(stint_map: dict):
-    # チーム→ドライバー順で並び替え
+def plot_tyres(stint_map: dict[int, dict[int, Stint]]):
     sorted_drivers = sorted(stint_map.keys(),
                             key=lambda d: (config.team_info_2025.get(d, 'Undefined'),
                                            config.name_info_2025.get(d, "UNDEFINED")))
 
     fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
-    y_ticks = []
-    y_tick_labels = []
-
     max_lap = 0
-    for i, driver_number in enumerate(sorted_drivers):
-        y = i
-        x = 0
-        y_ticks.append(y)
-        acronym = config.name_info_2025.get(driver_number, "UNDEFINED")
-        y_tick_labels.append(acronym)
-
-        driver_stints = stint_map[driver_number]
-        for stint_num in sorted(driver_stints.keys()):
-            stint = driver_stints[stint_num]
-            if not "TotalLaps" in stint:
+    y = 0
+    for driver_number in sorted_drivers:
+        stints = stint_map[driver_number]
+        stint_keys = sorted(stints.keys())
+        start = 0
+        for i in stint_keys:
+            stint = stints[i]
+            if stint.total_laps == 0:
                 continue
-            width = stint["TotalLaps"]
-            if "StartLaps" in stint:
-                width = width - stint["StartLaps"]
-            compound = stint.get("Compound", "UNKNOWN")
-            color = config.compound_colors.get(compound.upper(), "black")
-            rect = plt.Rectangle((x, y - 0.4), width, 0.8, facecolor=color, edgecolor='black', linestyle='-',
-                                 linewidth=2)
-            ax.add_patch(rect)
-            x += width
-            if x > max_lap:
-                max_lap = x
-
-    ax.set_yticks(y_ticks)
-    ax.set_yticklabels(y_tick_labels)
+            width = stint.total_laps
+            if stint.start_laps != 0:
+                width = width - stint.start_laps
+            ax.barh(y=y,
+                    width=width,
+                    left=start,
+                    color=config.compound_colors.get(stint.compound, 'gray'),
+                    edgecolor='black' if stint.is_new else 'gray'
+                    )
+            start += width
+            if start > max_lap:
+                max_lap = start
+        y += 1
+    ax.set_yticks([i for i in range(0, len(sorted_drivers))])
+    ax.set_yticklabels([str(i) for i in sorted_drivers])
     ax.set_xlim(0, max_lap)
     plt.grid(axis='x', linestyle=':', alpha=0.7)
     output_path: str = f"{images_path}/tyres.png"

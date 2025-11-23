@@ -6,6 +6,7 @@ from datetime import datetime
 
 import util
 from backup import plotter
+from backup.domain.Stint import Stint
 
 logging.basicConfig(
     level=logging.INFO,
@@ -20,6 +21,8 @@ laptime_map = {}
 gap_ahead_map = {}
 gap_top_map = {}
 stint_map = {}
+
+stints_map: dict[int, dict[int, Stint]] = {}
 position_map = {}
 
 lap_end_map = {}
@@ -54,17 +57,6 @@ def push(driver_number: int, lap_number: int | datetime, target_map, value):
         target_map[driver_number][lap_number] = value
     else:
         target_map[driver_number] = {lap_number: value}
-
-
-def push_stint(key, driver_number: int, stint_number: int, stint, m):
-    if key in stint:
-        if driver_number in m:
-            if stint_number in m[driver_number]:
-                m[driver_number][stint_number][key] = stint[key]
-            else:
-                m[driver_number][stint_number] = {key: stint[key]}
-        else:
-            m[driver_number] = {stint_number: {key: stint[key]}}
 
 
 def to_json_style(s: str) -> str:
@@ -119,11 +111,20 @@ def handle_timing_app_data(data, handled_time: datetime):
                 t = str_to_seconds(lap_time)
                 push(driver_number, lap_number, lap_end_map, t)
                 push(driver_number, lap_number, lap_end_map, handled_time)
+            if driver_number not in stints_map:
+                stints_map[driver_number] = {}
+            s = stints_map[driver_number]
             stint_number = int(stint_no)
-            push_stint('Compound', driver_number, stint_number, stint, stint_map)
-            push_stint('New', driver_number, stint_number, stint, stint_map)
-            push_stint('TotalLaps', driver_number, stint_number, stint, stint_map)
-            push_stint('StartLaps', driver_number, stint_number, stint, stint_map)
+            if stint_number not in s:
+                s[stint_number] = Stint()
+            if 'Compound' in stint:
+                s[stint_number].set_compound(stint['Compound'])
+            if 'New' in stint:
+                s[stint_number].set_is_new(stint['New'])
+            if 'TotalLaps' in stint:
+                s[stint_number].set_total_laps(stint['TotalLaps'])
+            if 'StartLaps' in stint:
+                s[stint_number].set_start_laps(stint['StartLaps'])
 
 
 air_temp_map = {}
@@ -214,7 +215,7 @@ while True:
 
     # ファイルが更新されていた場合のみplotを実行
     if start != prev_start:
-        plotter.plot_tyres(stint_map)
+        plotter.plot_tyres(stints_map)
         plotter.plot_with_lap_end(lap_end_map, gap_ahead_map, "gap_ahead", 8)
         plotter.plot_with_lap_end(lap_end_map, gap_top_map, "gap_top", 35)
         plotter.plot_positions(lap_end_map, position_map, "position")
