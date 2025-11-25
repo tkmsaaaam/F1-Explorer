@@ -7,6 +7,7 @@ from datetime import datetime
 import util
 from backup import plotter
 from backup.domain.Stint import Stint
+from backup.domain.lap import Lap
 
 logging.basicConfig(
     level=logging.INFO,
@@ -17,15 +18,8 @@ logging.basicConfig(
 )
 log = logging.getLogger(__name__)
 
-laptime_map: dict[int, dict[int, float]] = {}
-gap_ahead_map = {}
-gap_top_map = {}
-stint_map = {}
-
+laptime_map: dict[int, dict[int, Lap]] = {}
 stints_map: dict[int, dict[int, Stint]] = {}
-position_map = {}
-
-lap_end_map = {}
 
 results_path = "../live/data/results"
 logs_path = results_path + "/logs"
@@ -52,13 +46,6 @@ def str_to_seconds(param: str) -> float:
         raise ValueError(f"Unsupported time format: {param}")
 
 
-def push(driver_number: int, lap_number: int | datetime, target_map, value):
-    if driver_number in target_map:
-        target_map[driver_number][lap_number] = value
-    else:
-        target_map[driver_number] = {lap_number: value}
-
-
 def to_json_style(s: str) -> str:
     replaced = s.replace("'", '"') \
         .replace('True', 'true') \
@@ -77,23 +64,42 @@ def handle_timing_data(data, t: datetime):
             if lap_time != "":
                 if driver_number not in laptime_map:
                     laptime_map[driver_number] = {}
-                laptime_map[driver_number][lap_number] = str_to_seconds(lap_time)
-            push(driver_number, lap_number, lap_end_map, t)
+                lap = Lap()
+                lap.set_time(str_to_seconds(lap_time))
+                lap.set_at(t)
+                laptime_map[driver_number][lap_number] = lap
         if 'Position' in v:
             position_str: str = v["Position"]
             position = int(position_str)
-            push(driver_number, t, position_map, position)
+            if driver_number not in laptime_map:
+                lap = Lap()
+                lap.set_position(position)
+                laptime_map[driver_number] = {0: lap}
+            if len(laptime_map.get(driver_number).keys()) > 0:
+                laptime_map.get(driver_number).get(max(laptime_map.get(driver_number).keys())).set_position(position)
         if 'GapToLeader' in v:
             if not 'L' in v["GapToLeader"]:
                 diff_str: str = v["GapToLeader"].replace("+", "")
                 diff = str_to_seconds(diff_str)
-                push(driver_number, t, gap_top_map, diff)
+                if driver_number not in laptime_map:
+                    lap = Lap()
+                    lap.set_gap_to_top(diff)
+                    laptime_map[driver_number] = {0: lap}
+                if len(laptime_map.get(driver_number).keys()) > 0:
+                    laptime_map.get(driver_number).get(max(laptime_map.get(driver_number).keys())).set_gap_to_top(
+                        diff)
         if 'IntervalToPositionAhead' in v:
             if 'Value' in v["IntervalToPositionAhead"]:
                 if not 'L' in v["IntervalToPositionAhead"]["Value"]:
                     diff_str: str = v["IntervalToPositionAhead"]["Value"].replace("+", "")
                     diff = str_to_seconds(diff_str)
-                    push(driver_number, t, gap_ahead_map, diff)
+                    if driver_number not in laptime_map:
+                        lap = Lap()
+                        lap.set_gap_to_ahead(diff)
+                        laptime_map[driver_number] = {0: lap}
+                    if len(laptime_map.get(driver_number).keys()) > 0:
+                        laptime_map.get(driver_number).get(max(laptime_map.get(driver_number).keys())).set_gap_to_ahead(
+                            diff)
 
 
 def handle_timing_app_data(data, handled_time: datetime):
@@ -110,9 +116,13 @@ def handle_timing_app_data(data, handled_time: datetime):
             if 'LapTime' in stint and 'LapNumber' in stint:
                 lap_time = stint["LapTime"]
                 lap_number = stint["LapNumber"]
-                t = str_to_seconds(lap_time)
-                push(driver_number, lap_number, lap_end_map, t)
-                push(driver_number, lap_number, lap_end_map, handled_time)
+                if driver_number not in laptime_map:
+                    laptime_map[driver_number] = {}
+                if lap_number not in laptime_map[driver_number]:
+                    lap = Lap()
+                    lap.set_at(handled_time)
+                    lap.set_time(str_to_seconds(lap_time))
+                    laptime_map[driver_number][lap_number] = lap
             if driver_number not in stints_map:
                 stints_map[driver_number] = {}
             s = stints_map[driver_number]
@@ -218,9 +228,9 @@ while True:
     # ファイルが更新されていた場合のみplotを実行
     if start != prev_start:
         plotter.plot_tyres(stints_map)
-        plotter.plot_with_lap_end(lap_end_map, gap_ahead_map, "gap_ahead", 8)
-        plotter.plot_with_lap_end(lap_end_map, gap_top_map, "gap_top", 35)
-        plotter.plot_positions(lap_end_map, position_map, "position")
+        plotter.plot_gap_to_ahead(laptime_map, "gap_ahead", 8)
+        plotter.plot_gap_to_top(laptime_map, "gap_top", 35)
+        plotter.plot_positions(laptime_map, "position")
         plotter.plot_laptime(laptime_map, "laptime", 7)
         plotter.plot_laptime_diff(laptime_map, "laptime_diffs", 0.75, 0.75)
 

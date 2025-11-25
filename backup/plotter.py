@@ -1,4 +1,3 @@
-import bisect
 import logging
 import os
 
@@ -6,6 +5,7 @@ from matplotlib import pyplot as plt
 
 import config
 from backup.domain.Stint import Stint
+from backup.domain.lap import Lap
 
 logging.basicConfig(
     level=logging.INFO,
@@ -68,32 +68,12 @@ def plot_tyres(stint_map: dict[int, dict[int, Stint]]):
     plt.close(fig)
 
 
-def plot_with_lap_end(map_by_timedelta, target_map, filename: str, d: int):
-    m_by_lap_end = {}
-    for driver, lap_dict in map_by_timedelta.items():
-        # 対象ドライバーの position 情報を取得してソート
-        time_points = sorted(target_map.get(driver, {}).keys())
-        time_to_position = target_map.get(driver, {})
-
-        driver_result = {}
-
-        for lap, t in lap_dict.items():
-            # t 以下で最大の time_point を探す
-            idx = bisect.bisect_right(time_points, t)
-            if idx == 0:
-                position = None  # それ以前の position が存在しない
-            else:
-                nearest_time = time_points[idx - 1]
-                position = time_to_position[nearest_time]
-            driver_result[lap] = position
-
-        m_by_lap_end[driver] = driver_result
-
+def plot_gap_to_top(dicts: dict[int, dict[int, Lap]], filename: str, d: int):
     fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
-    for no, laps in m_by_lap_end.items():
+    for no, data in dicts.items():
         style = set_style(no)
-        x = sorted(laps.keys())
-        y = [laps[lap] for lap in x]
+        x = sorted(list(data.keys()))
+        y = [data[i].gap_to_top for i in x]
         ax.plot(x, y, **style)
     ax.legend(fontsize='small')
     ax.invert_yaxis()
@@ -111,45 +91,46 @@ def plot_with_lap_end(map_by_timedelta, target_map, filename: str, d: int):
         plt.close(fig)
 
 
-def plot_positions(map_by_timedelta: dict, target_map: dict, filename: str):
-    lap_end_positions = {}
-    for driver, lap_dict in map_by_timedelta.items():
-        # 対象ドライバーの position 情報を取得してソート
-        time_points = sorted(target_map.get(driver, {}).keys())
-        time_to_position = target_map.get(driver, {})
-
-        driver_result = {}
-
-        for lap, t in lap_dict.items():
-            # t 以下で最大の time_point を探す
-            idx = bisect.bisect_right(time_points, t)
-            if idx == 0:
-                position = None  # それ以前の position が存在しない
-            else:
-                nearest_time = time_points[idx - 1]
-                position = time_to_position[nearest_time]
-
-            driver_result[lap] = position
-
-        lap_end_positions[driver] = driver_result
-
+def plot_gap_to_ahead(dicts: dict[int, dict[int, Lap]], filename: str, d: int):
     fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
-    current_positon_map = {}
-    for no, laps in lap_end_positions.items():
-        j = len(laps) + 1
-        if j not in laps.keys():
-            current_positon_map[max(laps.keys())] = no
-        else:
-            current_positon_map[laps[j]] = no
-
-    for p in range(1, len(current_positon_map) + 1):
-        if not p in current_positon_map:
-            continue
-        no = current_positon_map[p]
-        laps = lap_end_positions[no]
+    for no, data in dicts.items():
         style = set_style(no)
-        x = sorted(laps.keys())
-        y = [laps[lap] for lap in x]
+        x = sorted(list(data.keys()))
+        y = [data[i].gap_to_ahead for i in x]
+        ax.plot(x, y, **style)
+    ax.legend(fontsize='small')
+    ax.invert_yaxis()
+    output_path = f"{images_path}/{filename}.png"
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+    fig.savefig(output_path, bbox_inches='tight')
+    log.info(f"Saved plot to {output_path}")
+    plt.close(fig)
+    if d is not None:
+        ax.set_ylim(d, 0)
+        output_path = f"{images_path}/{filename}_{d}.png"
+        os.makedirs(os.path.dirname(output_path), exist_ok=True)
+        fig.savefig(output_path, bbox_inches='tight')
+        log.info(f"Saved plot to {output_path}")
+        plt.close(fig)
+
+
+def plot_positions(dicts: dict[int, dict[int, Lap]], filename: str):
+    fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
+    for no, data in dicts.items():
+        style = set_style(no)
+        x = sorted(list(data.keys()))
+        y = []
+        last_pos = None
+        for i in x:
+            pos = data.get(i, 180).position
+            if pos != 0:
+                last_pos = pos
+                y.append(pos)
+            else:
+                if last_pos is not None:
+                    y.append(last_pos)
+                else:
+                    y.append(0)
         ax.plot(x, y, **style)
     ax.legend(fontsize='small')
     ax.invert_yaxis()
@@ -160,13 +141,22 @@ def plot_positions(map_by_timedelta: dict, target_map: dict, filename: str):
     plt.close(fig)
 
 
-def plot_laptime(dicts: dict[int, dict[int, float]], filename: str, d: int):
+def plot_laptime(dicts: dict[int, dict[int, Lap]], filename: str, d: int):
     fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
     all_y = []
     for no, data in dicts.items():
         style = set_style(no)
-        x = sorted(list(data.keys()))
-        y = [data.get(i, 180) for i in x]
+
+        x = []
+        y = []
+        for i in sorted(list(data.keys())):
+            if i < 1:
+                continue
+            lap = data[i]
+            if lap.time == 0:
+                continue
+            x.append(i)
+            y.append(lap.time)
         all_y += y
         ax.plot(x, y, **style)
 
@@ -193,13 +183,18 @@ def plot_laptime(dicts: dict[int, dict[int, float]], filename: str, d: int):
         plt.close(fig)
 
 
-def plot_laptime_diff(dicts: dict[int, dict[int, float]], filename: str, minus: float, plus: float):
+def plot_laptime_diff(dicts: dict[int, dict[int, Lap]], filename: str, minus: float, plus: float):
     fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
     for no, data in dicts.items():
         style = set_style(no)
-        x = sorted(list(data.keys()))
-        y = [data.get(i, 180) - data.get(i - 1, 180) for i in x[1:]]
-        ax.plot(x[1:], y, **style)
+        x = []
+        y = []
+        for i in sorted(list(data.keys())):
+            if i - 1 not in data.keys():
+                continue
+            x.append(i)
+            y.append(data.get(i, 180).time - data.get(i - 1, 180).time)
+        ax.plot(x, y, **style)
     ax.invert_yaxis()
     if minus != 0 or plus != 0:
         ax.set_ylim(- minus, plus)
