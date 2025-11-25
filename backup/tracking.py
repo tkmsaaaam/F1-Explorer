@@ -17,7 +17,7 @@ logging.basicConfig(
 )
 log = logging.getLogger(__name__)
 
-laptime_map = {}
+laptime_map: dict[int, dict[int, float]] = {}
 gap_ahead_map = {}
 gap_top_map = {}
 stint_map = {}
@@ -32,7 +32,7 @@ logs_path = results_path + "/logs"
 images_path = results_path + "/images"
 
 
-def str_to_seconds(param: str):
+def str_to_seconds(param: str) -> float:
     if param == "":
         return 0
     parts = param.split(":")
@@ -75,7 +75,9 @@ def handle_timing_data(data, t: datetime):
             lap_time: str = v["LastLapTime"]["Value"]
             lap_number: int = v["NumberOfLaps"]
             if lap_time != "":
-                push(driver_number, lap_number, laptime_map, str_to_seconds(lap_time))
+                if driver_number not in laptime_map:
+                    laptime_map[driver_number] = {}
+                laptime_map[driver_number][lap_number] = str_to_seconds(lap_time)
             push(driver_number, lap_number, lap_end_map, t)
         if 'Position' in v:
             position_str: str = v["Position"]

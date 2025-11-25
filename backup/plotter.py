@@ -160,14 +160,14 @@ def plot_positions(map_by_timedelta: dict, target_map: dict, filename: str):
     plt.close(fig)
 
 
-def plot_laptime(dicts: dict, filename: str, d: int):
+def plot_laptime(dicts: dict[int, dict[int, float]], filename: str, d: int):
     fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
     all_y = []
     for no, data in dicts.items():
         style = set_style(no)
-        x = list(data.keys())
-        y = list(data.values())
-        all_y.extend(y)
+        x = sorted(list(data.keys()))
+        y = [data.get(i, 180) for i in x]
+        all_y += y
         ax.plot(x, y, **style)
 
     if len(all_y) > 0:
@@ -193,19 +193,13 @@ def plot_laptime(dicts: dict, filename: str, d: int):
         plt.close(fig)
 
 
-def plot_laptime_diff(dicts: dict, filename: str, minus: float, plus: float):
+def plot_laptime_diff(dicts: dict[int, dict[int, float]], filename: str, minus: float, plus: float):
     fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
     for no, data in dicts.items():
         style = set_style(no)
-        x = []
-        y = []
-        for lap in range(2, len(data) + 1):
-            if lap in data and lap - 1 in data:
-                delta = data[lap] - data[lap - 1]
-                if abs(delta) <= 5.0:  # 5秒以上の差をスキップ
-                    x.append(lap)
-                    y.append(delta)
-        ax.plot(x, y, **style)
+        x = sorted(list(data.keys()))
+        y = [data.get(i, 180) - data.get(i - 1, 180) for i in x[1:]]
+        ax.plot(x[1:], y, **style)
     ax.invert_yaxis()
     if minus != 0 or plus != 0:
         ax.set_ylim(- minus, plus)
