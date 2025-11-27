@@ -1,13 +1,14 @@
+import datetime
 import json
 import logging
 import os
 import time
-from datetime import datetime
 
 import util
 from backup import plotter
-from backup.domain.Stint import Stint
 from backup.domain.lap import Lap
+from backup.domain.stint import Stint
+from backup.domain.weather import Weather
 
 logging.basicConfig(
     level=logging.INFO,
@@ -20,6 +21,7 @@ log = logging.getLogger(__name__)
 
 laptime_map: dict[int, dict[int, Lap]] = {}
 stints_map: dict[int, dict[int, Stint]] = {}
+weather_map: dict[datetime.datetime, Weather] = {}
 
 results_path = "../live/data/results"
 logs_path = results_path + "/logs"
@@ -53,7 +55,7 @@ def to_json_style(s: str) -> str:
     return replaced
 
 
-def handle_timing_data(data, t: datetime):
+def handle_timing_data(data, t: datetime.datetime):
     if not isinstance(data, dict):
         return
     for driver, v in data['Lines'].items():
@@ -102,7 +104,7 @@ def handle_timing_data(data, t: datetime):
                             diff)
 
 
-def handle_timing_app_data(data, handled_time: datetime):
+def handle_timing_app_data(data, handled_time: datetime.datetime):
     if not isinstance(data, dict):
         return
     for driver, v in data['Lines'].items():
@@ -139,31 +141,28 @@ def handle_timing_app_data(data, handled_time: datetime):
                 s[stint_number].set_start_laps(stint['StartLaps'])
 
 
-air_temp_map = {}
-rainfall_map = {}
-track_temp_map = {}
-wind_speed_map = {}
-
-
-def handle_weather(data, t: datetime):
+def handle_weather(data, t: datetime.datetime):
     if not isinstance(data, dict):
         return
+    if t not in weather_map:
+        weather_map[t] = Weather()
+    weather = weather_map[t]
     if 'AirTemp' in data:
         air_temp: str = data["AirTemp"]
         if air_temp != "":
-            air_temp_map[t] = float(air_temp)
+            weather.set_air_temp(float(air_temp))
     if 'Rainfall' in data:
         rainfall: str = data["Rainfall"]
         if rainfall != "":
-            rainfall_map[t] = float(rainfall)
+            weather.set_rain_fall(float(rainfall))
     if 'TrackTemp' in data:
         track_temp: str = data["TrackTemp"]
         if track_temp != "":
-            track_temp_map[t] = float(track_temp)
+            weather.set_track_temp(float(track_temp))
     if 'WindSpeed' in data:
         wind_speed: str = data["WindSpeed"]
         if wind_speed != "":
-            wind_speed_map[t] = float(wind_speed)
+            weather.set_wind_speed(float(wind_speed))
 
 
 def handle_race_control(t, data):
@@ -185,11 +184,11 @@ def handle(message):
         return
     category = msg[0]
     if category == "TimingAppData":
-        handle_timing_app_data(msg[1], datetime.fromisoformat(msg[2].replace("Z", "+00:00")))
+        handle_timing_app_data(msg[1], datetime.datetime.fromisoformat(msg[2].replace("Z", "+00:00")))
     if category == "TimingData":
-        handle_timing_data(msg[1], datetime.fromisoformat(msg[2].replace("Z", "+00:00")))
+        handle_timing_data(msg[1], datetime.datetime.fromisoformat(msg[2].replace("Z", "+00:00")))
     if category == "WeatherData":
-        handle_weather(msg[1], datetime.fromisoformat(msg[2].replace("Z", "+00:00")))
+        handle_weather(msg[1], datetime.datetime.fromisoformat(msg[2].replace("Z", "+00:00")))
     if category == "RaceControlMessages":
         handle_race_control(msg[2], msg[1])
     if category == "TrackStatus":
@@ -234,15 +233,12 @@ while True:
         plotter.plot_laptime(laptime_map, "laptime", 7)
         plotter.plot_laptime_diff(laptime_map, "laptime_diffs", 0.75, 0.75)
 
-        plotter.plot_weather(air_temp_map, 'air_temp')
-        plotter.plot_weather(rainfall_map, 'rainfall')
-        plotter.plot_weather(track_temp_map, 'track_temp')
-        plotter.plot_weather(wind_speed_map, 'wind_speed')
+        plotter.plot_weather(weather_map)
     else:
         log.info("plot is skipped")
     try:
         os.remove(f"{logs_path}/timestamp.txt")
     except FileNotFoundError:
         pass
-    util.write_to_file_top(f"{logs_path}/timestamp.txt", f"{datetime.now()}")
+    util.write_to_file_top(f"{logs_path}/timestamp.txt", f"{datetime.datetime.now()}")
     time.sleep(60)

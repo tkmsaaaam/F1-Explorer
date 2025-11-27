@@ -1,11 +1,13 @@
+import datetime
 import logging
 import os
 
-from matplotlib import pyplot as plt
+from matplotlib import pyplot
 
 import config
-from backup.domain.Stint import Stint
 from backup.domain.lap import Lap
+from backup.domain.stint import Stint
+from backup.domain.weather import Weather
 
 logging.basicConfig(
     level=logging.INFO,
@@ -33,7 +35,7 @@ def plot_tyres(stint_map: dict[int, dict[int, Stint]]):
                             key=lambda d: (config.team_info_2025.get(d, 'Undefined'),
                                            config.name_info_2025.get(d, "UNDEFINED")))
 
-    fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
+    fig, ax = pyplot.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
     max_lap = 0
     y = 0
     for driver_number in sorted_drivers:
@@ -60,16 +62,16 @@ def plot_tyres(stint_map: dict[int, dict[int, Stint]]):
     ax.set_yticks([i for i in range(0, len(sorted_drivers))])
     ax.set_yticklabels([str(i) for i in sorted_drivers])
     ax.set_xlim(0, max_lap)
-    plt.grid(axis='x', linestyle=':', alpha=0.7)
+    pyplot.grid(axis='x', linestyle=':', alpha=0.7)
     output_path: str = f"{images_path}/tyres.png"
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     fig.savefig(output_path, bbox_inches='tight')
     log.info(f"Saved plot to {output_path}")
-    plt.close(fig)
+    pyplot.close(fig)
 
 
 def plot_gap_to_top(dicts: dict[int, dict[int, Lap]], filename: str, d: int):
-    fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
+    fig, ax = pyplot.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
     for no, data in dicts.items():
         style = set_style(no)
         x = sorted(list(data.keys()))
@@ -81,18 +83,18 @@ def plot_gap_to_top(dicts: dict[int, dict[int, Lap]], filename: str, d: int):
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     fig.savefig(output_path, bbox_inches='tight')
     log.info(f"Saved plot to {output_path}")
-    plt.close(fig)
+    pyplot.close(fig)
     if d is not None:
         ax.set_ylim(d, 0)
         output_path = f"{images_path}/{filename}_{d}.png"
         os.makedirs(os.path.dirname(output_path), exist_ok=True)
         fig.savefig(output_path, bbox_inches='tight')
         log.info(f"Saved plot to {output_path}")
-        plt.close(fig)
+        pyplot.close(fig)
 
 
 def plot_gap_to_ahead(dicts: dict[int, dict[int, Lap]], filename: str, d: int):
-    fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
+    fig, ax = pyplot.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
     for no, data in dicts.items():
         style = set_style(no)
         x = sorted(list(data.keys()))
@@ -104,18 +106,18 @@ def plot_gap_to_ahead(dicts: dict[int, dict[int, Lap]], filename: str, d: int):
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     fig.savefig(output_path, bbox_inches='tight')
     log.info(f"Saved plot to {output_path}")
-    plt.close(fig)
+    pyplot.close(fig)
     if d is not None:
         ax.set_ylim(d, 0)
         output_path = f"{images_path}/{filename}_{d}.png"
         os.makedirs(os.path.dirname(output_path), exist_ok=True)
         fig.savefig(output_path, bbox_inches='tight')
         log.info(f"Saved plot to {output_path}")
-        plt.close(fig)
+        pyplot.close(fig)
 
 
 def plot_positions(dicts: dict[int, dict[int, Lap]], filename: str):
-    fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
+    fig, ax = pyplot.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
     for no, data in dicts.items():
         style = set_style(no)
         x = sorted(list(data.keys()))
@@ -138,11 +140,11 @@ def plot_positions(dicts: dict[int, dict[int, Lap]], filename: str):
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     fig.savefig(output_path, bbox_inches='tight')
     log.info(f"Saved plot to {output_path}")
-    plt.close(fig)
+    pyplot.close(fig)
 
 
 def plot_laptime(dicts: dict[int, dict[int, Lap]], filename: str, d: int):
-    fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
+    fig, ax = pyplot.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
     all_y = []
     for no, data in dicts.items():
         style = set_style(no)
@@ -160,17 +162,14 @@ def plot_laptime(dicts: dict[int, dict[int, Lap]], filename: str, d: int):
         all_y += y
         ax.plot(x, y, **style)
 
-    if len(all_y) > 0:
-        min_time = min(all_y)
-    else:
-        min_time = 0
+    min_time = min(all_y) if len(all_y) > 0 else 0
     ax.set_ylim(min_time + 20, min_time)
     ax.legend(fontsize='small')
     output_path: str = f"{images_path}/{filename}.png"
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     fig.savefig(output_path, bbox_inches='tight')
     log.info(f"Saved plot to {output_path}")
-    plt.close(fig)
+    pyplot.close(fig)
     if all_y and d is not None:
         threshold = min_time + d
         capped_max_time = max(v for v in all_y if v <= threshold)
@@ -180,11 +179,11 @@ def plot_laptime(dicts: dict[int, dict[int, Lap]], filename: str, d: int):
         os.makedirs(os.path.dirname(output_path), exist_ok=True)
         fig.savefig(output_path, bbox_inches='tight')
         log.info(f"Saved plot to {output_path}")
-        plt.close(fig)
+        pyplot.close(fig)
 
 
 def plot_laptime_diff(dicts: dict[int, dict[int, Lap]], filename: str, minus: float, plus: float):
-    fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
+    fig, ax = pyplot.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
     for no, data in dicts.items():
         style = set_style(no)
         x = []
@@ -203,19 +202,46 @@ def plot_laptime_diff(dicts: dict[int, dict[int, Lap]], filename: str, minus: fl
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     fig.savefig(output_path, bbox_inches='tight')
     log.info(f"Saved plot to {output_path}")
-    plt.close(fig)
+    pyplot.close(fig)
 
 
-def plot_weather(m: dict, filename: str):
-    fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150)
-    x = []
-    y = []
-    for k, v in sorted(m.items()):
-        x.append(k)
-        y.append(v)
+def plot_weather(m: dict[datetime.datetime, Weather]):
+    fig, ax = pyplot.subplots(figsize=(12.8, 7.2), dpi=150)
+    x = [i for i in sorted(m.keys())]
+    y = [m[i].air_temp for i in x]
     ax.plot(x, y)
-    output_path = f"{images_path}/{filename}.png"
+    output_path = f"{images_path}/air_temp.png"
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     fig.savefig(output_path, bbox_inches='tight')
     log.info(f"Saved plot to {output_path}")
-    plt.close(fig)
+    pyplot.close(fig)
+
+    fig, ax = pyplot.subplots(figsize=(12.8, 7.2), dpi=150)
+    x = [i for i in sorted(m.keys())]
+    y = [m[i].rain_fall for i in x]
+    ax.plot(x, y)
+    output_path = f"{images_path}/rainfall.png"
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+    fig.savefig(output_path, bbox_inches='tight')
+    log.info(f"Saved plot to {output_path}")
+    pyplot.close(fig)
+
+    fig, ax = pyplot.subplots(figsize=(12.8, 7.2), dpi=150)
+    x = [i for i in sorted(m.keys())]
+    y = [m[i].track_temp for i in x]
+    ax.plot(x, y)
+    output_path = f"{images_path}/track_temp.png"
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+    fig.savefig(output_path, bbox_inches='tight')
+    log.info(f"Saved plot to {output_path}")
+    pyplot.close(fig)
+
+    fig, ax = pyplot.subplots(figsize=(12.8, 7.2), dpi=150)
+    x = [i for i in sorted(m.keys())]
+    y = [m[i].wind_speed for i in x]
+    ax.plot(x, y)
+    output_path = f"{images_path}/wind_speed.png"
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+    fig.savefig(output_path, bbox_inches='tight')
+    log.info(f"Saved plot to {output_path}")
+    pyplot.close(fig)
