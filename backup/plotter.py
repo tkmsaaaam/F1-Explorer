@@ -3,6 +3,7 @@ import logging
 import os
 
 from matplotlib import pyplot
+from plotly import graph_objects
 
 import config
 from backup.domain.lap import Lap
@@ -182,27 +183,55 @@ def plot_laptime(dicts: dict[int, dict[int, Lap]], filename: str, d: int):
         pyplot.close(fig)
 
 
-def plot_laptime_diff(dicts: dict[int, dict[int, Lap]], filename: str, minus: float, plus: float):
-    fig, ax = pyplot.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
+def plot_laptime_diff(dicts: dict[int, dict[int, Lap]], filename: str):
+    max_car_number, max_laps_dict = max(
+        dicts.items(),
+        key=lambda item: len(item[1])
+    )
+    header = ['Lap']
+    max_lap_key = max(max_laps_dict.keys())
+    numbers = [i for i in range(max_lap_key, 1, -1)]
+    data_rows = [numbers]
+    fill_colors = [["#f0f0f0"] * len(numbers)]
+
     for no, data in dicts.items():
-        style = set_style(no)
-        x = []
-        y = []
-        for i in sorted(list(data.keys())):
-            if i - 1 not in data.keys():
+        header.append(str(no))
+        lap_times = []
+        colors = []
+        for i in range(max_lap_key, 1, -1):
+            if i not in data or i - 1 not in data:
+                lap_times.append('---')
+                colors.append('#808080')  # gray
                 continue
-            x.append(i)
-            y.append(data.get(i, 180).time - data.get(i - 1, 180).time)
-        ax.plot(x, y, **style)
-    ax.invert_yaxis()
-    if minus != 0 or plus != 0:
-        ax.set_ylim(- minus, plus)
-    ax.legend(fontsize='small')
+            diff = data[i].time - data[i - 1].time
+            if diff < -10 or diff > 10:
+                lap_times.append("{:.3f}".format(diff))
+                colors.append('#808080')  # gray
+            elif diff > 0.1:
+                lap_times.append("{:.3f}".format(diff))
+                colors.append('#FF8488')  # light red
+            elif diff < -0.1:
+                lap_times.append("{:.3f}".format(diff))
+                colors.append('#ADD8E6')  # light blue
+            else:
+                lap_times.append("{:.3f}".format(diff))
+                colors.append('#ffffff')  # white
+        data_rows.append(lap_times)
+        fill_colors.append(colors)
+    # テーブル描画
+    fig = graph_objects.Figure(data=[graph_objects.Table(
+        header=dict(values=header, fill_color='lightgrey', align='center'),
+        cells=dict(values=data_rows, fill_color=fill_colors, align='center')
+    )])
+    fig.update_layout(
+        autosize=True,
+        margin=dict(autoexpand=True)
+    )
+
     output_path: str = f"{images_path}/{filename}.png"
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
-    fig.savefig(output_path, bbox_inches='tight')
+    fig.write_image(output_path, width=1920, height=1080)
     log.info(f"Saved plot to {output_path}")
-    pyplot.close(fig)
 
 
 def plot_weather(m: dict[datetime.datetime, Weather]):

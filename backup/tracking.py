@@ -223,7 +223,7 @@ while True:
         plotter.plot_gap_to_top(laptime_map, "gap_top", 35)
         plotter.plot_positions(laptime_map, "position")
         plotter.plot_laptime(laptime_map, "laptime", 7)
-        plotter.plot_laptime_diff(laptime_map, "laptime_diffs", 0.75, 0.75)
+        plotter.plot_laptime_diff(laptime_map, "laptime_diffs")
 
         plotter.plot_weather(weather_map)
     else:
