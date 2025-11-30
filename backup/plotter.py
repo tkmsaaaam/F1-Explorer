@@ -31,15 +31,13 @@ def set_style(no: int) -> dict[str, str]:
     return style
 
 
-def plot_tyres(stint_map: dict[int, dict[int, Stint]]):
-    sorted_drivers = sorted(stint_map.keys(),
-                            key=lambda d: (config.team_info_2025.get(d, 'Undefined'),
-                                           config.name_info_2025.get(d, "UNDEFINED")))
-
+def plot_tyres(stint_map: dict[int, dict[int, Stint]], order: list[int]):
     fig, ax = pyplot.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
     max_lap = 0
     y = 0
-    for driver_number in sorted_drivers:
+    for driver_number in order:
+        if driver_number not in stint_map:
+            continue
         stints = stint_map[driver_number]
         stint_keys = sorted(stints.keys())
         start = 0
@@ -60,8 +58,9 @@ def plot_tyres(stint_map: dict[int, dict[int, Stint]]):
             if start > max_lap:
                 max_lap = start
         y += 1
-    ax.set_yticks([i for i in range(0, len(sorted_drivers))])
-    ax.set_yticklabels([str(i) for i in sorted_drivers])
+    ax.grid(True)
+    ax.set_yticks([i for i in range(0, len(order))])
+    ax.set_yticklabels([str(i) for i in order])
     ax.set_xlim(0, max_lap)
     pyplot.grid(axis='x', linestyle=':', alpha=0.7)
     output_path: str = f"{images_path}/tyres.png"
@@ -78,6 +77,7 @@ def plot_gap_to_top(dicts: dict[int, dict[int, Lap]], filename: str, d: int):
         x = sorted(list(data.keys()))
         y = [data[i].gap_to_top for i in x]
         ax.plot(x, y, **style)
+    ax.grid(True)
     ax.legend(fontsize='small')
     ax.invert_yaxis()
     output_path = f"{images_path}/{filename}.png"
@@ -101,6 +101,7 @@ def plot_gap_to_ahead(dicts: dict[int, dict[int, Lap]], filename: str, d: int):
         x = sorted(list(data.keys()))
         y = [data[i].gap_to_ahead for i in x]
         ax.plot(x, y, **style)
+    ax.grid(True)
     ax.legend(fontsize='small')
     ax.invert_yaxis()
     output_path = f"{images_path}/{filename}.png"
@@ -122,19 +123,9 @@ def plot_positions(dicts: dict[int, dict[int, Lap]], filename: str):
     for no, data in dicts.items():
         style = set_style(no)
         x = sorted(list(data.keys()))
-        y = []
-        last_pos = None
-        for i in x:
-            pos = data.get(i, 180).position
-            if pos != 0:
-                last_pos = pos
-                y.append(pos)
-            else:
-                if last_pos is not None:
-                    y.append(last_pos)
-                else:
-                    y.append(0)
+        y = [data[i].position for i in x]
         ax.plot(x, y, **style)
+    ax.grid(True)
     ax.legend(fontsize='small')
     ax.invert_yaxis()
     output_path: str = f"{images_path}/{filename}.png"
@@ -162,8 +153,8 @@ def plot_laptime(dicts: dict[int, dict[int, Lap]], filename: str, d: int):
             y.append(lap.time)
         all_y += y
         ax.plot(x, y, **style)
-
     min_time = min(all_y) if len(all_y) > 0 else 0
+    ax.grid(True)
     ax.set_ylim(min_time + 20, min_time)
     ax.legend(fontsize='small')
     output_path: str = f"{images_path}/{filename}.png"
@@ -175,6 +166,7 @@ def plot_laptime(dicts: dict[int, dict[int, Lap]], filename: str, d: int):
         threshold = min_time + d
         capped_max_time = max(v for v in all_y if v <= threshold)
         log.info(f"min: {min_time}, capped max: {capped_max_time}")
+        ax.grid(True)
         ax.set_ylim(capped_max_time, min_time)
         output_path: str = f"{images_path}/{filename}_{d}.png"
         os.makedirs(os.path.dirname(output_path), exist_ok=True)
@@ -183,8 +175,8 @@ def plot_laptime(dicts: dict[int, dict[int, Lap]], filename: str, d: int):
         pyplot.close(fig)
 
 
-def plot_laptime_diff(dicts: dict[int, dict[int, Lap]], filename: str):
-    max_car_number, max_laps_dict = max(
+def plot_laptime_diff(dicts: dict[int, dict[int, Lap]], order: list[int], filename: str):
+    _, max_laps_dict = max(
         dicts.items(),
         key=lambda item: len(item[1])
     )
@@ -194,7 +186,8 @@ def plot_laptime_diff(dicts: dict[int, dict[int, Lap]], filename: str):
     data_rows = [numbers]
     fill_colors = [["#f0f0f0"] * len(numbers)]
 
-    for no, data in dicts.items():
+    for no in order:
+        data = dicts[no]
         header.append(str(no))
         lap_times = []
         colors = []
@@ -218,7 +211,6 @@ def plot_laptime_diff(dicts: dict[int, dict[int, Lap]], filename: str):
                 colors.append('#ffffff')  # white
         data_rows.append(lap_times)
         fill_colors.append(colors)
-    # テーブル描画
     fig = graph_objects.Figure(data=[graph_objects.Table(
         header=dict(values=header, fill_color='lightgrey', align='center'),
         cells=dict(values=data_rows, fill_color=fill_colors, align='center')
@@ -227,7 +219,6 @@ def plot_laptime_diff(dicts: dict[int, dict[int, Lap]], filename: str):
         autosize=True,
         margin=dict(autoexpand=True)
     )
-
     output_path: str = f"{images_path}/{filename}.png"
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     fig.write_image(output_path, width=1920, height=1080)
@@ -239,6 +230,7 @@ def plot_weather(m: dict[datetime.datetime, Weather]):
     x = [i for i in sorted(m.keys())]
     y = [m[i].air_temp for i in x]
     ax.plot(x, y)
+    ax.grid(True)
     output_path = f"{images_path}/air_temp.png"
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     fig.savefig(output_path, bbox_inches='tight')
@@ -249,6 +241,7 @@ def plot_weather(m: dict[datetime.datetime, Weather]):
     x = [i for i in sorted(m.keys())]
     y = [m[i].rain_fall for i in x]
     ax.plot(x, y)
+    ax.grid(True)
     output_path = f"{images_path}/rainfall.png"
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     fig.savefig(output_path, bbox_inches='tight')
@@ -259,6 +252,7 @@ def plot_weather(m: dict[datetime.datetime, Weather]):
     x = [i for i in sorted(m.keys())]
     y = [m[i].track_temp for i in x]
     ax.plot(x, y)
+    ax.grid(True)
     output_path = f"{images_path}/track_temp.png"
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     fig.savefig(output_path, bbox_inches='tight')
@@ -269,6 +263,7 @@ def plot_weather(m: dict[datetime.datetime, Weather]):
     x = [i for i in sorted(m.keys())]
     y = [m[i].wind_speed for i in x]
     ax.plot(x, y)
+    ax.grid(True)
     output_path = f"{images_path}/wind_speed.png"
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     fig.savefig(output_path, bbox_inches='tight')

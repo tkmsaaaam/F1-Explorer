@@ -63,9 +63,12 @@ def handle_timing_data(data, t: datetime.datetime):
                 if driver_number not in laptime_map:
                     laptime_map[driver_number] = {}
                 lap = Lap()
+                lap_number = v["NumberOfLaps"]
+                if len(laptime_map[driver_number]) > 0:
+                    lap.set_position(laptime_map[driver_number][max(laptime_map[driver_number].keys())].position)
                 lap.set_time(str_to_seconds(lap_time))
                 lap.set_at(t)
-                laptime_map[driver_number][v["NumberOfLaps"]] = lap
+                laptime_map[driver_number][lap_number] = lap
         if 'Position' in v:
             position = int(v["Position"])
             if driver_number not in laptime_map:
@@ -114,6 +117,8 @@ def handle_timing_app_data(data, handled_time: datetime.datetime):
                 lap_number = stint["LapNumber"]
                 if lap_number not in laptime_map[driver_number]:
                     lap = Lap()
+                    if len(laptime_map[driver_number]) > 0:
+                        lap.set_position(laptime_map[driver_number][max(laptime_map[driver_number].keys())].position)
                     lap.set_at(handled_time)
                     lap.set_time(str_to_seconds(stint["LapTime"]))
                     laptime_map[driver_number][lap_number] = lap
@@ -218,12 +223,16 @@ while True:
 
     # ファイルが更新されていた場合のみplotを実行
     if start != prev_start:
-        plotter.plot_tyres(stints_map)
-        plotter.plot_gap_to_ahead(laptime_map, "gap_ahead", 8)
-        plotter.plot_gap_to_top(laptime_map, "gap_top", 35)
+        order = sorted(
+            laptime_map.keys(),
+            key=lambda car: laptime_map[car][max(laptime_map[car].keys())].position
+        )
+        plotter.plot_tyres(stints_map, order)
+        plotter.plot_gap_to_ahead(laptime_map, "gap_ahead", 6)
+        plotter.plot_gap_to_top(laptime_map, "gap_top", 30)
         plotter.plot_positions(laptime_map, "position")
         plotter.plot_laptime(laptime_map, "laptime", 7)
-        plotter.plot_laptime_diff(laptime_map, "laptime_diffs")
+        plotter.plot_laptime_diff(laptime_map, order, "laptime_diffs")
 
         plotter.plot_weather(weather_map)
     else:
