@@ -63,18 +63,16 @@ def handle_timing_data(data, t: datetime.datetime):
                 if driver_number not in laptime_map:
                     laptime_map[driver_number] = {}
                 lap = Lap()
-                lap_number = v["NumberOfLaps"]
                 driver_laps = laptime_map[driver_number]
                 if len(driver_laps) > 0:
                     lap.set_position(driver_laps[max(driver_laps.keys())].position)
                 lap.set_time(str_to_seconds(lap_time))
-                lap.set_at(t)
+                lap_number = v["NumberOfLaps"]
                 driver_laps[lap_number] = lap
         if 'Position' in v:
             position = int(v["Position"])
             if driver_number not in laptime_map:
                 lap = Lap()
-                lap.set_position(position)
                 laptime_map[driver_number] = {0: lap}
             driver_laps = laptime_map[driver_number]
             if len(driver_laps.keys()) > 0:
@@ -84,7 +82,6 @@ def handle_timing_data(data, t: datetime.datetime):
                 diff = str_to_seconds(v["GapToLeader"].replace("+", ""))
                 if driver_number not in laptime_map:
                     lap = Lap()
-                    lap.set_gap_to_top(diff)
                     laptime_map[driver_number] = {0: lap}
                 driver_laps = laptime_map[driver_number]
                 if len(driver_laps.keys()) > 0:
@@ -95,7 +92,6 @@ def handle_timing_data(data, t: datetime.datetime):
                     diff = str_to_seconds(v["IntervalToPositionAhead"]["Value"].replace("+", ""))
                     if driver_number not in laptime_map:
                         lap = Lap()
-                        lap.set_gap_to_ahead(diff)
                         laptime_map[driver_number] = {0: lap}
                     driver_laps = laptime_map[driver_number]
                     if len(driver_laps.keys()) > 0:
@@ -117,12 +113,11 @@ def handle_timing_app_data(data, handled_time: datetime.datetime):
                 if driver_number not in laptime_map:
                     laptime_map[driver_number] = {}
                 lap_number = stint["LapNumber"]
-                if lap_number not in laptime_map[driver_number]:
+                driver_laps = laptime_map[driver_number]
+                if lap_number not in driver_laps:
                     lap = Lap()
-                    driver_laps = laptime_map[driver_number]
                     if len(driver_laps) > 0:
                         lap.set_position(driver_laps[max(driver_laps.keys())].position)
-                    lap.set_at(handled_time)
                     lap.set_time(str_to_seconds(stint["LapTime"]))
                     driver_laps[lap_number] = lap
             if driver_number not in stints_map:

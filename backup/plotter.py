@@ -51,6 +51,7 @@ def plot_tyres(stint_map: dict[int, dict[int, Stint]], order: list[int]):
             ax.barh(y=y,
                     width=width,
                     left=start,
+                    label=stint.compound,
                     color=config.compound_colors.get(stint.compound, 'gray'),
                     edgecolor='black' if stint.is_new else 'gray'
                     )
