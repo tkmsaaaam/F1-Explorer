@@ -105,25 +105,43 @@ def handle_timing_app_data(data, handled_time: datetime.datetime):
         if not 'Stints' in v:
             continue
         stints = v['Stints']
-        if not isinstance(stints, dict):
-            continue
-        driver_number = int(driver)
-        for stint_no, stint in stints.items():
-            if 'LapTime' in stint and 'LapNumber' in stint:
-                if driver_number not in laptime_map:
-                    laptime_map[driver_number] = {}
-                lap_number = stint["LapNumber"]
-                driver_laps = laptime_map[driver_number]
-                if lap_number not in driver_laps:
-                    lap = Lap()
-                    if len(driver_laps) > 0:
-                        lap.set_position(driver_laps[max(driver_laps.keys())].position)
-                    lap.set_time(str_to_seconds(stint["LapTime"]))
-                    driver_laps[lap_number] = lap
+        if isinstance(stints, dict):
+            driver_number = int(driver)
+            for stint_no, stint in stints.items():
+                if 'LapTime' in stint and 'LapNumber' in stint:
+                    if driver_number not in laptime_map:
+                        laptime_map[driver_number] = {}
+                    lap_number = stint["LapNumber"]
+                    driver_laps = laptime_map[driver_number]
+                    if lap_number not in driver_laps:
+                        lap = Lap()
+                        if len(driver_laps) > 0:
+                            lap.set_position(driver_laps[max(driver_laps.keys())].position)
+                        lap.set_time(str_to_seconds(stint["LapTime"]))
+                        driver_laps[lap_number] = lap
+                if driver_number not in stints_map:
+                    stints_map[driver_number] = {}
+                s = stints_map[driver_number]
+                stint_number = int(stint_no)
+                if stint_number not in s:
+                    s[stint_number] = Stint()
+                if 'Compound' in stint:
+                    s[stint_number].set_compound(stint['Compound'])
+                if 'New' in stint:
+                    s[stint_number].set_is_new(stint['New'])
+                if 'TotalLaps' in stint:
+                    s[stint_number].set_total_laps(stint['TotalLaps'])
+                if 'StartLaps' in stint:
+                    s[stint_number].set_start_laps(stint['StartLaps'])
+        if isinstance(stints, list):
+            driver_number = int(driver)
+            if len(stints) < 1:
+                continue
             if driver_number not in stints_map:
                 stints_map[driver_number] = {}
+            stint_number = max(stints_map[driver_number].keys()) + 1 if len(stints_map[driver_number]) > 0 else 0
+            stint = stints[0]
             s = stints_map[driver_number]
-            stint_number = int(stint_no)
             if stint_number not in s:
                 s[stint_number] = Stint()
             if 'Compound' in stint:
