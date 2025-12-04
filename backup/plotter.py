@@ -48,13 +48,14 @@ def plot_tyres(stint_map: dict[int, dict[int, Stint]], order: list[int]):
             width = stint.total_laps
             if stint.start_laps != 0:
                 width = width - stint.start_laps
-            ax.barh(y=y,
-                    width=width,
-                    left=start,
-                    label=stint.compound,
-                    color=config.compound_colors.get(stint.compound, 'gray'),
-                    edgecolor='black' if stint.is_new else 'gray'
-                    )
+            bar = ax.barh(y=y,
+                          width=width,
+                          left=start,
+                          color=config.compound_colors.get(stint.compound, 'gray'),
+                          edgecolor='black' if stint.is_new else 'gray'
+                          )
+            ax.bar_label(bar, labels=[str(stint.start_laps)],
+                         label_type="center")
             start += width
             if start > max_lap:
                 max_lap = start
