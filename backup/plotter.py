@@ -218,8 +218,9 @@ def plot_laptime_diff(dicts: dict[int, dict[int, Lap]], order: list[int], filena
         cells=dict(values=data_rows, fill_color=fill_colors, align='center')
     )])
     fig.update_layout(
-        autosize=True,
-        margin=dict(autoexpand=True)
+        width=1920,
+        height=1080,
+        margin=dict(l=20, r=20, t=20, b=20)
     )
     output_path: str = f"{images_path}/{filename}.png"
     os.makedirs(os.path.dirname(output_path), exist_ok=True)

@@ -52,7 +52,7 @@ def to_json_style(s: str) -> str:
     return s.replace("'", '"').replace('True', 'true').replace('False', 'false')
 
 
-def handle_timing_data(data, t: datetime.datetime):
+def handle_timing_data(data):
     if not isinstance(data, dict):
         return
     for driver, v in data['Lines'].items():
@@ -75,8 +75,7 @@ def handle_timing_data(data, t: datetime.datetime):
                 lap = Lap()
                 laptime_map[driver_number] = {0: lap}
             driver_laps = laptime_map[driver_number]
-            if len(driver_laps.keys()) > 0:
-                driver_laps.get(max(driver_laps.keys())).set_position(position)
+            driver_laps.get(max(driver_laps.keys())).set_position(position)
         if 'GapToLeader' in v:
             if not 'L' in v["GapToLeader"]:
                 diff = str_to_seconds(v["GapToLeader"].replace("+", ""))
@@ -84,8 +83,7 @@ def handle_timing_data(data, t: datetime.datetime):
                     lap = Lap()
                     laptime_map[driver_number] = {0: lap}
                 driver_laps = laptime_map[driver_number]
-                if len(driver_laps.keys()) > 0:
-                    driver_laps.get(max(driver_laps.keys())).set_gap_to_top(diff)
+                driver_laps.get(max(driver_laps.keys())).set_gap_to_top(diff)
         if 'IntervalToPositionAhead' in v:
             if 'Value' in v["IntervalToPositionAhead"]:
                 if not 'L' in v["IntervalToPositionAhead"]["Value"]:
@@ -94,11 +92,10 @@ def handle_timing_data(data, t: datetime.datetime):
                         lap = Lap()
                         laptime_map[driver_number] = {0: lap}
                     driver_laps = laptime_map[driver_number]
-                    if len(driver_laps.keys()) > 0:
-                        driver_laps.get(max(driver_laps.keys())).set_gap_to_ahead(diff)
+                    driver_laps.get(max(driver_laps.keys())).set_gap_to_ahead(diff)
 
 
-def handle_timing_app_data(data, handled_time: datetime.datetime):
+def handle_timing_app_data(data):
     if not isinstance(data, dict):
         return
     for driver, v in data['Lines'].items():
@@ -134,9 +131,9 @@ def handle_timing_app_data(data, handled_time: datetime.datetime):
                 if 'StartLaps' in stint:
                     s[stint_number].set_start_laps(stint['StartLaps'])
         if isinstance(stints, list):
-            driver_number = int(driver)
             if len(stints) < 1:
                 continue
+            driver_number = int(driver)
             if driver_number not in stints_map:
                 stints_map[driver_number] = {}
             stint_number = max(stints_map[driver_number].keys()) + 1 if len(stints_map[driver_number]) > 0 else 0
@@ -197,9 +194,9 @@ def handle(message):
         return
     category = msg[0]
     if category == "TimingAppData":
-        handle_timing_app_data(msg[1], datetime.datetime.fromisoformat(msg[2].replace("Z", "+00:00")))
+        handle_timing_app_data(msg[1])
     if category == "TimingData":
-        handle_timing_data(msg[1], datetime.datetime.fromisoformat(msg[2].replace("Z", "+00:00")))
+        handle_timing_data(msg[1])
     if category == "WeatherData":
         handle_weather(msg[1], datetime.datetime.fromisoformat(msg[2].replace("Z", "+00:00")))
     if category == "RaceControlMessages":
