@@ -24,14 +24,14 @@ tracer = trace.get_tracer(__name__)
 def execute(session: Session, log: Logger, images_path: str, logs_path: str, lap_time_range: int | None,
             gap_top_range: int | None,
             gap_ahead_range: int | None):
-    lap_logs = make_lap_log(session.laps)
-    position_log = make_position_log(session.laps)
-    laptime(log, images_path, "laptime", session, lap_time_range, lap_logs)
-    gap(log, f"{images_path}/gap.png", lap_logs, position_log)
-    gap_to_ahead(log, images_path, "gap_ahead", session, gap_ahead_range, lap_logs, position_log)
-    gap_to_top(log, images_path, "gap_top", session, gap_top_range, lap_logs)
-    positions(log, f"{images_path}/position.png", session, lap_logs)
-    tyres(log, f"{images_path}/tyres.png", lap_logs)
+    driver_laps_set = make_driver_laps_set(session.laps)
+    start_by_position_by_number = make_lap_start_by_position_by_number(session.laps)
+    laptime(log, images_path, "laptime", session, lap_time_range, driver_laps_set)
+    gap(log, f"{images_path}/gap.png", driver_laps_set, start_by_position_by_number)
+    gap_to_ahead(log, images_path, "gap_ahead", session, gap_ahead_range, driver_laps_set, start_by_position_by_number)
+    gap_to_top(log, images_path, "gap_top", session, gap_top_range, driver_laps_set)
+    positions(log, f"{images_path}/position.png", session, driver_laps_set)
+    tyres(log, f"{images_path}/tyres.png", driver_laps_set)
     write_messages(session, logs_path)
     write_track_status(session, logs_path)
     try:
@@ -47,7 +47,7 @@ class DriverLaps:
         self.laps = laps
 
 
-def make_lap_log(laps: Laps) -> set[DriverLaps]:
+def make_driver_laps_set(laps: Laps) -> set[DriverLaps]:
     result = set()
     grouped = laps.groupby(['DriverNumber'])
     for _, stint_laps in grouped:
@@ -65,7 +65,7 @@ def make_lap_log(laps: Laps) -> set[DriverLaps]:
     return result
 
 
-def make_position_log(laps: Laps) -> dict[int, dict[int, datetime.datetime]]:
+def make_lap_start_by_position_by_number(laps: Laps) -> dict[int, dict[int, datetime.datetime]]:
     result = {}
     for i in range(0, len(laps)):
         lap_number = laps.LapNumber.iloc[i]

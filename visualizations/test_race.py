@@ -3,7 +3,7 @@ import unittest
 import pandas
 from fastf1.core import Laps
 
-from visualizations.race import make_lap_log
+from visualizations.race import make_driver_laps_set
 
 
 class Race(unittest.TestCase):
@@ -17,7 +17,7 @@ class Race(unittest.TestCase):
             "LapTime": pandas.to_timedelta(["83.456s", "82.789s", "83.000s"]),
         }
         laps = Laps(pandas.DataFrame(data))
-        result = make_lap_log(laps)
+        result = make_driver_laps_set(laps)
         self.assertEqual(1, len(result))
         self.assertEqual(3, len(list(result)[0].laps))
 
