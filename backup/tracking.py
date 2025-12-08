@@ -4,6 +4,7 @@ import logging
 import os
 import time
 
+import setup
 import util
 from backup import plotter
 from backup.domain.lap import Lap
@@ -201,14 +202,7 @@ def handle_track_status(t, data, logs_path: str):
 
 
 def main():
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s - %(levelname)s - %(message)s",  # Log format
-        handlers=[
-            logging.StreamHandler(),
-        ],
-    )
-    log = logging.getLogger(__name__)
+    log = setup.log()
 
     results_path = "../live/data/results"
     logs_path = results_path + "/logs"
