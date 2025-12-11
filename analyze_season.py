@@ -187,14 +187,15 @@ def main():
                           "{:.2f}".format(point / (latest - 1))]
     sum_map = sorted(sum_map.items(), key=lambda x: x[1])
     fig = graph_objects.Figure(data=[graph_objects.Table(
-        header=dict(values=["name"] + [k[0] for k in sum_map], fill_color='lightgrey', align='center'),
+        header=dict(values=["No", "name"] + [k[0] for k in sum_map], fill_color='lightgrey', align='center'),
         cells=dict(
-            values=[[f"{event.RoundNumber} {event.EventName.replace('Grand Prix', '')}" for _, event in
-                     schedule.iterrows()] + ["sum", "order", "top10",
-                                             "point", "point avg"]] + [
-                       res_map[k[0]] for k
-                       in sum_map],
-            fill_color=[['lightgrey' for _ in range(1, len(schedule) + 2)]] + [color_map[k[0]] for k in sum_map],
+            values=[[event.RoundNumber for _, event in schedule.iterrows()] + ["sum", "order", "top10", "point",
+                                                                               "point avg"]] + [
+                       [event.EventName.replace('Grand Prix', '') for _, event in schedule.iterrows()] + ["", "", "",
+                                                                                                          "", ""]] + [
+                       res_map[k[0]] for k in sum_map],
+            fill_color=[['lightgrey' for _ in range(1, len(schedule) + 2)]] + [
+                ['lightgrey' for _ in range(1, len(schedule) + 2)]] + [color_map[k[0]] for k in sum_map],
             align='center', font_color='darkgrey')
     )], layout=dict(autosize=True, margin=dict(autoexpand=True)))
 
@@ -213,11 +214,7 @@ def main():
                            [event.EventDate for _, event in schedule.iterrows()]],
                    fill_color=[["white" if i % 2 == 0 else "#f2f2f2" for i in range(1, len(numbers) + 1)]],
                    align='center')
-    )])
-    fig.update_layout(
-        autosize=True,
-        margin=dict(autoexpand=True)
-    )
+    )], layout=dict(autosize=True, margin=dict(autoexpand=True)))
 
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     fig.write_image(output_path, width=1920, height=2160)

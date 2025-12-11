@@ -167,11 +167,7 @@ def gap(log: Logger, filepath: str, lap_logs: set[DriverLaps],
         header=dict(values=header, fill_color='lightgrey', align='center'),
         cells=dict(values=[list(range(1, max_laps + 1))] + all_gaps, fill_color=[["#f0f0f0"] * max_laps] + fill_colors,
                    align='center')
-    )])
-    fig.update_layout(
-        autosize=True,
-        margin=dict(autoexpand=True)
-    )
+    )], layout=dict(autosize=True, margin=dict(autoexpand=True)))
 
     os.makedirs(os.path.dirname(filepath), exist_ok=True)
     fig.write_image(filepath, width=1920, height=1620)

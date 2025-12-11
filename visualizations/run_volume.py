@@ -89,11 +89,7 @@ def plot_laptime(session: Session, log: Logger):
     fig = graph_objects.Figure(data=[graph_objects.Table(
         header=dict(values=header, fill_color='lightgrey', align='center'),
         cells=dict(values=data_rows, fill_color=fill_colors, align='center')
-    )])
-    fig.update_layout(
-        autosize=True,
-        margin=dict(autoexpand=True)
-    )
+    )], layout=dict(autosize=True, margin=dict(autoexpand=True)))
 
     output_path = f"./images/{session.event.year}/{session.event.RoundNumber}_{session.event.Location}/{session.name.replace(' ', '')}/laptimes.png"
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
