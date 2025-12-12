@@ -31,6 +31,8 @@ def main():
     # {"round_number": {"name": "Japan", "sprint": true, "sprint_position": {"abbreviation": 1},"grid_position": {"abbreviation": 1}, "position": {"abbreviation": 1}}}
     results = {}
 
+    color_master_map = {1: 'gold', 2: 'silver', 3: 'darkgoldenrod', 4: '#4B0000', 5: '#660000', 6: '#800000',
+                        7: '#990000', 8: '#B20000', 9: '#CC0000', 10: '#E60000'}
     schedule = schedule.sort_values(by='RoundNumber')
     now = datetime.datetime.now()
     for _, event in schedule.iterrows():
@@ -38,7 +40,7 @@ def main():
             break
         if event.RoundNumber not in results:
             results[event.RoundNumber] = {"name": event.EventName, "date": event.EventDate, "grid_position": {},
-                                          "position": {}, "point": {}, "sprint": False}
+                                          "position": {}, "point": {}, "color": {}, "sprint": False}
 
         gp = results[event.RoundNumber]
         if event.EventFormat == "sprint_qualifying":
@@ -52,6 +54,7 @@ def main():
             for _, driver_row in sprint.results.iterrows():
                 gp["sprint_position"][driver_row.Abbreviation] = driver_row.Position
                 gp["sprint_point"][driver_row.Abbreviation] = driver_row.Points
+                gp["color"][driver_row.Abbreviation] = color_master_map.get(driver_row.Position, "white")
 
         race = fastf1.get_session(season, event.EventName, "R")
         race.load(laps=False, telemetry=False, weather=False, messages=False)
@@ -60,6 +63,7 @@ def main():
             gp["grid_position"][abbreviation] = driver_row.GridPosition
             gp["position"][abbreviation] = driver_row.Position
             gp["point"][abbreviation] = driver_row.Points
+            gp["color"][driver_row.Abbreviation] = color_master_map.get(driver_row.Position, "white")
             driver_colors[abbreviation] = race.get_driver(abbreviation).TeamColor
 
     latest = len(results) + 1
@@ -155,48 +159,48 @@ def main():
 
     output_path = f"{base_dir}/points.png"
     color_map = {}
-    color_master_map = {1: 'gold', 2: 'silver', 3: 'darkgoldenrod', 4: '#4B0000', 5: '#660000', 6: '#800000',
-                        7: '#990000', 8: '#B20000', 9: '#CC0000', 10: '#E60000'}
-    point_master_map = {1: 25, 2: 18, 3: 15, 4: 12, 5: 10, 6: 8, 7: 6, 8: 4, 9: 2, 10: 1}
-    sum_map = {}
+
     res_map = {}
+    point_map = {}
     for k, v in driver_colors.items():
         r = []
         c = []
         point_finish = 0
-        point = 0
+        sum_point = 0
         for i in numbers:
             if i not in results:
                 c.append('white')
                 r.append(0)
                 continue
             position = results[i]["position"].get(k, 0)
-            if position in color_master_map:
-                c.append(color_master_map[position])
-            else:
-                c.append('white')
-            if position in point_master_map:
-                point += point_master_map[position]
-            if 0 < position < 11:
+            c.append(results[i]["color"].get(k, 'white'))
+            point = results[i]["point"].get(k, 0)
+            sum_point += point
+            if point > 0:
                 point_finish += 1
             r.append(position)
         s = sum(r)
         color_map[k] = c + ['white', 'white', 'white', 'white', 'white']
-        sum_map[k] = s
-        res_map[k] = r + [sum(r), "{:.2f}".format(s / (latest - 1)), point_finish, point,
-                          "{:.2f}".format(point / (latest - 1))]
-    sum_map = sorted(sum_map.items(), key=lambda x: x[1])
+        res_map[k] = r + [sum(r), "{:.2f}".format(s / (latest - 1)), point_finish, sum_point,
+                          "{:.2f}".format(sum_point / (latest - 1))]
+        point_map[k] = sum_point
+    point_tuple = sorted(point_map.items(), key=lambda item: item[1], reverse=True)
+
+    headers = ["No", "name"] + [k[0] for k in point_tuple]
+    header_colors = (['lightgrey', 'lightgrey'] + ['#' + driver_colors.get(k[0], 'd3d3d3') for k in point_tuple])
+
+    round_numbers = [
+        [event.RoundNumber for _, event in schedule.iterrows()] + ["sum", "order", "top10", "point", "point avg"]]
+    event_names = [
+        [event.EventName.replace('Grand Prix', '') for _, event in schedule.iterrows()] + ["", "", "", "", ""]]
+
+    topic_colors = [['lightgrey' for _ in range(1, len(schedule) + 2)]]
+
     fig = graph_objects.Figure(data=[graph_objects.Table(
-        header=dict(values=["No", "name"] + [k[0] for k in sum_map], fill_color='lightgrey', align='center'),
-        cells=dict(
-            values=[[event.RoundNumber for _, event in schedule.iterrows()] + ["sum", "order", "top10", "point",
-                                                                               "point avg"]] + [
-                       [event.EventName.replace('Grand Prix', '') for _, event in schedule.iterrows()] + ["", "", "",
-                                                                                                          "", ""]] + [
-                       res_map[k[0]] for k in sum_map],
-            fill_color=[['lightgrey' for _ in range(1, len(schedule) + 2)]] + [
-                ['lightgrey' for _ in range(1, len(schedule) + 2)]] + [color_map[k[0]] for k in sum_map],
-            align='center', font_color='darkgrey')
+        header=dict(values=headers, fill_color=header_colors, align='center'),
+        cells=dict(values=round_numbers + event_names + [res_map[k[0]] for k in point_tuple],
+                   fill_color=topic_colors + topic_colors + [color_map[k[0]] for k in point_tuple],
+                   align='center', font_color='darkgrey')
     )], layout=dict(autosize=True, margin=dict(autoexpand=True)))
 
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
