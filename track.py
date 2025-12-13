@@ -44,7 +44,7 @@ while True:
         livedata = LiveTimingData(output_file, _files_read=True)
         livedata.load()
         session = fastf1.get_session(config['Year'], config['Round'], 'Race')
-        session.load(livedata=livedata)
+        session.load(livedata=livedata, telemetry=False)
         race.execute(session, log, "./live/data/results/images", "./live/data/results/logs",
                      config['Race']['LapTimeRange'], config['Race']['GapTopRange'], config['Race']['GapAheadRange'])
         weather.execute(session, log, "./live/data/results/images")
