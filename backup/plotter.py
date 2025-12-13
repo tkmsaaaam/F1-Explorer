@@ -61,9 +61,7 @@ def plot_tyres(stint_map: dict[int, dict[int, Stint]], order: list[int]):
                 max_lap = start
         y += 1
     ax.grid(True)
-    ax.set_yticks([i for i in range(0, len(order))])
-    ax.set_yticklabels([str(i) for i in order])
-    ax.set_xlim(0, max_lap)
+    ax.set(yticks=[i for i in range(0, len(order))], yticklabels=[str(i) for i in order], xlim=(0, max_lap))
     pyplot.grid(axis='x', linestyle=':', alpha=0.7)
     output_path: str = f"{images_path}/tyres.png"
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
