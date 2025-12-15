@@ -13,15 +13,11 @@ tracer = trace.get_tracer(__name__)
 
 
 class Weekend:
-    def __init__(self, gp_name: str, race_date: datetime.datetime):
+    def __init__(self, gp_name: str):
         self.gp_name = gp_name
-        self.race_date = race_date
         self.grid_position: dict[str, int] = {}
         self.position: dict[str, int] = {}
         self.point: dict[str, int] = {}
-        self.color: dict[str, str] = {}
-        self.sprint: bool = False
-        self.sprint_position: dict[str, int] = {}
         self.sprint_point: dict[str, int] = {}
 
     def set_grid_position(self, k: str, v: int):
@@ -32,15 +28,6 @@ class Weekend:
 
     def set_point(self, k: str, v: int):
         self.point[k] = v
-
-    def set_color(self, k: str, v: str):
-        self.color[k] = v
-
-    def set_sprint(self):
-        self.sprint = True
-
-    def set_sprint_position(self, k: str, v: int):
-        self.sprint_position[k] = v
 
     def set_sprint_point(self, k: str, v: int):
         self.sprint_point[k] = v
@@ -55,23 +42,15 @@ class Weekend:
             return self.position[k]
         return len(self.position) + 1
 
-    def get_point(self, k: str):
+    def get_point(self, k: str) -> int:
         if k in self.point:
             return self.point[k]
         return 0
-
-    def get_sprint(self):
-        return self.sprint
 
     def get_sprint_point(self, k: str) -> int:
         if k in self.sprint_point:
             return self.sprint_point[k]
         return 0
-
-    def get_color(self, k: str):
-        if k in self.color:
-            return self.color[k]
-        return 'white'
 
 
 @tracer.start_as_current_span("main")
@@ -93,23 +72,19 @@ def main():
     # {"round_number": {"name": "Japan", "sprint": true, "sprint_position": {"abbreviation": 1},"grid_position": {"abbreviation": 1}, "position": {"abbreviation": 1}}}
     results: dict[int, Weekend] = {}
 
-    color_master_map = {1: 'gold', 2: 'silver', 3: 'darkgoldenrod', 4: '#4B0000', 5: '#660000', 6: '#800000',
-                        7: '#990000', 8: '#B20000', 9: '#CC0000', 10: '#E60000'}
     schedule = schedule.sort_values(by='RoundNumber')
     now = datetime.datetime.now()
     for _, event in schedule.iterrows():
         if now < event.EventDate:
             break
         if event.RoundNumber not in results:
-            results[event.RoundNumber] = Weekend(event.EventName, event.EventDate)
+            results[event.RoundNumber] = Weekend(event.EventName)
 
         gp: Weekend = results[event.RoundNumber]
         if event.EventFormat == "sprint_qualifying":
             sprint = fastf1.get_session(season, event.EventName, "S")
             sprint.load(laps=False, telemetry=False, weather=False, messages=False)
-            gp.set_sprint()
             for _, driver_row in sprint.results.iterrows():
-                gp.set_sprint_position(driver_row.Abbreviation, driver_row.Position)
                 gp.set_sprint_point(driver_row.Abbreviation, driver_row.Points)
 
         race = fastf1.get_session(season, event.EventName, "R")
@@ -119,7 +94,6 @@ def main():
             gp.set_grid_position(driver_row.Abbreviation, driver_row.GridPosition)
             gp.set_position(driver_row.Abbreviation, driver_row.Position)
             gp.set_point(driver_row.Abbreviation, driver_row.Points)
-            gp.set_color(driver_row.Abbreviation, color_master_map.get(driver_row.Position, "white"))
             driver_colors[abbreviation] = race.get_driver(abbreviation).TeamColor
 
     latest = len(results) + 1
@@ -135,9 +109,7 @@ def main():
         y = []
         for i in range(1, latest):
             weekend = results[i]
-            sum_point = weekend.get_point(k)
-            if weekend.get_sprint():
-                sum_point += weekend.get_sprint_point(k)
+            sum_point = weekend.get_point(k) + weekend.get_sprint_point(k)
             y.append(sum_point)
         if sum(y) > sum(champion_points):
             champion_points = y
@@ -156,9 +128,7 @@ def main():
         y = []
         for i in range(1, latest):
             weekend = results[i]
-            p = weekend.get_point(k)
-            if weekend.get_sprint():
-                p += weekend.get_sprint_point(k)
+            p = weekend.get_point(k) + weekend.get_sprint_point(k)
             y.append(p)
         ax.plot([i for i in range(1, latest)], y, label=k, color='#' + v, linewidth=1)
     ax.legend(fontsize='small')
@@ -174,9 +144,7 @@ def main():
         y = []
         for i in range(1, latest):
             weekend = results[i]
-            p = weekend.get_point(k)
-            if weekend.get_sprint_point(k):
-                p += weekend.get_sprint_point(k)
+            p = weekend.get_point(k) + weekend.get_sprint_point(k)
             y.append(p)
         diff = [a - b for a, b in zip(accumulate(y), accumulate(champion_points))]
         ax.plot([i for i in range(1, latest)], diff, label=k, color="#" + v, linewidth=1)
@@ -221,6 +189,8 @@ def main():
 
     res_map = {}
     point_map = {}
+    color_master_map = {1: 'gold', 2: 'silver', 3: 'darkgoldenrod', 4: '#4B0000', 5: '#660000', 6: '#800000',
+                        7: '#990000', 8: '#B20000', 9: '#CC0000', 10: '#E60000'}
     for k, v in driver_colors.items():
         r = []
         c = []
@@ -233,7 +203,7 @@ def main():
                 continue
             weekend = results[i]
             position = weekend.get_position(k)
-            c.append(weekend.get_color(k))
+            c.append(color_master_map.get(weekend.get_position(k), 'white'))
             point = weekend.get_point(k)
             sum_point += point
             if point > 0:
