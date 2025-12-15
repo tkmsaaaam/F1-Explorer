@@ -12,6 +12,68 @@ import setup
 tracer = trace.get_tracer(__name__)
 
 
+class Weekend:
+    def __init__(self, gp_name: str, race_date: datetime.datetime):
+        self.gp_name = gp_name
+        self.race_date = race_date
+        self.grid_position: dict[str, int] = {}
+        self.position: dict[str, int] = {}
+        self.point: dict[str, int] = {}
+        self.color: dict[str, str] = {}
+        self.sprint: bool = False
+        self.sprint_position: dict[str, int] = {}
+        self.sprint_point: dict[str, int] = {}
+
+    def set_grid_position(self, k: str, v: int):
+        self.grid_position[k] = v
+
+    def set_position(self, k: str, v: int):
+        self.position[k] = v
+
+    def set_point(self, k: str, v: int):
+        self.point[k] = v
+
+    def set_color(self, k: str, v: str):
+        self.color[k] = v
+
+    def set_sprint(self):
+        self.sprint = True
+
+    def set_sprint_position(self, k: str, v: int):
+        self.sprint_position[k] = v
+
+    def set_sprint_point(self, k: str, v: int):
+        self.sprint_point[k] = v
+
+    def get_grid_position(self, k: str) -> int:
+        if k in self.grid_position:
+            return self.grid_position[k]
+        return len(self.grid_position) + 1
+
+    def get_position(self, k: str) -> int:
+        if k in self.position:
+            return self.position[k]
+        return len(self.position) + 1
+
+    def get_point(self, k: str):
+        if k in self.point:
+            return self.point[k]
+        return 0
+
+    def get_sprint(self):
+        return self.sprint
+
+    def get_sprint_point(self, k: str) -> int:
+        if k in self.sprint_point:
+            return self.sprint_point[k]
+        return 0
+
+    def get_color(self, k: str):
+        if k in self.color:
+            return self.color[k]
+        return 'white'
+
+
 @tracer.start_as_current_span("main")
 def main():
     config = setup.load_config()
@@ -29,7 +91,7 @@ def main():
     driver_colors = {}
 
     # {"round_number": {"name": "Japan", "sprint": true, "sprint_position": {"abbreviation": 1},"grid_position": {"abbreviation": 1}, "position": {"abbreviation": 1}}}
-    results = {}
+    results: dict[int, Weekend] = {}
 
     color_master_map = {1: 'gold', 2: 'silver', 3: 'darkgoldenrod', 4: '#4B0000', 5: '#660000', 6: '#800000',
                         7: '#990000', 8: '#B20000', 9: '#CC0000', 10: '#E60000'}
@@ -39,31 +101,25 @@ def main():
         if now < event.EventDate:
             break
         if event.RoundNumber not in results:
-            results[event.RoundNumber] = {"name": event.EventName, "date": event.EventDate, "grid_position": {},
-                                          "position": {}, "point": {}, "color": {}, "sprint": False}
+            results[event.RoundNumber] = Weekend(event.EventName, event.EventDate)
 
-        gp = results[event.RoundNumber]
+        gp: Weekend = results[event.RoundNumber]
         if event.EventFormat == "sprint_qualifying":
             sprint = fastf1.get_session(season, event.EventName, "S")
             sprint.load(laps=False, telemetry=False, weather=False, messages=False)
-            gp["sprint"] = True
-            if "sprint_position" not in gp:
-                gp["sprint_position"] = {}
-            if "sprint_point" not in gp:
-                gp["sprint_point"] = {}
+            gp.set_sprint()
             for _, driver_row in sprint.results.iterrows():
-                gp["sprint_position"][driver_row.Abbreviation] = driver_row.Position
-                gp["sprint_point"][driver_row.Abbreviation] = driver_row.Points
-                gp["color"][driver_row.Abbreviation] = color_master_map.get(driver_row.Position, "white")
+                gp.set_sprint_position(driver_row.Abbreviation, driver_row.Position)
+                gp.set_sprint_point(driver_row.Abbreviation, driver_row.Points)
 
         race = fastf1.get_session(season, event.EventName, "R")
         race.load(laps=False, telemetry=False, weather=False, messages=False)
         for _, driver_row in race.results.iterrows():
             abbreviation = driver_row.Abbreviation
-            gp["grid_position"][abbreviation] = driver_row.GridPosition
-            gp["position"][abbreviation] = driver_row.Position
-            gp["point"][abbreviation] = driver_row.Points
-            gp["color"][driver_row.Abbreviation] = color_master_map.get(driver_row.Position, "white")
+            gp.set_grid_position(driver_row.Abbreviation, driver_row.GridPosition)
+            gp.set_position(driver_row.Abbreviation, driver_row.Position)
+            gp.set_point(driver_row.Abbreviation, driver_row.Points)
+            gp.set_color(driver_row.Abbreviation, color_master_map.get(driver_row.Position, "white"))
             driver_colors[abbreviation] = race.get_driver(abbreviation).TeamColor
 
     latest = len(results) + 1
@@ -78,9 +134,10 @@ def main():
     for k, v in driver_colors.items():
         y = []
         for i in range(1, latest):
-            sum_point = results[i]["point"].get(k, 0)
-            if results[i]["sprint"]:
-                sum_point += results[i]["sprint_point"].get(k, 0)
+            weekend = results[i]
+            sum_point = weekend.get_point(k)
+            if weekend.get_sprint():
+                sum_point += weekend.get_sprint_point(k)
             y.append(sum_point)
         if sum(y) > sum(champion_points):
             champion_points = y
@@ -98,9 +155,10 @@ def main():
     for k, v in driver_colors.items():
         y = []
         for i in range(1, latest):
-            p = results[i]["point"].get(k, 0)
-            if results[i]["sprint"]:
-                p += results[i]["sprint_point"].get(k, 0)
+            weekend = results[i]
+            p = weekend.get_point(k)
+            if weekend.get_sprint():
+                p += weekend.get_sprint_point(k)
             y.append(p)
         ax.plot([i for i in range(1, latest)], y, label=k, color='#' + v, linewidth=1)
     ax.legend(fontsize='small')
@@ -115,9 +173,10 @@ def main():
     for k, v in driver_colors.items():
         y = []
         for i in range(1, latest):
-            p = results[i]["point"].get(k, 0)
-            if results[i]["sprint"]:
-                p += results[i]["sprint_point"].get(k, 0)
+            weekend = results[i]
+            p = weekend.get_point(k)
+            if weekend.get_sprint_point(k):
+                p += weekend.get_sprint_point(k)
             y.append(p)
         diff = [a - b for a, b in zip(accumulate(y), accumulate(champion_points))]
         ax.plot([i for i in range(1, latest)], diff, label=k, color="#" + v, linewidth=1)
@@ -132,7 +191,7 @@ def main():
     fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
     x = [i for i in range(1, latest)]
     for k, v in driver_colors.items():
-        y = [results[i]["grid_position"].get(k, 21) for i in range(1, latest)]
+        y = [results[i].get_grid_position(k) for i in range(1, latest)]
         ax.plot(x, y, label=k, color='#' + v, linewidth=1)
     ax.legend(fontsize='small')
     ax.grid(True)
@@ -145,7 +204,7 @@ def main():
 
     fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
     for k, v in driver_colors.items():
-        y = [results[i]["grid_position"].get(k, 21) - results[i]["position"].get(k, 21) for i in range(1, latest)]
+        y = [results[i].get_grid_position(k) - results[i].get_position(k) for i in range(1, latest)]
         ax.plot(x, y, label=k, color='#' + v, linewidth=1)
     ax.legend(fontsize='small')
     ax.grid(True)
@@ -172,9 +231,10 @@ def main():
                 c.append('white')
                 r.append(0)
                 continue
-            position = results[i]["position"].get(k, 0)
-            c.append(results[i]["color"].get(k, 'white'))
-            point = results[i]["point"].get(k, 0)
+            weekend = results[i]
+            position = weekend.get_position(k)
+            c.append(weekend.get_color(k))
+            point = weekend.get_point(k)
             sum_point += point
             if point > 0:
                 point_finish += 1
