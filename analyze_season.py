@@ -106,11 +106,7 @@ def main():
     fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
     champion_points = []
     for k, v in driver_colors.items():
-        y = []
-        for i in range(1, latest):
-            weekend = results[i]
-            sum_point = weekend.get_point(k) + weekend.get_sprint_point(k)
-            y.append(sum_point)
+        y = [results[i].get_point(k) + results[i].get_sprint_point(k) for i in range(1, latest)]
         if sum(y) > sum(champion_points):
             champion_points = y
         ax.plot([i for i in range(1, latest)], [sum(y[:i + 1]) for i in range(len(y))], label=k,
@@ -125,11 +121,7 @@ def main():
 
     fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
     for k, v in driver_colors.items():
-        y = []
-        for i in range(1, latest):
-            weekend = results[i]
-            p = weekend.get_point(k) + weekend.get_sprint_point(k)
-            y.append(p)
+        y = [results[i].get_point(k) + results[i].get_sprint_point(k) for i in range(1, latest)]
         ax.plot([i for i in range(1, latest)], y, label=k, color='#' + v, linewidth=1)
     ax.legend(fontsize='small')
     ax.grid(True)
@@ -141,11 +133,7 @@ def main():
 
     fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout="tight")
     for k, v in driver_colors.items():
-        y = []
-        for i in range(1, latest):
-            weekend = results[i]
-            p = weekend.get_point(k) + weekend.get_sprint_point(k)
-            y.append(p)
+        y = [results[i].get_point(k) + results[i].get_sprint_point(k) for i in range(1, latest)]
         diff = [a - b for a, b in zip(accumulate(y), accumulate(champion_points))]
         ax.plot([i for i in range(1, latest)], diff, label=k, color="#" + v, linewidth=1)
     ax.legend(fontsize='small')
@@ -184,40 +172,30 @@ def main():
 
     numbers = [event.RoundNumber for _, event in schedule.iterrows()]
 
-    output_path = f"{base_dir}/points.png"
     color_map = {}
+    values_map = {}
+    sum_map = {}
 
-    res_map = {}
-    point_map = {}
     color_master_map = {1: 'gold', 2: 'silver', 3: 'darkgoldenrod', 4: '#4B0000', 5: '#660000', 6: '#800000',
                         7: '#990000', 8: '#B20000', 9: '#CC0000', 10: '#E60000'}
     for k, v in driver_colors.items():
-        r = []
-        c = []
-        point_finish = 0
-        sum_point = 0
-        for i in numbers:
-            if i not in results:
-                c.append('white')
-                r.append(0)
-                continue
-            weekend = results[i]
-            position = weekend.get_position(k)
-            c.append(color_master_map.get(weekend.get_position(k), 'white'))
-            point = weekend.get_point(k)
-            sum_point += point
-            if point > 0:
-                point_finish += 1
-            r.append(position)
-        s = sum(r)
-        color_map[k] = c + ['white', 'white', 'white', 'white', 'white']
-        res_map[k] = r + [sum(r), "{:.2f}".format(s / (latest - 1)), point_finish, sum_point,
-                          "{:.2f}".format(sum_point / (latest - 1))]
-        point_map[k] = sum_point
-    point_tuple = sorted(point_map.items(), key=lambda item: item[1], reverse=True)
+        positions = [results[i].get_point(k) if i in results else 0 for i in numbers]
+        point_finish = sum(1 for i in numbers if results[i].get_point(k) >= 0)
+        sum_point = sum([results[i].get_point(k) for i in numbers])
 
-    headers = ["No", "name"] + [k[0] for k in point_tuple]
-    header_colors = (['lightgrey', 'lightgrey'] + ['#' + driver_colors.get(k[0], 'd3d3d3') for k in point_tuple])
+        values_map[k] = positions + [sum(positions), "{:.2f}".format(sum(positions) / (latest - 1)), point_finish,
+                                     sum_point,
+                                     "{:.2f}".format(sum_point / (latest - 1))]
+
+        sum_map[k] = sum_point
+
+        color_map[k] = [color_master_map.get(results[i].get_position(k), 'white') if i in results else 'white' for i in
+                        numbers] + ['white', 'white', 'white', 'white', 'white']
+
+    standings_tuple = sorted(sum_map.items(), key=lambda item: item[1], reverse=True)
+
+    headers = ["No", "name"] + [k[0] for k in standings_tuple]
+    header_colors = (['lightgrey', 'lightgrey'] + ['#' + driver_colors.get(k[0], 'd3d3d3') for k in standings_tuple])
 
     round_numbers = [
         [event.RoundNumber for _, event in schedule.iterrows()] + ["sum", "order", "top10", "point", "point avg"]]
@@ -228,11 +206,12 @@ def main():
 
     fig = graph_objects.Figure(data=[graph_objects.Table(
         header=dict(values=headers, fill_color=header_colors, align='center'),
-        cells=dict(values=round_numbers + event_names + [res_map[k[0]] for k in point_tuple],
-                   fill_color=topic_colors + topic_colors + [color_map[k[0]] for k in point_tuple],
+        cells=dict(values=round_numbers + event_names + [values_map[k[0]] for k in standings_tuple],
+                   fill_color=topic_colors + topic_colors + [color_map[k[0]] for k in standings_tuple],
                    align='center', font_color='darkgrey')
     )], layout=dict(autosize=True, margin=dict(autoexpand=True)))
 
+    output_path = f"{base_dir}/points.png"
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     fig.write_image(output_path, width=1920, height=2160)
     log.info(f"Saved plot to {output_path}")
