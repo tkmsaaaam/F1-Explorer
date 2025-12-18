@@ -67,9 +67,7 @@ def main():
     setup.fast_f1()
     schedule = fastf1.get_event_schedule(season, include_testing=False)
 
-    driver_colors = {}
-
-    # {"round_number": {"name": "Japan", "sprint": true, "sprint_position": {"abbreviation": 1},"grid_position": {"abbreviation": 1}, "position": {"abbreviation": 1}}}
+    driver_colors: dict[str, str] = {}
     results: dict[int, Weekend] = {}
 
     schedule = schedule.sort_values(by='RoundNumber')
@@ -91,9 +89,9 @@ def main():
         race.load(laps=False, telemetry=False, weather=False, messages=False)
         for _, driver_row in race.results.iterrows():
             abbreviation = driver_row.Abbreviation
-            gp.set_grid_position(driver_row.Abbreviation, driver_row.GridPosition)
-            gp.set_position(driver_row.Abbreviation, driver_row.Position)
-            gp.set_point(driver_row.Abbreviation, driver_row.Points)
+            gp.set_grid_position(abbreviation, driver_row.GridPosition)
+            gp.set_position(abbreviation, driver_row.Position)
+            gp.set_point(abbreviation, driver_row.Points)
             driver_colors[abbreviation] = race.get_driver(abbreviation).TeamColor
 
     latest = len(results) + 1
