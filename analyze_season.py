@@ -94,11 +94,10 @@ def main():
             gp.set_point(abbreviation, driver_row.Points)
             driver_colors[abbreviation] = race.get_driver(abbreviation).TeamColor
 
-    latest = len(results) + 1
-
-    if latest == 1:
+    if len(results) == 0:
         return
 
+    latest = len(results) + 1
     base_dir = f"./images/{season}"
 
     fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
@@ -168,18 +167,16 @@ def main():
     plt.close(fig)
     log.info(f"Saved plot to {output_path}")
 
-    numbers = [event.RoundNumber for _, event in schedule.iterrows()]
-
-    color_map = {}
     values_map = {}
     sum_map = {}
+    color_map = {}
 
     color_master_map = {1: 'gold', 2: 'silver', 3: 'darkgoldenrod', 4: '#4B0000', 5: '#660000', 6: '#800000',
                         7: '#990000', 8: '#B20000', 9: '#CC0000', 10: '#E60000'}
     for k, v in driver_colors.items():
-        positions = [results[i].get_point(k) if i in results else 0 for i in numbers]
-        point_finish = sum(1 for i in numbers if results[i].get_point(k) >= 0)
-        sum_point = sum([results[i].get_point(k) for i in numbers])
+        positions = [results[i].get_point(k) if i in results else 0 for i in range(1, latest)]
+        point_finish = sum(1 for i in range(1, latest) if results[i].get_point(k) >= 0)
+        sum_point = sum([results[i].get_point(k) for i in range(1, latest)])
 
         values_map[k] = positions + [sum(positions), "{:.2f}".format(sum(positions) / (latest - 1)), point_finish,
                                      sum_point,
@@ -188,12 +185,12 @@ def main():
         sum_map[k] = sum_point
 
         color_map[k] = [color_master_map.get(results[i].get_position(k), 'white') if i in results else 'white' for i in
-                        numbers] + ['white', 'white', 'white', 'white', 'white']
+                        range(1, latest)] + ['white', 'white', 'white', 'white', 'white']
 
-    standings_tuple = sorted(sum_map.items(), key=lambda item: item[1], reverse=True)
+    drivers_standing = [k for k, _ in sorted(sum_map.items(), key=lambda x: x[1], reverse=True)]
 
-    headers = ["No", "name"] + [k[0] for k in standings_tuple]
-    header_colors = (['lightgrey', 'lightgrey'] + ['#' + driver_colors.get(k[0], 'd3d3d3') for k in standings_tuple])
+    headers = ["No", "name"] + [k for k in drivers_standing]
+    header_colors = (['lightgrey', 'lightgrey'] + ['#' + driver_colors.get(k, 'd3d3d3') for k in drivers_standing])
 
     round_numbers = [
         [event.RoundNumber for _, event in schedule.iterrows()] + ["sum", "order", "top10", "point", "point avg"]]
@@ -204,8 +201,8 @@ def main():
 
     fig = graph_objects.Figure(data=[graph_objects.Table(
         header=dict(values=headers, fill_color=header_colors, align='center'),
-        cells=dict(values=round_numbers + event_names + [values_map[k[0]] for k in standings_tuple],
-                   fill_color=topic_colors + topic_colors + [color_map[k[0]] for k in standings_tuple],
+        cells=dict(values=round_numbers + event_names + [values_map[k] for k in drivers_standing],
+                   fill_color=topic_colors + topic_colors + [color_map[k] for k in drivers_standing],
                    align='center', font_color='darkgrey')
     )], layout=dict(autosize=True, margin=dict(autoexpand=True)))
 
@@ -219,11 +216,12 @@ def main():
         return
     fig = graph_objects.Figure(data=[graph_objects.Table(
         header=dict(values=["number", "name", "sprint", "date"], fill_color='lightgrey', align='center'),
-        cells=dict(values=[numbers,
+        cells=dict(values=[[event.RoundNumber for _, event in schedule.iterrows()],
                            [event.EventName for _, event in schedule.iterrows()],
                            [event.EventFormat == "sprint_qualifying" for _, event in schedule.iterrows()],
                            [event.EventDate for _, event in schedule.iterrows()]],
-                   fill_color=[["white" if i % 2 == 0 else "#f2f2f2" for i in range(1, len(numbers) + 1)]],
+                   fill_color=[
+                       ["white" if event.RoundNumber % 2 == 0 else "#f2f2f2" for _, event in schedule.iterrows()]],
                    align='center')
     )], layout=dict(autosize=True, margin=dict(autoexpand=True)))
 
