@@ -3,10 +3,12 @@ import os
 from itertools import accumulate
 
 import fastf1.plotting
+from fastf1.core import DriverResult
 from matplotlib import pyplot as plt
 from opentelemetry import trace
 from plotly import graph_objects
 
+import config
 import setup
 
 tracer = trace.get_tracer(__name__)
@@ -55,19 +57,19 @@ class Weekend:
 
 @tracer.start_as_current_span("main")
 def main():
-    config = setup.load_config()
+    c = setup.load_config()
 
     log = setup.log()
-    if config is None:
+    if c is None:
         log.warning("no config")
         return
     trace.get_current_span().set_attributes(
-        {"year": config['Year'], "round": config['Round'], "session": config['Session']})
-    season = config["Year"]
+        {"year": c['Year'], "round": c['Round'], "session": c['Session']})
+    season = c["Year"]
     setup.fast_f1()
     schedule = fastf1.get_event_schedule(season, include_testing=False)
 
-    driver_colors: dict[str, str] = {}
+    drivers: dict[int, DriverResult] = {}
     results: dict[int, Weekend] = {}
 
     schedule = schedule.sort_values(by='RoundNumber')
@@ -92,7 +94,8 @@ def main():
             gp.set_grid_position(abbreviation, driver_row.GridPosition)
             gp.set_position(abbreviation, driver_row.Position)
             gp.set_point(abbreviation, driver_row.Points)
-            driver_colors[abbreviation] = race.get_driver(abbreviation).TeamColor
+            if driver_row.DriverNumber not in drivers:
+                drivers[int(driver_row.DriverNumber)] = race.get_driver(abbreviation)
 
     if len(results) == 0:
         return
@@ -102,12 +105,14 @@ def main():
 
     fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
     champion_points = []
-    for k, v in driver_colors.items():
-        y = [results[i].get_point(k) + results[i].get_sprint_point(k) for i in range(1, latest)]
+    for k, v in drivers.items():
+        y = [results[i].get_point(v.Abbreviation) + results[i].get_sprint_point(v.Abbreviation) for i in
+             range(1, latest)]
         if sum(y) > sum(champion_points):
             champion_points = y
-        ax.plot([i for i in range(1, latest)], [sum(y[:i + 1]) for i in range(len(y))], label=k,
-                color='#' + v, linewidth=1)
+        ax.plot([i for i in range(1, latest)], [sum(y[:i + 1]) for i in range(len(y))], label=v.Abbreviation,
+                color='#' + v.TeamColor, linewidth=1,
+                linestyle="solid" if config.camera_info_2025.get(k, 'black') == "black" else "dashed")
     ax.legend(fontsize='small')
     ax.grid(True)
     output_path = f"{base_dir}/standings.png"
@@ -117,9 +122,11 @@ def main():
     log.info(f"Saved plot to {output_path}")
 
     fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
-    for k, v in driver_colors.items():
-        y = [results[i].get_point(k) + results[i].get_sprint_point(k) for i in range(1, latest)]
-        ax.plot([i for i in range(1, latest)], y, label=k, color='#' + v, linewidth=1)
+    for k, v in drivers.items():
+        y = [results[i].get_point(v.Abbreviation) + results[i].get_sprint_point(v.Abbreviation) for i in
+             range(1, latest)]
+        ax.plot([i for i in range(1, latest)], y, label=v.Abbreviation, color='#' + v.TeamColor, linewidth=1,
+                linestyle="solid" if config.camera_info_2025.get(k, 'black') == "black" else "dashed")
     ax.legend(fontsize='small')
     ax.grid(True)
     output_path = f"{base_dir}/results.png"
@@ -129,10 +136,12 @@ def main():
     log.info(f"Saved plot to {output_path}")
 
     fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout="tight")
-    for k, v in driver_colors.items():
-        y = [results[i].get_point(k) + results[i].get_sprint_point(k) for i in range(1, latest)]
+    for k, v in drivers.items():
+        y = [results[i].get_point(v.Abbreviation) + results[i].get_sprint_point(v.Abbreviation) for i in
+             range(1, latest)]
         diff = [a - b for a, b in zip(accumulate(y), accumulate(champion_points))]
-        ax.plot([i for i in range(1, latest)], diff, label=k, color="#" + v, linewidth=1)
+        ax.plot([i for i in range(1, latest)], diff, label=v.Abbreviation, color="#" + v.TeamColor, linewidth=1,
+                linestyle="solid" if config.camera_info_2025.get(k, 'black') == "black" else "dashed")
     ax.legend(fontsize='small')
     ax.grid(True)
     output_path = f"{base_dir}/diffs.png"
@@ -143,9 +152,10 @@ def main():
 
     fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
     x = [i for i in range(1, latest)]
-    for k, v in driver_colors.items():
-        y = [results[i].get_grid_position(k) for i in range(1, latest)]
-        ax.plot(x, y, label=k, color='#' + v, linewidth=1)
+    for k, v in drivers.items():
+        y = [results[i].get_grid_position(v.Abbreviation) for i in range(1, latest)]
+        ax.plot(x, y, label=v.Abbreviation, color='#' + v.TeamColor, linewidth=1,
+                linestyle="solid" if config.camera_info_2025.get(k, 'black') == "black" else "dashed")
     ax.legend(fontsize='small')
     ax.grid(True)
     ax.invert_yaxis()
@@ -156,9 +166,11 @@ def main():
     log.info(f"Saved plot to {output_path}")
 
     fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
-    for k, v in driver_colors.items():
-        y = [results[i].get_grid_position(k) - results[i].get_position(k) for i in range(1, latest)]
-        ax.plot(x, y, label=k, color='#' + v, linewidth=1)
+    for k, v in drivers.items():
+        y = [results[i].get_grid_position(v.Abbreviation) - results[i].get_position(v.Abbreviation) for i in
+             range(1, latest)]
+        ax.plot(x, y, label=v.Abbreviation, color='#' + v.TeamColor, linewidth=1,
+                linestyle="solid" if config.camera_info_2025.get(k, 'black') == "black" else "dashed")
     ax.legend(fontsize='small')
     ax.grid(True)
     output_path = f"{base_dir}/grid_to_results.png"
@@ -173,24 +185,26 @@ def main():
 
     color_master_map = {1: 'gold', 2: 'silver', 3: 'darkgoldenrod', 4: '#4B0000', 5: '#660000', 6: '#800000',
                         7: '#990000', 8: '#B20000', 9: '#CC0000', 10: '#E60000'}
-    for k, v in driver_colors.items():
-        positions = [results[i].get_point(k) if i in results else 0 for i in range(1, latest)]
-        point_finish = sum(1 for i in range(1, latest) if results[i].get_point(k) >= 0)
-        sum_point = sum([results[i].get_point(k) for i in range(1, latest)])
+    for k, v in drivers.items():
+        positions = [results[i].get_point(v.Abbreviation) if i in results else 0 for i in range(1, latest)]
+        point_finish = sum(1 for i in range(1, latest) if results[i].get_point(v.Abbreviation) >= 0)
+        sum_point = sum([results[i].get_point(v.Abbreviation) for i in range(1, latest)])
 
-        values_map[k] = positions + [sum(positions), "{:.2f}".format(sum(positions) / (latest - 1)), point_finish,
-                                     sum_point,
-                                     "{:.2f}".format(sum_point / (latest - 1))]
+        values_map[k] = positions + [sum(positions), "{:.2f}".format(sum(positions) / (latest - 1)),
+                                                  point_finish,
+                                                  sum_point,
+                                                  "{:.2f}".format(sum_point / (latest - 1))]
 
         sum_map[k] = sum_point
 
-        color_map[k] = [color_master_map.get(results[i].get_position(k), 'white') if i in results else 'white' for i in
-                        range(1, latest)] + ['white', 'white', 'white', 'white', 'white']
+        color_map[k] = [color_master_map.get(results[i].get_position(v.Abbreviation),
+                                                          'white') if i in results else 'white' for i in
+                                     range(1, latest)] + ['white', 'white', 'white', 'white', 'white']
 
     drivers_standing = [k for k, _ in sorted(sum_map.items(), key=lambda x: x[1], reverse=True)]
 
-    headers = ["No", "name"] + [k for k in drivers_standing]
-    header_colors = (['lightgrey', 'lightgrey'] + ['#' + driver_colors.get(k, 'd3d3d3') for k in drivers_standing])
+    headers = ["No", "name"] + [drivers[k].Abbreviation for k in drivers_standing]
+    header_colors = (['lightgrey', 'lightgrey'] + ['#' + drivers[k].TeamColor for k in drivers_standing])
 
     round_numbers = [
         [event.RoundNumber for _, event in schedule.iterrows()] + ["sum", "order", "top10", "point", "point avg"]]
