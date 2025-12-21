@@ -186,20 +186,25 @@ def main():
     color_master_map = {1: 'gold', 2: 'silver', 3: 'darkgoldenrod', 4: '#4B0000', 5: '#660000', 6: '#800000',
                         7: '#990000', 8: '#B20000', 9: '#CC0000', 10: '#E60000'}
     for k, v in drivers.items():
+        values = [
+            f"{results[i].get_point(v.Abbreviation)} ({results[i].get_grid_position(v.Abbreviation)})" if i in results else 0
+            for i in range(1, latest)]
         positions = [results[i].get_point(v.Abbreviation) if i in results else 0 for i in range(1, latest)]
+        grids = [results[i].get_grid_position(v.Abbreviation) if i in results else 0 for i in range(1, latest)]
+
         point_finish = sum(1 for i in range(1, latest) if results[i].get_point(v.Abbreviation) >= 0)
         sum_point = sum([results[i].get_point(v.Abbreviation) for i in range(1, latest)])
 
-        values_map[k] = positions + [sum(positions), "{:.2f}".format(sum(positions) / (latest - 1)),
-                                                  point_finish,
-                                                  sum_point,
-                                                  "{:.2f}".format(sum_point / (latest - 1))]
+        values_map[k] = values + [sum(positions), "{:.2f}".format(sum(positions) / (latest - 1)),
+                                  point_finish,
+                                  sum_point,
+                                  "{:.2f}".format(sum_point / (latest - 1)), "{:.2f}".format(sum(grids) / (latest - 1))]
 
         sum_map[k] = sum_point
 
         color_map[k] = [color_master_map.get(results[i].get_position(v.Abbreviation),
-                                                          'white') if i in results else 'white' for i in
-                                     range(1, latest)] + ['white', 'white', 'white', 'white', 'white']
+                                             'white') if i in results else 'white' for i in
+                        range(1, latest)] + ['white', 'white', 'white', 'white', 'white', "white"]
 
     drivers_standing = [k for k, _ in sorted(sum_map.items(), key=lambda x: x[1], reverse=True)]
 
@@ -207,9 +212,10 @@ def main():
     header_colors = (['lightgrey', 'lightgrey'] + ['#' + drivers[k].TeamColor for k in drivers_standing])
 
     round_numbers = [
-        [event.RoundNumber for _, event in schedule.iterrows()] + ["sum", "order", "top10", "point", "point avg"]]
+        [event.RoundNumber for _, event in schedule.iterrows()] + ["sum", "order", "top10", "point", "point avg",
+                                                                   "grid avg"]]
     event_names = [
-        [event.EventName.replace('Grand Prix', '') for _, event in schedule.iterrows()] + ["", "", "", "", ""]]
+        [event.EventName.replace('Grand Prix', '') for _, event in schedule.iterrows()] + ["", "", "", "", "", ""]]
 
     topic_colors = [['lightgrey' for _ in range(1, len(schedule) + 2)]]
 
