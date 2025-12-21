@@ -187,7 +187,7 @@ def main():
                         7: '#990000', 8: '#B20000', 9: '#CC0000', 10: '#E60000'}
     for k, v in drivers.items():
         values = [
-            f"{results[i].get_point(v.Abbreviation)} ({results[i].get_grid_position(v.Abbreviation)})" if i in results else 0
+            f"{'{:.0f}'.format(results[i].get_point(v.Abbreviation))} ({'{:.0f}'.format(results[i].get_grid_position(v.Abbreviation))})" if i in results else 0
             for i in range(1, latest)]
         positions = [results[i].get_point(v.Abbreviation) if i in results else 0 for i in range(1, latest)]
         grids = [results[i].get_grid_position(v.Abbreviation) if i in results else 0 for i in range(1, latest)]
