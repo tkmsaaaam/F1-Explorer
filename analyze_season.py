@@ -189,22 +189,22 @@ def main():
         values = [
             f"{'{:.0f}'.format(results[i].get_point(v.Abbreviation))} ({'{:.0f}'.format(results[i].get_grid_position(v.Abbreviation))})" if i in results else 0
             for i in range(1, latest)]
-        positions = [results[i].get_point(v.Abbreviation) if i in results else 0 for i in range(1, latest)]
+        sum_point = sum([results[i].get_point(v.Abbreviation) + results[i].get_sprint_point(v.Abbreviation) for i in
+                         range(1, latest)])
+        positions = [results[i].get_position(v.Abbreviation) if i in results else 0 for i in range(1, latest)]
         grids = [results[i].get_grid_position(v.Abbreviation) if i in results else 0 for i in range(1, latest)]
+        point_finish = sum(1 for i in range(1, latest) if results[i].get_point(v.Abbreviation) > 0)
+        sprint = sum([results[i].get_sprint_point(v.Abbreviation) if i in results else 0 for i in range(1, latest)])
 
-        point_finish = sum(1 for i in range(1, latest) if results[i].get_point(v.Abbreviation) >= 0)
-        sum_point = sum([results[i].get_point(v.Abbreviation) for i in range(1, latest)])
-
-        values_map[k] = values + [sum(positions), "{:.2f}".format(sum(positions) / (latest - 1)),
-                                  point_finish,
-                                  sum_point,
-                                  "{:.2f}".format(sum_point / (latest - 1)), "{:.2f}".format(sum(grids) / (latest - 1))]
+        values_map[k] = values + [sum_point, "{:.2f}".format(sum_point / (latest - 1)),
+                                  "{:.2f}".format(sum(positions) / (latest - 1)),
+                                  "{:.2f}".format(sum(grids) / (latest - 1)), point_finish, sprint]
 
         sum_map[k] = sum_point
 
         color_map[k] = [color_master_map.get(results[i].get_position(v.Abbreviation),
                                              'white') if i in results else 'white' for i in
-                        range(1, latest)] + ['white', 'white', 'white', 'white', 'white', "white"]
+                        range(1, latest)] + ['white', 'white', 'white', 'white', "white", "white"]
 
     drivers_standing = [k for k, _ in sorted(sum_map.items(), key=lambda x: x[1], reverse=True)]
 
@@ -212,8 +212,8 @@ def main():
     header_colors = (['lightgrey', 'lightgrey'] + ['#' + drivers[k].TeamColor for k in drivers_standing])
 
     round_numbers = [
-        [event.RoundNumber for _, event in schedule.iterrows()] + ["sum", "order", "top10", "point", "point avg",
-                                                                   "grid avg"]]
+        [event.RoundNumber for _, event in schedule.iterrows()] + ["point sum", "point", "order", "grid", "top10",
+                                                                   "sprint"]]
     event_names = [
         [event.EventName.replace('Grand Prix', '') for _, event in schedule.iterrows()] + ["", "", "", "", "", ""]]
 
