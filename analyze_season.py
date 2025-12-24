@@ -185,6 +185,7 @@ def main():
 
     color_master_map = {1: 'gold', 2: 'silver', 3: 'darkgoldenrod', 4: '#4B0000', 5: '#660000', 6: '#800000',
                         7: '#990000', 8: '#B20000', 9: '#CC0000', 10: '#E60000'}
+    summaries = ["point sum", "point", "order", "grid", "top10", "sprint"]
     for k, v in drivers.items():
         values = [
             f"{'{:.0f}'.format(results[i].get_point(v.Abbreviation))} ({'{:.0f}'.format(results[i].get_grid_position(v.Abbreviation))})" if i in results else 0
@@ -204,18 +205,17 @@ def main():
 
         color_map[k] = [color_master_map.get(results[i].get_position(v.Abbreviation),
                                              'white') if i in results else 'white' for i in
-                        range(1, latest)] + ['white', 'white', 'white', 'white', "white", "white"]
+                        range(1, latest)] + ['white' for _ in range(0, len(summaries))]
 
     drivers_standing = [k for k, _ in sorted(sum_map.items(), key=lambda x: x[1], reverse=True)]
 
     headers = ["No", "name"] + [drivers[k].Abbreviation for k in drivers_standing]
     header_colors = (['lightgrey', 'lightgrey'] + ['#' + drivers[k].TeamColor for k in drivers_standing])
 
-    round_numbers = [
-        [event.RoundNumber for _, event in schedule.iterrows()] + ["point sum", "point", "order", "grid", "top10",
-                                                                   "sprint"]]
+    round_numbers = [[event.RoundNumber for _, event in schedule.iterrows()] + summaries]
     event_names = [
-        [event.EventName.replace('Grand Prix', '') for _, event in schedule.iterrows()] + ["", "", "", "", "", ""]]
+        [event.EventName.replace('Grand Prix', '') for _, event in schedule.iterrows()] + ["" for _ in
+                                                                                           range(0, len(summaries))]]
 
     topic_colors = [['lightgrey' for _ in range(1, len(schedule) + 2)]]
 
