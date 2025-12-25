@@ -77,6 +77,32 @@ name_info_2025: dict[int, str] = {
     55: "SAI",
 }
 
+camera_info: dict[int, dict[int, str]] = {
+    2025: {
+        1: "black",
+        22: "yellow",
+        16: "black",
+        44: "yellow",
+        63: "black",
+        12: "yellow",
+        4: "black",
+        81: "yellow",
+        31: "black",
+        87: "yellow",
+        14: "black",
+        18: "yellow",
+        10: "black",
+        7: "yellow",
+        43: "yellow",
+        6: "black",
+        30: "yellow",
+        5: "black",
+        27: "yellow",
+        23: "black",
+        55: "yellow"
+    }
+}
+
 camera_info_2025: dict[int, str] = {
     1: "black",
     22: "yellow",

@@ -112,7 +112,7 @@ def main():
             champion_points = y
         ax.plot([i for i in range(1, latest)], [sum(y[:i + 1]) for i in range(len(y))], label=v.Abbreviation,
                 color='#' + v.TeamColor, linewidth=1,
-                linestyle="solid" if config.camera_info_2025.get(k, 'black') == "black" else "dashed")
+                linestyle="solid" if config.camera_info.get(season, {}).get(k, 'black') == "black" else "dashed")
     ax.legend(fontsize='small')
     ax.grid(True)
     output_path = f"{base_dir}/standings.png"
@@ -126,7 +126,7 @@ def main():
         y = [results[i].get_point(v.Abbreviation) + results[i].get_sprint_point(v.Abbreviation) for i in
              range(1, latest)]
         ax.plot([i for i in range(1, latest)], y, label=v.Abbreviation, color='#' + v.TeamColor, linewidth=1,
-                linestyle="solid" if config.camera_info_2025.get(k, 'black') == "black" else "dashed")
+                linestyle="solid" if config.camera_info.get(season, {}).get(k, 'black') == "black" else "dashed")
     ax.legend(fontsize='small')
     ax.grid(True)
     output_path = f"{base_dir}/results.png"
@@ -141,7 +141,7 @@ def main():
              range(1, latest)]
         diff = [a - b for a, b in zip(accumulate(y), accumulate(champion_points))]
         ax.plot([i for i in range(1, latest)], diff, label=v.Abbreviation, color="#" + v.TeamColor, linewidth=1,
-                linestyle="solid" if config.camera_info_2025.get(k, 'black') == "black" else "dashed")
+                linestyle="solid" if config.camera_info.get(season, {}).get(k, 'black') == "black" else "dashed")
     ax.legend(fontsize='small')
     ax.grid(True)
     output_path = f"{base_dir}/diffs.png"
@@ -155,7 +155,7 @@ def main():
     for k, v in drivers.items():
         y = [results[i].get_grid_position(v.Abbreviation) for i in range(1, latest)]
         ax.plot(x, y, label=v.Abbreviation, color='#' + v.TeamColor, linewidth=1,
-                linestyle="solid" if config.camera_info_2025.get(k, 'black') == "black" else "dashed")
+                linestyle="solid" if config.camera_info.get(season, {}).get(k, 'black') == "black" else "dashed")
     ax.legend(fontsize='small')
     ax.grid(True)
     ax.invert_yaxis()
@@ -170,7 +170,7 @@ def main():
         y = [results[i].get_grid_position(v.Abbreviation) - results[i].get_position(v.Abbreviation) for i in
              range(1, latest)]
         ax.plot(x, y, label=v.Abbreviation, color='#' + v.TeamColor, linewidth=1,
-                linestyle="solid" if config.camera_info_2025.get(k, 'black') == "black" else "dashed")
+                linestyle="solid" if config.camera_info.get(season, {}).get(k, 'black') == "black" else "dashed")
     ax.legend(fontsize='small')
     ax.grid(True)
     output_path = f"{base_dir}/grid_to_results.png"
