@@ -104,12 +104,9 @@ def main():
     base_dir = f"./images/{season}"
 
     fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
-    champion_points = []
     for k, v in drivers.items():
         y = [results[i].get_point(v.Abbreviation) + results[i].get_sprint_point(v.Abbreviation) for i in
              range(1, latest)]
-        if sum(y) > sum(champion_points):
-            champion_points = y
         ax.plot([i for i in range(1, latest)], [sum(y[:i + 1]) for i in range(len(y))], label=v.Abbreviation,
                 color='#' + v.TeamColor, linewidth=1,
                 linestyle="solid" if config.camera_info.get(season, {}).get(k, 'black') == "black" else "dashed")
@@ -135,6 +132,14 @@ def main():
     plt.close(fig)
     log.info(f"Saved plot to {output_path}")
 
+    champion_points = max(
+        (
+            [results[i].get_point(v.Abbreviation) + results[i].get_sprint_point(v.Abbreviation)
+             for i in range(1, latest)]
+            for v in drivers.values()
+        ),
+        key=sum,
+    )
     fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout="tight")
     for k, v in drivers.items():
         y = [results[i].get_point(v.Abbreviation) + results[i].get_sprint_point(v.Abbreviation) for i in
