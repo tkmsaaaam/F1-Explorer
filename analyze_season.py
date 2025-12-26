@@ -190,7 +190,7 @@ def main():
 
     color_master_map = {1: 'gold', 2: 'silver', 3: 'darkgoldenrod', 4: '#4B0000', 5: '#660000', 6: '#800000',
                         7: '#990000', 8: '#B20000', 9: '#CC0000', 10: '#E60000'}
-    summaries = ["point sum", "point", "order", "grid", "top10", "sprint"]
+    summaries = ["point sum", "point", "order", "grid", "top10", "top3", "sprint"]
     for k, v in drivers.items():
         values = [
             f"{'{:.0f}'.format(results[i].get_point(v.Abbreviation))} ({'{:.0f}'.format(results[i].get_grid_position(v.Abbreviation))})" if i in results else 0
@@ -200,11 +200,12 @@ def main():
         positions = [results[i].get_position(v.Abbreviation) if i in results else 0 for i in range(1, latest)]
         grids = [results[i].get_grid_position(v.Abbreviation) if i in results else 0 for i in range(1, latest)]
         point_finish = sum(1 for i in range(1, latest) if results[i].get_point(v.Abbreviation) > 0)
+        top3_finish = sum(1 for i in range(1, latest) if results[i].get_point(v.Abbreviation) >= 15)
         sprint = sum([results[i].get_sprint_point(v.Abbreviation) if i in results else 0 for i in range(1, latest)])
 
         values_map[k] = values + [sum_point, "{:.2f}".format(sum_point / (latest - 1)),
                                   "{:.2f}".format(sum(positions) / (latest - 1)),
-                                  "{:.2f}".format(sum(grids) / (latest - 1)), point_finish, sprint]
+                                  "{:.2f}".format(sum(grids) / (latest - 1)), point_finish, top3_finish, sprint]
 
         sum_map[k] = sum_point
 
