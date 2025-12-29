@@ -191,8 +191,9 @@ def main():
     color_master_map = {1: 'gold', 2: 'silver', 3: 'darkgoldenrod', 4: '#4B0000', 5: '#660000', 6: '#800000',
                         7: '#990000', 8: '#B20000', 9: '#CC0000', 10: '#E60000'}
     one_to_ten = sorted(color_master_map.keys())
-    summaries = ["", "point sum", "point", "order", "grid", "top10", "top3", "sprint", ""] + [f"{i}" for i in
-                                                                                              one_to_ten]
+    summaries = ["", "point sum", "point", "order", "grid", "top10", "top3", "sprint", ""]
+    by_orders = [f"{i}" for i in one_to_ten]
+
     for k, v in drivers.items():
         values = [
             f"{'{:.0f}'.format(results[i].get_point(v.Abbreviation))} ({'{:.0f}'.format(results[i].get_grid_position(v.Abbreviation))})" if i in results else 0
@@ -215,19 +216,25 @@ def main():
 
         sum_map[k] = sum_point
 
-        color_map[k] = [color_master_map.get(results[i].get_position(v.Abbreviation),
-                                             'white') if i in results else 'white' for i in
-                        range(1, latest)] + ['white' for _ in range(0, len(summaries))]
+        color_map[k] = ([color_master_map.get(
+            results[i].get_position(v.Abbreviation), 'white'
+        ) if i in results else 'white' for i in range(1, latest)]
+                        + ['lightgrey']
+                        + ['white' for _ in range(0, len(summaries) - 2)]
+                        + ['lightgrey']
+                        + ['white' for _ in range(0, len(by_orders) - 1)])
 
     drivers_standing = [k for k, _ in sorted(sum_map.items(), key=lambda x: x[1], reverse=True)]
 
     headers = ["No", "name"] + [drivers[k].Abbreviation for k in drivers_standing]
     header_colors = (['lightgrey', 'lightgrey'] + ['#' + drivers[k].TeamColor for k in drivers_standing])
 
-    round_numbers = [[event.RoundNumber for _, event in schedule.iterrows()] + summaries]
+    round_numbers = [[event.RoundNumber for _, event in schedule.iterrows()] + summaries + by_orders]
     event_names = [
         [event.EventName.replace('Grand Prix', '') for _, event in schedule.iterrows()] + ["" for _ in
-                                                                                           range(0, len(summaries))]]
+                                                                                           range(0, len(summaries))] + [
+            "" for _ in
+            range(0, len(by_orders))]]
 
     topic_colors = [['lightgrey' for _ in range(1, len(schedule) + 2)]]
 
