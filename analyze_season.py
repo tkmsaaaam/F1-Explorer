@@ -16,7 +16,7 @@ tracer = trace.get_tracer(__name__)
 
 class Weekend:
     def __init__(self, gp_name: str):
-        self.gp_name = gp_name
+        self.gp_name = gp_name.replace('Grand Prix', '')
         self.grid_position: dict[str, int] = {}
         self.position: dict[str, int] = {}
         self.point: dict[str, int] = {}
@@ -33,6 +33,9 @@ class Weekend:
 
     def set_sprint_point(self, k: str, v: int):
         self.sprint_point[k] = v
+
+    def get_gp_name(self):
+        return self.gp_name
 
     def get_grid_position(self, k: str) -> int:
         if k in self.grid_position:
@@ -198,21 +201,23 @@ def main():
         values = [
             f"{'{:.0f}'.format(results[i].get_point(v.Abbreviation))} ({'{:.0f}'.format(results[i].get_grid_position(v.Abbreviation))})" if i in results else 0
             for i in range(1, latest)]
-        sum_point = sum([results[i].get_point(v.Abbreviation) + results[i].get_sprint_point(v.Abbreviation) for i in
-                         range(1, latest)])
+        sum_point = sum([
+            results[i].get_point(v.Abbreviation) + results[i].get_sprint_point(v.Abbreviation) for i in range(1, latest)
+        ])
         positions = [results[i].get_position(v.Abbreviation) if i in results else 0 for i in range(1, latest)]
         grids = [results[i].get_grid_position(v.Abbreviation) if i in results else 0 for i in range(1, latest)]
         point_finish = sum(1 for i in range(1, latest) if results[i].get_point(v.Abbreviation) > 0)
         top3_finish = sum(1 for i in range(1, latest) if results[i].get_point(v.Abbreviation) >= 15)
         sprint = sum([results[i].get_sprint_point(v.Abbreviation) if i in results else 0 for i in range(1, latest)])
-        count_by_order = [sum(p == rank for p in
-                              (results[i].get_position(v.Abbreviation) if i in results else 0 for i in
-                               range(1, latest))) for rank in one_to_ten]
+        count_by_order = [sum(
+            p == rank for p in (
+                results[i].get_position(v.Abbreviation) if i in results else 0 for i in range(1, latest)
+            )
+        ) for rank in one_to_ten]
 
-        values_map[k] = values + ["", sum_point, "{:.2f}".format(sum_point / (latest - 1)),
-                                  "{:.2f}".format(sum(positions) / (latest - 1)),
-                                  "{:.2f}".format(sum(grids) / (latest - 1)), point_finish, top3_finish,
-                                  sprint, ""] + count_by_order
+        values_map[k] = values + [
+            "", sum_point, "{:.2f}".format(sum_point / (latest - 1)), "{:.2f}".format(sum(positions) / (latest - 1)),
+            "{:.2f}".format(sum(grids) / (latest - 1)), point_finish, top3_finish, sprint, ""] + count_by_order
 
         sum_map[k] = sum_point
 
@@ -224,17 +229,17 @@ def main():
                         + ['lightgrey']
                         + ['white' for _ in range(0, len(by_orders) - 1)])
 
-    drivers_standing = [k for k, _ in sorted(sum_map.items(), key=lambda x: x[1], reverse=True)]
+    drivers_standing = [k for k, _ in sorted(sum_map.items(), key=lambda kk: kk[1], reverse=True)]
 
     headers = ["No", "name"] + [drivers[k].Abbreviation for k in drivers_standing]
     header_colors = (['lightgrey', 'lightgrey'] + ['#' + drivers[k].TeamColor for k in drivers_standing])
 
-    round_numbers = [[event.RoundNumber for _, event in schedule.iterrows()] + summaries + by_orders]
+    round_numbers = [sorted(results.keys()) + summaries + by_orders]
     event_names = [
-        [event.EventName.replace('Grand Prix', '') for _, event in schedule.iterrows()] + ["" for _ in
-                                                                                           range(0, len(summaries))] + [
-            "" for _ in
-            range(0, len(by_orders))]]
+        [results.get(id).get_gp_name() for id in sorted(results.keys())]
+        + ["" for _ in range(0, len(summaries))]
+        + ["" for _ in range(0, len(by_orders))]
+    ]
 
     topic_colors = [['lightgrey' for _ in range(1, len(schedule) + 2)]]
 
