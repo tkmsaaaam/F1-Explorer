@@ -16,7 +16,7 @@ tracer = trace.get_tracer(__name__)
 
 class Weekend:
     def __init__(self, gp_name: str):
-        self.gp_name = gp_name.replace('Grand Prix', '')
+        self.gp_name = gp_name.replace('Grand Prix', '').strip()
         self.grid_position: dict[str, int] = {}
         self.position: dict[str, int] = {}
         self.point: dict[str, int] = {}
@@ -195,7 +195,6 @@ def main():
                         7: '#990000', 8: '#B20000', 9: '#CC0000', 10: '#E60000'}
     one_to_ten = sorted(color_master_map.keys())
     summaries = ["", "point sum", "point", "order", "grid", "top10", "top3", "sprint", ""]
-    by_orders = [f"{i}" for i in one_to_ten]
 
     for k, v in drivers.items():
         values = [
@@ -227,18 +226,18 @@ def main():
                         + ['lightgrey']
                         + ['white' for _ in range(0, len(summaries) - 2)]
                         + ['lightgrey']
-                        + ['white' for _ in range(0, len(by_orders) - 1)])
+                        + ['white' for _ in range(0, len(one_to_ten) - 1)])
 
     drivers_standing = [k for k, _ in sorted(sum_map.items(), key=lambda kk: kk[1], reverse=True)]
 
     headers = ["No", "name"] + [drivers[k].Abbreviation for k in drivers_standing]
     header_colors = (['lightgrey', 'lightgrey'] + ['#' + drivers[k].TeamColor for k in drivers_standing])
 
-    round_numbers = [sorted(results.keys()) + summaries + by_orders]
+    round_numbers = [sorted(results.keys()) + summaries + [f"{i}" for i in one_to_ten]]
     event_names = [
         [results.get(id).get_gp_name() for id in sorted(results.keys())]
         + ["" for _ in range(0, len(summaries))]
-        + ["" for _ in range(0, len(by_orders))]
+        + ["" for _ in range(0, len(one_to_ten))]
     ]
 
     topic_colors = [['lightgrey' for _ in range(1, len(schedule) + 2)]]
