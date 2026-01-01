@@ -22,39 +22,39 @@ class Weekend:
         self.point: dict[str, int] = {}
         self.sprint_point: dict[str, int] = {}
 
-    def set_grid_position(self, k: str, v: int):
-        self.grid_position[k] = v
+    def set_grid_position(self, abbreviation: str, v: int):
+        self.grid_position[abbreviation] = v
 
-    def set_position(self, k: str, v: int):
-        self.position[k] = v
+    def set_position(self, abbreviation: str, v: int):
+        self.position[abbreviation] = v
 
-    def set_point(self, k: str, v: int):
-        self.point[k] = v
+    def set_point(self, abbreviation: str, v: int):
+        self.point[abbreviation] = v
 
-    def set_sprint_point(self, k: str, v: int):
-        self.sprint_point[k] = v
+    def set_sprint_point(self, abbreviation: str, v: int):
+        self.sprint_point[abbreviation] = v
 
     def get_gp_name(self):
         return self.gp_name
 
-    def get_grid_position(self, k: str) -> int:
-        if k in self.grid_position:
-            return self.grid_position[k]
+    def get_grid_position(self, abbreviation: str) -> int:
+        if abbreviation in self.grid_position:
+            return self.grid_position[abbreviation]
         return len(self.grid_position) + 1
 
-    def get_position(self, k: str) -> int:
-        if k in self.position:
-            return self.position[k]
+    def get_position(self, abbreviation: str) -> int:
+        if abbreviation in self.position:
+            return self.position[abbreviation]
         return len(self.position) + 1
 
-    def get_point(self, k: str) -> int:
-        if k in self.point:
-            return self.point[k]
+    def get_point(self, abbreviation: str) -> int:
+        if abbreviation in self.point:
+            return self.point[abbreviation]
         return 0
 
-    def get_sprint_point(self, k: str) -> int:
-        if k in self.sprint_point:
-            return self.sprint_point[k]
+    def get_sprint_point(self, abbreviation: str) -> int:
+        if abbreviation in self.sprint_point:
+            return self.sprint_point[abbreviation]
         return 0
 
 
