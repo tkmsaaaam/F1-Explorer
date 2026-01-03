@@ -175,10 +175,23 @@ def main():
 
     fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
     for k, v in drivers.items():
-        y = [results[i].get_grid_position(v.Abbreviation) - results[i].get_position(v.Abbreviation) for i in
-             range(1, latest)]
-        ax.plot(x, y, label=v.Abbreviation, color='#' + v.TeamColor, linewidth=1,
-                linestyle="solid" if config.camera_info.get(season, {}).get(k, 'black') == "black" else "dashed")
+        y = [
+            results[i].get_grid_position(v.Abbreviation)
+            - results[i].get_position(v.Abbreviation)
+            for i in range(1, latest)
+        ]
+        is_black = config.camera_info.get(season, {}).get(k, 'black') == "black"
+        ax.scatter(
+            x, y,
+            label=v.Abbreviation,
+            s=20,
+            marker='o',
+            facecolors=('#' + v.TeamColor) if is_black else 'none',
+            edgecolors='#' + v.TeamColor,
+            linewidths=1,
+            alpha=0.8,
+        )
+
     ax.legend(fontsize='small')
     ax.grid(True)
     output_path = f"{base_dir}/grid_to_results.png"
