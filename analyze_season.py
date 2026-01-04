@@ -3,6 +3,7 @@ import os
 from itertools import accumulate
 
 import fastf1.plotting
+import numpy
 from fastf1.core import DriverResult
 from matplotlib import pyplot as plt
 from opentelemetry import trace
@@ -175,14 +176,16 @@ def main():
 
     fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
     for k, v in drivers.items():
+        x_j = numpy.array(x) + numpy.random.uniform(-0.15, 0.15, len(x))
         y = [
             results[i].get_grid_position(v.Abbreviation)
             - results[i].get_position(v.Abbreviation)
             for i in range(1, latest)
         ]
+        y_j = numpy.array(y) + numpy.random.uniform(-0.15, 0.15, len(y))
         is_black = config.camera_info.get(season, {}).get(k, 'black') == "black"
         ax.scatter(
-            x, y,
+            x_j, y_j,
             label=v.Abbreviation,
             s=20,
             marker='o',
