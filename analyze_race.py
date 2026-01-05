@@ -16,18 +16,18 @@ def main():
         log.warning("no config")
         return
 
-    if config['Session'] != 'R' and 'SR':
-        log.warning(f"{config['Session']} is not R or SR. \"Session\" needs to be set to S or SR.")
+    if config.get_session() != 'R' and 'SR':
+        log.warning(f"{config.get_session()} is not R or SR. \"Session\" needs to be set to S or SR.")
         return
     trace.get_current_span().set_attributes(
-        {"year": config['Year'], "round": config['Round'], "session": config['Session']})
+        {"year": config.get_year(), "round": config.get_round(), "session": config.get_session()})
     setup.fast_f1()
-    session = fastf1.get_session(config['Year'], config['Round'], config['Session'])
+    session = fastf1.get_session(config.get_year(), config.get_round(), config.get_session())
     session.load(telemetry=False)
 
     log.info(f"{session.event.year} Race {session.event.RoundNumber} {session.event.EventName} Race")
 
-    weekend.plot_tyre(config['Year'], config['Round'], log)
+    weekend.plot_tyre(config.get_year(), config.get_round(), log)
 
     run_volume.plot_laptime(session, log)
     run_volume.plot_laptime_by_timing(session, log)

@@ -16,18 +16,18 @@ def main():
         log.warning("no config")
         return
 
-    if not config['Session'].startswith('FP'):
-        log.warning(f"{config['Session']} is not FP.  \"Session\" needs to be set to FP.")
+    if not config.get_session().startswith('FP'):
+        log.warning(f"{config.get_session()} is not FP.  \"Session\" needs to be set to FP.")
         return
     trace.get_current_span().set_attributes(
-        {"year": config['Year'], "round": config['Round'], "session": config['Session']})
+        {"year": config.get_year(), "round": config.get_round(), "session": config.get_session()})
     setup.fast_f1()
-    session = fastf1.get_session(config['Year'], config['Round'], config['Session'])
+    session = fastf1.get_session(config.get_year(), config.get_round(), config.get_session())
     session.load(messages=False)
 
-    log.info(f"{session.event.year} Race {session.event['RoundNumber']} {session.event.EventName} {config['Session']}")
+    log.info(f"{session.event.year} Race {session.event['RoundNumber']} {session.event.EventName} {config.get_session()}")
 
-    weekend.plot_tyre(config['Year'], config['Round'], log)
+    weekend.plot_tyre(config.get_year(), config.get_round(), log)
 
     run_volume.plot_lap_number_by_timing(session, log)
     run_volume.plot_laptime(session, log)
@@ -52,8 +52,8 @@ def main():
     ) + [session.laps.pick_fastest().get_telemetry().add_distance()['Distance'].iloc[-1]]
     short_runs.plot_mini_segment_on_circuit(session, log, corners, 'corners')
     short_runs.compute_and_save_segment_tables_plotly(session, base_path + "/corners", corners, log)
-    corner_map = config["corners"]
-    segments = short_runs.make_mini_segment(session, log, corner_map, config["separator"])
+    corner_map = config.get_corners()
+    segments = short_runs.make_mini_segment(session, log, corner_map, config.get_separator())
     short_runs.plot_mini_segment_on_circuit(session, log, segments, 'mini_segments')
     short_runs.compute_and_save_segment_tables_plotly(session, base_path + "/mini_segments", segments, log)
     short_runs.plot_flat_out(session, log)
