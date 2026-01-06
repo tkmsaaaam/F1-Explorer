@@ -61,11 +61,11 @@ class Weekend:
 
 @tracer.start_as_current_span("main")
 def main():
-    c = setup.load_config()
-
     log = setup.log()
-    if c is None:
-        log.warning("no config")
+    try:
+        c = setup.load_config()
+    except Exception as exception:
+        log.warning(exception.args)
         return
     trace.get_current_span().set_attributes(
         {"year": c.get_year(), "round": c.get_round(), "session": c.get_session()})

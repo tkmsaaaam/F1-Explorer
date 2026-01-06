@@ -9,14 +9,14 @@ tracer = trace.get_tracer(__name__)
 
 @tracer.start_as_current_span("main")
 def main():
-    config = setup.load_config()
-
     log = setup.log()
-    if config is None:
-        log.warning("no config")
+    try:
+        config = setup.load_config()
+    except Exception as exception:
+        log.warning(exception.args)
         return
 
-    if not config.get_session().startswith('FP'):
+    if not config.get_session_category() != setup.SessionCategory.FreePractice:
         log.warning(f"{config.get_session()} is not FP.  \"Session\" needs to be set to FP.")
         return
     trace.get_current_span().set_attributes(
@@ -25,7 +25,8 @@ def main():
     session = fastf1.get_session(config.get_year(), config.get_round(), config.get_session())
     session.load(messages=False)
 
-    log.info(f"{session.event.year} Race {session.event['RoundNumber']} {session.event.EventName} {config.get_session()}")
+    log.info(
+        f"{session.event.year} Race {session.event['RoundNumber']} {session.event.EventName} {config.get_session()}")
 
     weekend.plot_tyre(config.get_year(), config.get_round(), log)
 

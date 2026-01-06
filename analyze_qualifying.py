@@ -9,14 +9,14 @@ tracer = trace.get_tracer(__name__)
 
 @tracer.start_as_current_span("main")
 def main():
-    config = setup.load_config()
-
     log = setup.log()
-    if config is None:
-        log.warning("no config")
+    try:
+        config = setup.load_config()
+    except Exception as exception:
+        log.warning(exception.args)
         return
 
-    if config.get_session() != 'Q' and 'SQ':
+    if not config.get_session_category() != setup.SessionCategory.Qualifying:
         log.warning(f"{config.get_session()} is not Q or SQ.  \"Session\" needs to be set to Q or SQ.")
         return
     trace.get_current_span().set_attributes(
