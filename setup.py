@@ -66,12 +66,8 @@ def load_config() -> Config:
     if config is None:
         raise Exception("Config must be provided")
     validate_config(config)
-    separator = []
-    if 'Separator' in config:
-        separator = config['Separator']
-    corners = {}
-    if 'Corners' in config:
-        corners = config['Corners']
+    separator = config['Separator'] if 'Separator' in config else []
+    corners = config['Corners'] if 'Corners' in config else {}
     return Config(config['Year'], config['Round'], config['Session'], corners, separator)
 
 
