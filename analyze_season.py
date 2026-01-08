@@ -67,8 +67,7 @@ def main():
     except Exception as exception:
         log.warning(exception.args)
         return
-    trace.get_current_span().set_attributes(
-        {"year": c.get_year(), "round": c.get_round(), "session": c.get_session()})
+    c.set_attribute_to_span()
     season = c.get_year()
     setup.fast_f1()
     schedule = fastf1.get_event_schedule(season, include_testing=False)

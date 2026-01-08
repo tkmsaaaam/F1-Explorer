@@ -9,10 +9,12 @@ from opentelemetry import trace
 
 tracer = trace.get_tracer(__name__)
 
+
 class SessionCategory(Enum):
     FreePractice = "FreePractice"
     Qualifying = "Qualifying"
     Race = "Race"
+
 
 class Config:
     def __init__(self, year: int, round: int, session: str, corners: dict[str, list[float]], separator: list[int]):
@@ -48,6 +50,11 @@ class Config:
     def get_separator(self):
         return self.separator
 
+    def set_attribute_to_span(self):
+        trace.get_current_span().set_attributes(
+            {"year": self.get_year(), "round": self.get_round(), "session": self.get_session()})
+
+
 def validate_config(config: dict[str, Any]):
     if 'Year' not in config:
         raise Exception("Year must be provided")
@@ -57,6 +64,7 @@ def validate_config(config: dict[str, Any]):
         raise Exception("Session must be provided")
     if not config['Session'] != 'FP1' and 'FP2' and 'FP3' and 'SQ' and 'Q' and 'R' and 'SR':
         raise Exception("Session is invalid")
+
 
 @tracer.start_as_current_span("load_config")
 def load_config() -> Config:

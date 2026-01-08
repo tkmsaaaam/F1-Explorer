@@ -17,10 +17,9 @@ def main():
         return
 
     if not config.get_session_category() != setup.SessionCategory.FreePractice:
-        log.warning(f"{config.get_session()} is not FP.  \"Session\" needs to be set to FP.")
+        log.warning(f"{config.get_session()} is not FP. \"Session\" needs to be set to FP.")
         return
-    trace.get_current_span().set_attributes(
-        {"year": config.get_year(), "round": config.get_round(), "session": config.get_session()})
+    config.set_attribute_to_span()
     setup.fast_f1()
     session = fastf1.get_session(config.get_year(), config.get_round(), config.get_session())
     session.load(messages=False)
