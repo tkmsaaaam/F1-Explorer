@@ -16,7 +16,7 @@ def main():
         log.warning(exception.args)
         return
 
-    if not config.get_session_category() != setup.SessionCategory.Race:
+    if config.get_session_category() != setup.SessionCategory.Race:
         log.warning(f"{config.get_session()} is not R or SR. \"Session\" needs to be set to S or SR.")
         return
     config.set_attribute_to_span()

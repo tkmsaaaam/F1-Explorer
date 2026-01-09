@@ -16,7 +16,7 @@ def main():
         log.warning(exception.args)
         return
 
-    if not config.get_session_category() != setup.SessionCategory.FreePractice:
+    if config.get_session_category() != setup.SessionCategory.FreePractice:
         log.warning(f"{config.get_session()} is not FP. \"Session\" needs to be set to FP.")
         return
     config.set_attribute_to_span()

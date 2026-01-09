@@ -16,7 +16,7 @@ def main():
         log.warning(exception.args)
         return
 
-    if not config.get_session_category() != setup.SessionCategory.Qualifying:
+    if config.get_session_category() != setup.SessionCategory.Qualifying:
         log.warning(f"{config.get_session()} is not Q or SQ.  \"Session\" needs to be set to Q or SQ.")
         return
     config.set_attribute_to_span()
