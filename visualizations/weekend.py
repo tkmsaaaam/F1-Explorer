@@ -6,7 +6,7 @@ from fastf1.core import DataNotLoadedError
 from opentelemetry import trace
 from plotly import graph_objects
 
-import config
+import constants
 
 tracer = trace.get_tracer(__name__)
 

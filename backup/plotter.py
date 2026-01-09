@@ -5,7 +5,7 @@ import os
 from matplotlib import pyplot
 from plotly import graph_objects
 
-import config
+import constants
 from backup.domain.lap import Lap
 from backup.domain.stint import Stint
 from backup.domain.weather import Weather
@@ -25,9 +25,9 @@ images_path = results_path + "/images"
 
 
 def set_style(no: int) -> dict[str, str]:
-    style = {"color": config.team_color_info_2025.get(no, '#808080'),
-             "linestyle": "solid" if config.camera_info_2025.get(no, 'black') == "black" else "dashed",
-             "label": config.name_info_2025.get(no, 'UNDEFINED'), "linewidth": "1"}
+    style = {"color": constants.team_color_info_2025.get(no, '#808080'),
+             "linestyle": "solid" if constants.camera_info_2025.get(no, 'black') == "black" else "dashed",
+             "label": constants.name_info_2025.get(no, 'UNDEFINED'), "linewidth": "1"}
     return style
 
 
@@ -51,7 +51,7 @@ def plot_tyres(stint_map: dict[int, dict[int, Stint]], order: list[int]):
             bar = ax.barh(y=y,
                           width=width,
                           left=start,
-                          color=config.compound_colors.get(stint.compound, 'gray'),
+                          color=constants.compound_colors.get(stint.compound, 'gray'),
                           edgecolor='black' if stint.is_new else 'gray'
                           )
             ax.bar_label(bar, labels=[str(stint.start_laps)],

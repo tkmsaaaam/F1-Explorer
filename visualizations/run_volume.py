@@ -9,7 +9,7 @@ from numpy import datetime64
 from opentelemetry import trace
 from plotly import graph_objects
 
-import config
+import constants
 
 tracer = trace.get_tracer(__name__)
 

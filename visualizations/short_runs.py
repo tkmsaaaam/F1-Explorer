@@ -17,7 +17,7 @@ from matplotlib.colorbar import ColorbarBase
 from matplotlib.pyplot import colormaps
 from opentelemetry import trace
 
-import config
+import constants
 
 tracer = trace.get_tracer(__name__)
 

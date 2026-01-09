@@ -9,7 +9,7 @@ from matplotlib import pyplot as plt
 from opentelemetry import trace
 from plotly import graph_objects
 
-import config
+import constants
 import setup
 
 tracer = trace.get_tracer(__name__)

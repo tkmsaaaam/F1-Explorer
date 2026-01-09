@@ -11,7 +11,7 @@ from matplotlib.patches import Patch
 from opentelemetry import trace
 from plotly import graph_objects
 
-import config
+import constants
 import util
 from visualizations.domain.driver import Driver
 from visualizations.domain.lap import Lap

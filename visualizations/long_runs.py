@@ -7,7 +7,7 @@ from fastf1.core import Session, Laps
 from matplotlib import pyplot as plt
 from opentelemetry import trace
 
-import config
+import constants
 from visualizations.domain.driver import Driver
 from visualizations.domain.stint import Stint
 

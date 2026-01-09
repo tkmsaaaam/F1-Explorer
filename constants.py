@@ -29,30 +29,6 @@ team_color_info_2025: dict[int, str] = {
     55: "#00a0dd",
 }
 
-team_info_2025: dict[int, str] = {
-    1: "Red Bull Racing",
-    22: "Red Bull Racing",
-    16: "Ferrari",
-    44: "Ferrari",
-    63: "Mercedes",
-    12: "Mercedes",
-    4: "McLaren",
-    81: "McLaren",
-    31: "Haas",
-    87: "Haas",
-    14: "Aston Martin",
-    18: "Aston Martin",
-    10: "Alpine",
-    7: "Alpine",
-    43: "Alpine",
-    6: "Racing Bulls",
-    30: "Racing Bulls",
-    5: "Kick Sauber",
-    27: "Kick Sauber",
-    23: "Williams",
-    55: "Williams",
-}
-
 name_info_2025: dict[int, str] = {
     1: "VER",
     22: "TSU",
