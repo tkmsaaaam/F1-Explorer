@@ -524,7 +524,7 @@ def plot_speed_distance(session: Session, log: Logger):
             continue
         car_data = laps.get_car_data().add_distance()
         team_color = fastf1.plotting.get_team_color(laps.Team, session)
-        style = "solid" if config.camera_info_2025.get(int(driver_number), 'black') == "black" else "dashed"
+        style = "solid" if config.camera_info[session.event.year].get(int(driver_number), 'black') == "black" else "dashed"
 
         ax.plot(car_data.Distance, car_data.Speed,
                 color=team_color, label=laps.Driver, linestyle=style)
@@ -571,7 +571,7 @@ def plot_speed_distance_comparison(session: Session, log: Logger):
             car_data = laps.get_car_data().add_distance()
 
             team_color = fastf1.plotting.get_team_color(laps.Team, session)
-            style = "solid" if config.camera_info_2025.get(int(driver_number), 'black') == "black" else "dashed"
+            style = "solid" if config.camera_info[session.event.year].get(int(driver_number), 'black') == "black" else "dashed"
 
             ax.plot(car_data.Distance, car_data.Speed,
                     color=team_color, label=laps.Driver, linestyle=style)
@@ -688,7 +688,7 @@ def plot_time_distance_comparison(session: Session, log: Logger):
             car_data = laps.get_car_data().add_distance()
 
             team_color = fastf1.plotting.get_team_color(laps.Team, session)
-            style = "solid" if config.camera_info_2025.get(int(driver_number), 'black') == "black" else "dashed"
+            style = "solid" if config.camera_info[session.event.year].get(int(driver_number), 'black') == "black" else "dashed"
 
             y = [d.total_seconds() for d in car_data.Time]
             ax.plot(car_data.Distance, y,
@@ -743,7 +743,7 @@ def _plot_driver_telemetry(session: Session, log: Logger,
             car_data = laps.get_car_data().add_distance()
             driver_name = laps.Driver
             team_color = fastf1.plotting.get_team_color(laps.Team, session)
-            camera_color = config.camera_info_2025.get(int(driver_number), 'black')
+            camera_color = config.camera_info[session.event.year].get(int(driver_number), 'black')
             line_style = 'solid' if camera_color == 'black' else 'dashed'
 
             y_data = value_func(car_data)
@@ -939,7 +939,7 @@ def plot_telemetry(session: Session, log: Logger,
         car_data = laps.get_car_data().add_distance()
         driver_name = laps.Driver
         team_color = fastf1.plotting.get_team_color(laps.Team, session)
-        camera_color = config.camera_info_2025.get(int(driver_number), 'black')
+        camera_color = config.camera_info[session.event.year].get(int(driver_number), 'black')
         line_style = 'solid' if camera_color == 'black' else 'dashed'
 
         y_data = value_func(car_data)

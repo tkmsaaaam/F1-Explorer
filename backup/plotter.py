@@ -25,9 +25,10 @@ images_path = results_path + "/images"
 
 
 def set_style(no: int) -> dict[str, str]:
-    style = {"color": constants.team_color_info_2025.get(no, '#808080'),
-             "linestyle": "solid" if constants.camera_info_2025.get(no, 'black') == "black" else "dashed",
-             "label": constants.name_info_2025.get(no, 'UNDEFINED'), "linewidth": "1"}
+    year = datetime.datetime.now().year
+    style = {"color": constants.team_color_info[year].get(no, '#808080'),
+             "linestyle": "solid" if constants.camera_info[year].get(no, 'black') == "black" else "dashed",
+             "label": constants.name_info[year].get(no, 'UNDEFINED'), "linewidth": "1"}
     return style
 
 
