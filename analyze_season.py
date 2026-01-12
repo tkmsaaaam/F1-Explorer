@@ -63,19 +63,17 @@ class Weekend:
 def main():
     log = setup.log()
     try:
-        c = setup.load_config()
+        config = setup.load_config()
     except Exception as exception:
         log.warning(exception.args)
         return
-    c.set_attribute_to_span()
-    season = c.get_year()
+    config.set_attribute_to_span()
     setup.fast_f1()
-    schedule = fastf1.get_event_schedule(season, include_testing=False)
+    schedule = fastf1.get_event_schedule(config.get_year(), include_testing=False).sort_values(by='RoundNumber')
 
     drivers: dict[int, DriverResult] = {}
     results: dict[int, Weekend] = {}
 
-    schedule = schedule.sort_values(by='RoundNumber')
     now = datetime.datetime.now()
     for _, event in schedule.iterrows():
         if now < event.EventDate:
@@ -85,12 +83,12 @@ def main():
 
         gp: Weekend = results[event.RoundNumber]
         if event.EventFormat == "sprint_qualifying":
-            sprint = fastf1.get_session(season, event.EventName, "S")
+            sprint = fastf1.get_session(config.get_year(), event.EventName, "S")
             sprint.load(laps=False, telemetry=False, weather=False, messages=False)
             for _, driver_row in sprint.results.iterrows():
                 gp.set_sprint_point(driver_row.Abbreviation, driver_row.Points)
 
-        race = fastf1.get_session(season, event.EventName, "R")
+        race = fastf1.get_session(config.get_year(), event.EventName, "R")
         race.load(laps=False, telemetry=False, weather=False, messages=False)
         for _, driver_row in race.results.iterrows():
             abbreviation = driver_row.Abbreviation
@@ -104,7 +102,7 @@ def main():
         return
 
     latest = len(results) + 1
-    base_dir = f"./images/{season}"
+    base_dir = f"./images/{config.get_year()}"
 
     fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
     for k, v in drivers.items():
@@ -112,7 +110,7 @@ def main():
              range(1, latest)]
         ax.plot([i for i in range(1, latest)], [sum(y[:i + 1]) for i in range(len(y))], label=v.Abbreviation,
                 color='#' + v.TeamColor, linewidth=1,
-                linestyle="solid" if config.camera_info.get(season, {}).get(k, 'black') == "black" else "dashed")
+                linestyle="solid" if constants.camera_info.get(config.get_year(), {}).get(k, 'black') == "black" else "dashed")
     ax.legend(fontsize='small')
     ax.grid(True)
     output_path = f"{base_dir}/standings.png"
@@ -126,7 +124,7 @@ def main():
         y = [results[i].get_point(v.Abbreviation) + results[i].get_sprint_point(v.Abbreviation) for i in
              range(1, latest)]
         ax.plot([i for i in range(1, latest)], y, label=v.Abbreviation, color='#' + v.TeamColor, linewidth=1,
-                linestyle="solid" if config.camera_info.get(season, {}).get(k, 'black') == "black" else "dashed")
+                linestyle="solid" if constants.camera_info.get(config.get_year(), {}).get(k, 'black') == "black" else "dashed")
     ax.legend(fontsize='small')
     ax.grid(True)
     output_path = f"{base_dir}/results.png"
@@ -149,7 +147,7 @@ def main():
              range(1, latest)]
         diff = [a - b for a, b in zip(accumulate(y), accumulate(champion_points))]
         ax.plot([i for i in range(1, latest)], diff, label=v.Abbreviation, color="#" + v.TeamColor, linewidth=1,
-                linestyle="solid" if config.camera_info.get(season, {}).get(k, 'black') == "black" else "dashed")
+                linestyle="solid" if constants.camera_info.get(config.get_year(), {}).get(k, 'black') == "black" else "dashed")
     ax.legend(fontsize='small')
     ax.grid(True)
     output_path = f"{base_dir}/diffs.png"
@@ -163,7 +161,7 @@ def main():
     for k, v in drivers.items():
         y = [results[i].get_grid_position(v.Abbreviation) for i in range(1, latest)]
         ax.plot(x, y, label=v.Abbreviation, color='#' + v.TeamColor, linewidth=1,
-                linestyle="solid" if config.camera_info.get(season, {}).get(k, 'black') == "black" else "dashed")
+                linestyle="solid" if constants.camera_info.get(config.get_year(), {}).get(k, 'black') == "black" else "dashed")
     ax.legend(fontsize='small')
     ax.grid(True)
     ax.invert_yaxis()
@@ -182,7 +180,7 @@ def main():
             for i in range(1, latest)
         ]
         y_j = numpy.array(y) + numpy.random.uniform(-0.15, 0.15, len(y))
-        is_black = config.camera_info.get(season, {}).get(k, 'black') == "black"
+        is_black = constants.camera_info.get(config.get_year(), {}).get(k, 'black') == "black"
         ax.scatter(
             x_j, y_j,
             label=v.Abbreviation,
