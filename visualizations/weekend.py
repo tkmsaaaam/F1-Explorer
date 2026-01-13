@@ -38,7 +38,7 @@ def plot_tyre(year: int, race_number: int, log: Logger):
                     continue
                 session_names.append(session_name)
                 compound = lap.Compound
-                bg_colors.append(config.compound_colors.get(compound, "#dddddd"))
+                bg_colors.append(constants.compound_color.get(compound, "#dddddd"))
                 stints.add(lap.Stint)
             driver_name = session.get_driver(driver)['Abbreviation']
             if len(session_names) > 0:

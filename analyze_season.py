@@ -110,7 +110,7 @@ def main():
              range(1, latest)]
         ax.plot([i for i in range(1, latest)], [sum(y[:i + 1]) for i in range(len(y))], label=v.Abbreviation,
                 color='#' + v.TeamColor, linewidth=1,
-                linestyle="solid" if constants.camera_info.get(config.get_year(), {}).get(k, 'black') == "black" else "dashed")
+                linestyle="solid" if constants.camera.get(config.get_year(), {}).get(k, 'black') == "black" else "dashed")
     ax.legend(fontsize='small')
     ax.grid(True)
     output_path = f"{base_dir}/standings.png"
@@ -124,7 +124,7 @@ def main():
         y = [results[i].get_point(v.Abbreviation) + results[i].get_sprint_point(v.Abbreviation) for i in
              range(1, latest)]
         ax.plot([i for i in range(1, latest)], y, label=v.Abbreviation, color='#' + v.TeamColor, linewidth=1,
-                linestyle="solid" if constants.camera_info.get(config.get_year(), {}).get(k, 'black') == "black" else "dashed")
+                linestyle="solid" if constants.camera.get(config.get_year(), {}).get(k, 'black') == "black" else "dashed")
     ax.legend(fontsize='small')
     ax.grid(True)
     output_path = f"{base_dir}/results.png"
@@ -147,7 +147,7 @@ def main():
              range(1, latest)]
         diff = [a - b for a, b in zip(accumulate(y), accumulate(champion_points))]
         ax.plot([i for i in range(1, latest)], diff, label=v.Abbreviation, color="#" + v.TeamColor, linewidth=1,
-                linestyle="solid" if constants.camera_info.get(config.get_year(), {}).get(k, 'black') == "black" else "dashed")
+                linestyle="solid" if constants.camera.get(config.get_year(), {}).get(k, 'black') == "black" else "dashed")
     ax.legend(fontsize='small')
     ax.grid(True)
     output_path = f"{base_dir}/diffs.png"
@@ -161,7 +161,7 @@ def main():
     for k, v in drivers.items():
         y = [results[i].get_grid_position(v.Abbreviation) for i in range(1, latest)]
         ax.plot(x, y, label=v.Abbreviation, color='#' + v.TeamColor, linewidth=1,
-                linestyle="solid" if constants.camera_info.get(config.get_year(), {}).get(k, 'black') == "black" else "dashed")
+                linestyle="solid" if constants.camera.get(config.get_year(), {}).get(k, 'black') == "black" else "dashed")
     ax.legend(fontsize='small')
     ax.grid(True)
     ax.invert_yaxis()
@@ -180,7 +180,7 @@ def main():
             for i in range(1, latest)
         ]
         y_j = numpy.array(y) + numpy.random.uniform(-0.15, 0.15, len(y))
-        is_black = constants.camera_info.get(config.get_year(), {}).get(k, 'black') == "black"
+        is_black = constants.camera.get(config.get_year(), {}).get(k, 'black') == "black"
         ax.scatter(
             x_j, y_j,
             label=v.Abbreviation,

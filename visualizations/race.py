@@ -94,7 +94,7 @@ def laptime(log: Logger, filepath: str, filename: str, session: Session, r: int,
         lap_times = [lap_log.laps.get(i).time for i in lap_numbers]
         color = fastf1.plotting.get_team_color(lap_log.driver.team_name, session)
         ax.plot(lap_numbers, lap_times, color=color,
-                linestyle="solid" if config.camera_info[session.event.year].get(lap_log.driver.number,
+                linestyle="solid" if constants.camera[session.event.year].get(lap_log.driver.number,
                                                                  'black') == "black" else "dashed",
                 label=lap_log.driver.name)
     minimum = session.laps.sort_values(by='LapTime').iloc[0].LapTime.total_seconds()
@@ -193,7 +193,7 @@ def gap_to_ahead(log: Logger, filepath: str, filename: str, session: Session, r:
         x = sorted(driver_laps.laps.keys())
         y = [(driver_laps.laps.get(i).at - position_logs.get(i).get(
             driver_laps.laps.get(i).position - 1)).total_seconds() for i in x]
-        line_style = "solid" if config.camera_info[session.event.year].get(driver_laps.driver.number, 'black') == "black" else "dashed"
+        line_style = "solid" if constants.camera[session.event.year].get(driver_laps.driver.number, 'black') == "black" else "dashed"
         ax.plot(x, y, color=fastf1.plotting.get_team_color(driver_laps.driver.team_name, session),
                 label=driver_laps.driver.name,
                 linestyle=line_style, linewidth=1)
@@ -232,7 +232,7 @@ def gap_to_top(log: Logger, filepath: str, filename: str, session: Session, r: i
         color = fastf1.plotting.get_team_color(lap_log.driver.team_name, session)
         x = sorted(lap_log.laps.keys())
         y = [(lap_log.laps.get(i).at - top_time_map.get(i)).total_seconds() for i in x]
-        line_style = "solid" if config.camera_info[session.event.year].get(lap_log.driver.number, 'black') == "black" else "dashed"
+        line_style = "solid" if constants.camera[session.event.year].get(lap_log.driver.number, 'black') == "black" else "dashed"
         ax.plot(x, y, linewidth=1, color=color, label=lap_log.driver.name, linestyle=line_style)
     ax.legend(fontsize='small')
     ax.invert_yaxis()
@@ -268,7 +268,7 @@ def positions(log: Logger, filepath: str, session: Session, lap_logs: set[Driver
         color = fastf1.plotting.get_team_color(lap_log.driver.team_name, session)
         x = sorted(lap_log.laps.keys())
         y = [lap_log.laps.get(i).position for i in x]
-        line_style = "solid" if config.camera_info[session.event.year].get(lap_log.driver.number, 'black') == "black" else "dashed"
+        line_style = "solid" if constants.camera[session.event.year].get(lap_log.driver.number, 'black') == "black" else "dashed"
         ax.plot(x, y, linewidth=1, color=color, label=lap_log.driver.name, linestyle=line_style)
 
     ax.legend(fontsize='small')
@@ -303,7 +303,7 @@ def tyres(log: Logger, filepath: str, lap_logs: set[DriverLaps]):
             ax.barh(y=y,
                     width=j - start,
                     left=start,
-                    color=config.compound_colors.get(lap_log.laps.get(j).tyre.compound, 'gray'),
+                    color=constants.compound_color.get(lap_log.laps.get(j).tyre.compound, 'gray'),
                     edgecolor='black' if lap_log.laps.get(j).tyre.new else 'gray'
                     )
             start = j
@@ -311,7 +311,7 @@ def tyres(log: Logger, filepath: str, lap_logs: set[DriverLaps]):
     ax.set_yticks([i for i in range(0, len(lap_logs))])
     ax.set_yticklabels([str(driver.driver.number) for driver in lap_logs])
     legend_elements = [Patch(facecolor=color, edgecolor='black', label=compound)
-                       for compound, color in config.compound_colors.items()]
+                       for compound, color in constants.compound_color.items()]
     ax.legend(handles=legend_elements, title='Compound', loc='upper right', fontsize='small')
     ax.grid(True)
     os.makedirs(os.path.dirname(filepath), exist_ok=True)

@@ -26,9 +26,9 @@ images_path = results_path + "/images"
 
 def set_style(no: int) -> dict[str, str]:
     year = datetime.datetime.now().year
-    style = {"color": constants.team_color_info[year].get(no, '#808080'),
-             "linestyle": "solid" if constants.camera_info[year].get(no, 'black') == "black" else "dashed",
-             "label": constants.name_info[year].get(no, 'UNDEFINED'), "linewidth": "1"}
+    style = {"color": constants.team_color[year].get(no, '#808080'),
+             "linestyle": "solid" if constants.camera[year].get(no, 'black') == "black" else "dashed",
+             "label": constants.abbreviation[year].get(no, 'UNDEFINED'), "linewidth": "1"}
     return style
 
 
@@ -52,7 +52,7 @@ def plot_tyres(stint_map: dict[int, dict[int, Stint]], order: list[int]):
             bar = ax.barh(y=y,
                           width=width,
                           left=start,
-                          color=constants.compound_colors.get(stint.compound, 'gray'),
+                          color=constants.compound_color.get(stint.compound, 'gray'),
                           edgecolor='black' if stint.is_new else 'gray'
                           )
             ax.bar_label(bar, labels=[str(stint.start_laps)],

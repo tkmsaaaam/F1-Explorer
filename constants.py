@@ -1,4 +1,4 @@
-compound_colors: dict[str, str] = {
+compound_color: dict[str, str] = {
     "HARD": "white",
     "MEDIUM": "yellow",
     "SOFT": "red",
@@ -6,7 +6,7 @@ compound_colors: dict[str, str] = {
     "WET": "blue"
 }
 
-team_color_info: dict[int, dict[int, str]] = {
+team_color: dict[int, dict[int, str]] = {
     2025: {
         1: "#0600ef",
         22: "#0600ef",
@@ -32,7 +32,7 @@ team_color_info: dict[int, dict[int, str]] = {
     }
 }
 
-name_info: dict[int, dict[int, str]] = {
+abbreviation: dict[int, dict[int, str]] = {
     2025: {
         1: "VER",
         22: "TSU",
@@ -58,7 +58,7 @@ name_info: dict[int, dict[int, str]] = {
     }
 }
 
-camera_info: dict[int, dict[int, str]] = {
+camera: dict[int, dict[int, str]] = {
     2025: {
         1: "black",
         22: "yellow",

@@ -57,7 +57,7 @@ def plot_by_tyre_age_and_tyre(session: Session, log: Logger):
             color = fastf1.plotting.get_team_color(stint.driver.team_name, session)
             x = sorted(stint.laps.keys())
             y = [stint.laps.get(i) for i in x]
-            line_style = "solid" if config.camera_info[session.event.year].get(stint.driver.number, 'black') == "black" else "dashed"
+            line_style = "solid" if constants.camera[session.event.year].get(stint.driver.number, 'black') == "black" else "dashed"
             if stint.driver.number in legends:
                 ax.plot(x, y, linewidth=1, color=color, linestyle=line_style)
             else:
