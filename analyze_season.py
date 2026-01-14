@@ -248,7 +248,7 @@ def main():
 
     round_numbers = [sorted(results.keys()) + summaries + [f"{i}" for i in one_to_ten]]
     event_names = [
-        [results.get(id).get_gp_name() for id in sorted(results.keys())]
+        [results.get(i).get_gp_name() for i in sorted(results.keys())]
         + ["" for _ in range(0, len(summaries))]
         + ["" for _ in range(0, len(one_to_ten))]
     ]

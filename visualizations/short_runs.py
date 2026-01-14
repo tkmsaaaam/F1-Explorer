@@ -939,7 +939,7 @@ def plot_telemetry(session: Session, log: Logger,
         car_data = laps.get_car_data().add_distance()
         driver_name = laps.Driver
         team_color = fastf1.plotting.get_team_color(laps.Team, session)
-        camera_color = config.camera[session.event.year].get(int(driver_number), 'black')
+        camera_color = constants.camera[session.event.year].get(int(driver_number), 'black')
         line_style = 'solid' if camera_color == 'black' else 'dashed'
 
         y_data = value_func(car_data)
