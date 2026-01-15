@@ -110,7 +110,8 @@ def main():
              range(1, latest)]
         ax.plot([i for i in range(1, latest)], [sum(y[:i + 1]) for i in range(len(y))], label=v.Abbreviation,
                 color='#' + v.TeamColor, linewidth=1,
-                linestyle="solid" if constants.camera.get(config.get_year(), {}).get(k, 'black') == "black" else "dashed")
+                linestyle="solid" if constants.camera.get(config.get_year(), {}).get(k,
+                                                                                     'black') == "black" else "dashed")
     ax.legend(fontsize='small')
     ax.grid(True)
     output_path = f"{base_dir}/standings.png"
@@ -124,7 +125,8 @@ def main():
         y = [results[i].get_point(v.Abbreviation) + results[i].get_sprint_point(v.Abbreviation) for i in
              range(1, latest)]
         ax.plot([i for i in range(1, latest)], y, label=v.Abbreviation, color='#' + v.TeamColor, linewidth=1,
-                linestyle="solid" if constants.camera.get(config.get_year(), {}).get(k, 'black') == "black" else "dashed")
+                linestyle="solid" if constants.camera.get(config.get_year(), {}).get(k,
+                                                                                     'black') == "black" else "dashed")
     ax.legend(fontsize='small')
     ax.grid(True)
     output_path = f"{base_dir}/results.png"
@@ -147,7 +149,8 @@ def main():
              range(1, latest)]
         diff = [a - b for a, b in zip(accumulate(y), accumulate(champion_points))]
         ax.plot([i for i in range(1, latest)], diff, label=v.Abbreviation, color="#" + v.TeamColor, linewidth=1,
-                linestyle="solid" if constants.camera.get(config.get_year(), {}).get(k, 'black') == "black" else "dashed")
+                linestyle="solid" if constants.camera.get(config.get_year(), {}).get(k,
+                                                                                     'black') == "black" else "dashed")
     ax.legend(fontsize='small')
     ax.grid(True)
     output_path = f"{base_dir}/diffs.png"
@@ -161,7 +164,8 @@ def main():
     for k, v in drivers.items():
         y = [results[i].get_grid_position(v.Abbreviation) for i in range(1, latest)]
         ax.plot(x, y, label=v.Abbreviation, color='#' + v.TeamColor, linewidth=1,
-                linestyle="solid" if constants.camera.get(config.get_year(), {}).get(k, 'black') == "black" else "dashed")
+                linestyle="solid" if constants.camera.get(config.get_year(), {}).get(k,
+                                                                                     'black') == "black" else "dashed")
     ax.legend(fontsize='small')
     ax.grid(True)
     ax.invert_yaxis()
@@ -237,9 +241,9 @@ def main():
             results[i].get_position(v.Abbreviation), 'white'
         ) if i in results else 'white' for i in range(1, latest)]
                         + ['lightgrey']
-                        + ['white' for _ in range(0, len(summaries) - 2)]
+                        + ['white'] * (len(summaries) - 2)
                         + ['lightgrey']
-                        + ['white' for _ in range(0, len(one_to_ten) - 1)])
+                        + ['white'] * (len(one_to_ten) - 1))
 
     drivers_standing = [k for k, _ in sorted(sum_map.items(), key=lambda kk: kk[1], reverse=True)]
 
@@ -249,11 +253,11 @@ def main():
     round_numbers = [sorted(results.keys()) + summaries + [f"{i}" for i in one_to_ten]]
     event_names = [
         [results.get(i).get_gp_name() for i in sorted(results.keys())]
-        + ["" for _ in range(0, len(summaries))]
-        + ["" for _ in range(0, len(one_to_ten))]
+        + [""] * len(summaries)
+        + [""] * len(one_to_ten)
     ]
 
-    topic_colors = [['lightgrey' for _ in range(1, len(schedule) + 2)]]
+    topic_colors = [['lightgrey'] * (len(schedule) + 1)]
 
     fig = graph_objects.Figure(data=[graph_objects.Table(
         header=dict(values=headers, fill_color=header_colors, align='center'),
