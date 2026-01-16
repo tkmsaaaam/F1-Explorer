@@ -75,7 +75,7 @@ def main():
     results: dict[int, Weekend] = {}
 
     now = datetime.datetime.now()
-    for _, event in schedule.iterrows():
+    for event in schedule.itertuples(index=False):
         if now < event.EventDate:
             break
         if event.RoundNumber not in results:
@@ -85,12 +85,12 @@ def main():
         if event.EventFormat == "sprint_qualifying":
             sprint = fastf1.get_session(config.get_year(), event.EventName, "S")
             sprint.load(laps=False, telemetry=False, weather=False, messages=False)
-            for _, driver_row in sprint.results.iterrows():
+            for driver_row in sprint.results.itertuples(index=False):
                 gp.set_sprint_point(driver_row.Abbreviation, driver_row.Points)
 
         race = fastf1.get_session(config.get_year(), event.EventName, "R")
         race.load(laps=False, telemetry=False, weather=False, messages=False)
-        for _, driver_row in race.results.iterrows():
+        for driver_row in race.results.itertuples(index=False):
             abbreviation = driver_row.Abbreviation
             gp.set_grid_position(abbreviation, driver_row.GridPosition)
             gp.set_position(abbreviation, driver_row.Position)
