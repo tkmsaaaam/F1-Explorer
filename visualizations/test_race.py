@@ -7,6 +7,24 @@ from visualizations.race import make_driver_laps_set
 
 
 class Race(unittest.TestCase):
+    def test_make_lap_log_empty(self):
+        data = {
+            "DriverNumber": [],
+            "Driver": [],
+            "Stint": [],
+            "Team": [],
+            "LapNumber": [],
+            "Position": [],
+            "Compound": [],
+            "FreshTyre": [],
+            "PitOutTime": pandas.to_datetime([]),
+            "Time": pandas.to_datetime([]),
+            "LapTime": pandas.to_timedelta([]),
+        }
+        laps = Laps(pandas.DataFrame(data))
+        result = make_driver_laps_set(laps)
+        self.assertEqual(0, len(result))
+
     def test_make_lap_log(self):
         data = {
             "DriverNumber": ["1", "1", "1"],
