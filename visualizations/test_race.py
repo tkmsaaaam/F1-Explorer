@@ -27,22 +27,42 @@ class Race(unittest.TestCase):
 
     def test_make_lap_log(self):
         data = {
-            "DriverNumber": ["1", "1", "1"],
-            "Driver": ["Max", "Max", "Max"],
+            "DriverNumber": ["1", "1", "16"],
+            "Driver": ["Max", "Max", "Lec"],
             "Stint": [1, 1, 1],
-            "Team": ["Red Bull", "Red Bull", "Red Bull"],
-            "LapNumber": [1, 2, 3],
-            "Position": [1, 1, 1],
+            "Team": ["Red Bull", "Red Bull", "Ferrari"],
+            "LapNumber": [1, 2, 1],
+            "Position": [1, 1, 2],
             "Compound": ["Soft", "Soft", "Soft"],
             "FreshTyre": [True, True, True],
             "PitOutTime": pandas.to_datetime(["", "", ""]),
-            "Time": pandas.to_datetime(["2026-01-01 00:00:00", "2026-01-01 00:01:23", "2026-01-01 00:02:45"]),
+            "Time": pandas.to_datetime(["2026-01-01 00:00:00", "2026-01-01 00:01:23", "2026-01-01 00:00:0"]),
             "LapTime": pandas.to_timedelta(["83.456s", "82.789s", "83.000s"]),
         }
         laps = Laps(pandas.DataFrame(data))
         result = make_driver_laps_set(laps)
-        self.assertEqual(1, len(result))
-        self.assertEqual(3, len(list(result)[0].laps))
+        self.assertEqual(2, len(result))
+        self.assertEqual(2, len(list(result)[0].laps))
+        self.assertEqual(1, list(result)[0].driver.number)
+        self.assertEqual('Max', list(result)[0].driver.name)
+        self.assertEqual('Red Bull', list(result)[0].driver.team_name)
+        self.assertEqual(1, list(result)[0].laps[1].position)
+        self.assertEqual(True, list(result)[0].laps[1].pit_out)
+        self.assertEqual(True, list(result)[0].laps[1].tyre.new)
+        self.assertEqual('Soft', list(result)[0].laps[1].tyre.compound)
+        self.assertEqual(1, list(result)[0].laps[2].position)
+        self.assertEqual(True, list(result)[0].laps[2].pit_out)
+        self.assertEqual(True, list(result)[0].laps[2].tyre.new)
+        self.assertEqual('Soft', list(result)[0].laps[2].tyre.compound)
+
+        self.assertEqual(1, len(list(result)[1].laps))
+        self.assertEqual(16, list(result)[1].driver.number)
+        self.assertEqual('Lec', list(result)[1].driver.name)
+        self.assertEqual('Ferrari', list(result)[1].driver.team_name)
+        self.assertEqual(2, list(result)[1].laps[1].position)
+        self.assertEqual(True, list(result)[1].laps[1].pit_out)
+        self.assertEqual(True, list(result)[1].laps[1].tyre.new)
+        self.assertEqual('Soft', list(result)[1].laps[1].tyre.compound)
 
 
 if __name__ == '__main__':
