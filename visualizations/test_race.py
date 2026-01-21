@@ -3,7 +3,7 @@ import unittest
 import pandas
 from fastf1.core import Laps
 
-from visualizations.race import make_driver_laps_set
+from visualizations.race import make_driver_laps_set, make_lap_start_by_position_by_number
 
 
 class Race(unittest.TestCase):
@@ -63,6 +63,29 @@ class Race(unittest.TestCase):
         self.assertEqual(True, list(result)[1].laps[1].pit_out)
         self.assertEqual(True, list(result)[1].laps[1].tyre.new)
         self.assertEqual('Soft', list(result)[1].laps[1].tyre.compound)
+
+
+    def test_make_lap_start_by_position_by_number(self):
+        data = {
+            "DriverNumber": ["1", "1", "16", "16"],
+            "Driver": ["Max", "Max", "Lec", "Lec"],
+            "Stint": [1, 1, 1, 1],
+            "Team": ["Red Bull", "Red Bull", "Ferrari", "Ferrari"],
+            "LapNumber": [1, 2, 1, 2],
+            "Position": [1, 1, 2, 2],
+            "Compound": ["Soft", "Soft", "Soft", "Soft"],
+            "FreshTyre": [True, True, True, True],
+            "PitOutTime": pandas.to_datetime(["", "", "", ""]),
+            "Time": pandas.to_datetime(["2026-01-01 00:00:00", "2026-01-01 00:01:23", "2026-01-01 00:00:00", "2026-01-01 00:01:24"]),
+            "LapTime": pandas.to_timedelta(["83.456s", "82.789s", "84.000s", "83.000s"]),
+        }
+        laps = Laps(pandas.DataFrame(data))
+        result = make_lap_start_by_position_by_number(laps)
+        self.assertEqual(2, len(result))
+        self.assertEqual(pandas.to_datetime("2026-01-01 00:00:00"), result[1][1])
+        self.assertEqual(pandas.to_datetime("2026-01-01 00:00:00"), result[1][2])
+        self.assertEqual(pandas.to_datetime("2026-01-01 00:01:23"), result[2][1])
+        self.assertEqual(pandas.to_datetime("2026-01-01 00:01:24"), result[2][2])
 
 
 if __name__ == '__main__':

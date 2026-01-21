@@ -51,8 +51,6 @@ def make_driver_laps_set(laps: Laps) -> set[DriverLaps]:
     result = set()
     grouped = laps.groupby(['DriverNumber'])
     for _, stint_laps in grouped:
-        if stint_laps.empty:
-            continue
         driver: Driver = Driver(int(stint_laps.DriverNumber.iloc[0]), stint_laps.Driver.iloc[0],
                                 stint_laps.Team.iloc[0])
         laps: dict[int, Lap] = {}
