@@ -524,7 +524,8 @@ def plot_speed_distance(session: Session, log: Logger):
             continue
         car_data = laps.get_car_data().add_distance()
         team_color = fastf1.plotting.get_team_color(laps.Team, session)
-        style = "solid" if config.camera[session.event.year].get(int(driver_number), 'black') == "black" else "dashed"
+        style = "solid" if constants.camera[session.event.year].get(int(driver_number),
+                                                                    'black') == "black" else "dashed"
 
         ax.plot(car_data.Distance, car_data.Speed,
                 color=team_color, label=laps.Driver, linestyle=style)
@@ -571,7 +572,8 @@ def plot_speed_distance_comparison(session: Session, log: Logger):
             car_data = laps.get_car_data().add_distance()
 
             team_color = fastf1.plotting.get_team_color(laps.Team, session)
-            style = "solid" if config.camera[session.event.year].get(int(driver_number), 'black') == "black" else "dashed"
+            style = "solid" if constants.camera[session.event.year].get(int(driver_number),
+                                                                        'black') == "black" else "dashed"
 
             ax.plot(car_data.Distance, car_data.Speed,
                     color=team_color, label=laps.Driver, linestyle=style)
@@ -688,7 +690,8 @@ def plot_time_distance_comparison(session: Session, log: Logger):
             car_data = laps.get_car_data().add_distance()
 
             team_color = fastf1.plotting.get_team_color(laps.Team, session)
-            style = "solid" if config.camera[session.event.year].get(int(driver_number), 'black') == "black" else "dashed"
+            style = "solid" if constants.camera[session.event.year].get(int(driver_number),
+                                                                        'black') == "black" else "dashed"
 
             y = [d.total_seconds() for d in car_data.Time]
             ax.plot(car_data.Distance, y,
@@ -743,7 +746,7 @@ def _plot_driver_telemetry(session: Session, log: Logger,
             car_data = laps.get_car_data().add_distance()
             driver_name = laps.Driver
             team_color = fastf1.plotting.get_team_color(laps.Team, session)
-            camera_color = config.camera[session.event.year].get(int(driver_number), 'black')
+            camera_color = constants.camera[session.event.year].get(int(driver_number), 'black')
             line_style = 'solid' if camera_color == 'black' else 'dashed'
 
             y_data = value_func(car_data)
@@ -779,7 +782,7 @@ def _plot_driver_telemetry(session: Session, log: Logger,
 
 
 @tracer.start_as_current_span("make_mini_segment")
-def make_mini_segment(session: Session, log: Logger, corner_map: dict[str: list[int]], separators: list[int]) -> list[
+def make_mini_segment(session: Session, log: Logger, corner_map: dict[str, list[int]], separators: list[int]) -> list[
     int]:
     """
     ミニセグメント作成する
@@ -868,7 +871,7 @@ def plot_throttle(session: Session, log: Logger):
     driver_numbers = session.laps['DriverNumber'].unique()
     _plot_driver_telemetry(
         session, log,
-        driver_numbers,
+        driver_numbers.tolist(),
         key='throttle',
         label='Throttle [%]',
         value_func=lambda data: data.Throttle
@@ -887,7 +890,7 @@ def plot_brake(session: Session, log: Logger):
     driver_numbers = session.laps['DriverNumber'].unique()
     _plot_driver_telemetry(
         session, log,
-        driver_numbers,
+        driver_numbers.tolist(),
         key='brake',
         label='Brake',
         value_func=lambda data: data.Brake.astype(float)
@@ -905,7 +908,7 @@ def plot_drs(session: Session, log: Logger):
     """
     driver_numbers = session.laps['DriverNumber'].unique()
     _plot_driver_telemetry(session, log,
-                           driver_numbers,
+                           driver_numbers.tolist(),
                            key='drs',
                            label='DRS',
                            value_func=lambda data: data.DRS.astype(float)
