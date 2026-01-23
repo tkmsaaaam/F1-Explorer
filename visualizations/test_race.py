@@ -64,7 +64,6 @@ class Race(unittest.TestCase):
         self.assertEqual(True, list(result)[1].laps[1].tyre.new)
         self.assertEqual('Soft', list(result)[1].laps[1].tyre.compound)
 
-
     def test_make_lap_start_by_position_by_number(self):
         data = {
             "DriverNumber": ["1", "1", "16", "16"],
@@ -76,7 +75,8 @@ class Race(unittest.TestCase):
             "Compound": ["Soft", "Soft", "Soft", "Soft"],
             "FreshTyre": [True, True, True, True],
             "PitOutTime": pandas.to_datetime(["", "", "", ""]),
-            "Time": pandas.to_datetime(["2026-01-01 00:00:00", "2026-01-01 00:01:23", "2026-01-01 00:00:00", "2026-01-01 00:01:24"]),
+            "Time": pandas.to_datetime(
+                ["2026-01-01 00:00:00", "2026-01-01 00:01:23", "2026-01-01 00:00:00", "2026-01-01 00:01:24"]),
             "LapTime": pandas.to_timedelta(["83.456s", "82.789s", "84.000s", "83.000s"]),
         }
         laps = Laps(pandas.DataFrame(data))
@@ -86,6 +86,24 @@ class Race(unittest.TestCase):
         self.assertEqual(pandas.to_datetime("2026-01-01 00:00:00"), result[1][2])
         self.assertEqual(pandas.to_datetime("2026-01-01 00:01:23"), result[2][1])
         self.assertEqual(pandas.to_datetime("2026-01-01 00:01:24"), result[2][2])
+
+    def test_make_top_time_map(self):
+        data = {
+            "DriverNumber": ["1", "1"],
+            "Driver": ["Max", "Max"],
+            "Stint": [1, 1],
+            "Team": ["Red Bull", "Red Bull"],
+            "LapNumber": [1, 2],
+            "Position": [1, 1],
+            "Compound": ["Soft", "Soft"],
+            "FreshTyre": [True, True],
+            "PitOutTime": pandas.to_datetime(["", ""]),
+            "Time": pandas.to_datetime(["2026-01-01 00:00:00", "2026-01-01 00:01:23"]),
+            "LapTime": pandas.to_timedelta(["83.456s", "82.789s"]),
+        }
+        laps = Laps(pandas.DataFrame(data))
+        result = make_lap_start_by_position_by_number(laps)
+        self.assertEqual(2, len(result))
 
 
 if __name__ == '__main__':
