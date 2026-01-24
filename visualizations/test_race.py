@@ -3,7 +3,7 @@ import unittest
 import pandas
 from fastf1.core import Laps
 
-from visualizations.race import make_driver_laps_set, make_lap_start_by_position_by_number
+from visualizations.race import make_driver_laps_set, make_lap_start_by_position_by_number, make_top_time_map
 
 
 class Race(unittest.TestCase):
@@ -89,21 +89,24 @@ class Race(unittest.TestCase):
 
     def test_make_top_time_map(self):
         data = {
-            "DriverNumber": ["1", "1"],
-            "Driver": ["Max", "Max"],
-            "Stint": [1, 1],
-            "Team": ["Red Bull", "Red Bull"],
-            "LapNumber": [1, 2],
-            "Position": [1, 1],
-            "Compound": ["Soft", "Soft"],
-            "FreshTyre": [True, True],
-            "PitOutTime": pandas.to_datetime(["", ""]),
-            "Time": pandas.to_datetime(["2026-01-01 00:00:00", "2026-01-01 00:01:23"]),
-            "LapTime": pandas.to_timedelta(["83.456s", "82.789s"]),
+            "DriverNumber": ["1", "1", "16", "16"],
+            "Driver": ["Max", "Max", "Lec", "Lec"],
+            "Stint": [1, 1, 1, 1],
+            "Team": ["Red Bull", "Red Bull", "Ferrari", "Ferrari"],
+            "LapNumber": [1, 2, 1, 2],
+            "Position": [1, 1, 2, 2],
+            "Compound": ["Soft", "Soft", "Soft", "Soft"],
+            "FreshTyre": [True, True, True, True],
+            "PitOutTime": pandas.to_datetime(["", "", "", ""]),
+            "Time": pandas.to_datetime(
+                ["2026-01-01 00:00:00", "2026-01-01 00:01:23", "2026-01-01 00:00:00", "2026-01-01 00:01:24"]),
+            "LapTime": pandas.to_timedelta(["83.456s", "82.789s", "84.000s", "83.000s"]),
         }
         laps = Laps(pandas.DataFrame(data))
-        result = make_lap_start_by_position_by_number(laps)
+        result = make_top_time_map(laps)
         self.assertEqual(2, len(result))
+        self.assertEqual(pandas.to_datetime("2026-01-01 00:00:00"), result[1])
+        self.assertEqual(pandas.to_datetime("2026-01-01 00:01:23"), result[2])
 
 
 if __name__ == '__main__':
