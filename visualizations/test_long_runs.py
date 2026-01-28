@@ -51,13 +51,13 @@ class LongRuns(unittest.TestCase):
         laps = Laps(pandas.DataFrame(data))
         stint_set: set[Stint] = make_stint_set(2, laps, "SOFT")
         self.assertEqual(1, len(stint_set))
-        self.assertEqual(1, list(stint_set)[0].driver.number)
-        self.assertEqual("Max", list(stint_set)[0].driver.name)
-        self.assertEqual("Red Bull", list(stint_set)[0].driver.team_name)
-        self.assertEqual("SOFT", list(stint_set)[0].compound)
-        self.assertEqual(2, len(list(stint_set)[0].laps))
-        self.assertEqual(83.456, list(stint_set)[0].laps.get(1))
-        self.assertEqual(83.000, list(stint_set)[0].laps.get(3))
+        self.assertEqual(1, list(stint_set)[0].get_driver().get_number())
+        self.assertEqual("Max", list(stint_set)[0].get_driver().get_name())
+        self.assertEqual("Red Bull", list(stint_set)[0].get_driver().get_team_name())
+        self.assertEqual("SOFT", list(stint_set)[0].get_compound())
+        self.assertEqual(2, len(list(stint_set)[0].get_laps()))
+        self.assertEqual(83.456, list(stint_set)[0].get_laps().get(1))
+        self.assertEqual(83.000, list(stint_set)[0].get_laps().get(3))
 
     def test_make_stint_set_one_driver(self):
         data = {
@@ -73,14 +73,14 @@ class LongRuns(unittest.TestCase):
         laps = Laps(pandas.DataFrame(data))
         stint_set: set[Stint] = make_stint_set(2, laps, "SOFT")
         self.assertEqual(1, len(stint_set))
-        self.assertEqual(1, list(stint_set)[0].driver.number)
-        self.assertEqual("Max", list(stint_set)[0].driver.name)
-        self.assertEqual("Red Bull", list(stint_set)[0].driver.team_name)
-        self.assertEqual("SOFT", list(stint_set)[0].compound)
-        self.assertEqual(3, len(list(stint_set)[0].laps))
-        self.assertEqual(83.456, list(stint_set)[0].laps.get(1))
-        self.assertEqual(82.789, list(stint_set)[0].laps.get(2))
-        self.assertEqual(83.000, list(stint_set)[0].laps.get(3))
+        self.assertEqual(1, list(stint_set)[0].get_driver().get_number())
+        self.assertEqual("Max", list(stint_set)[0].get_driver().get_name())
+        self.assertEqual("Red Bull", list(stint_set)[0].get_driver().get_team_name())
+        self.assertEqual("SOFT", list(stint_set)[0].get_compound())
+        self.assertEqual(3, len(list(stint_set)[0].get_laps()))
+        self.assertEqual(83.456, list(stint_set)[0].get_laps().get(1))
+        self.assertEqual(82.789, list(stint_set)[0].get_laps().get(2))
+        self.assertEqual(83.000, list(stint_set)[0].get_laps().get(3))
 
     def test_make_stint_set_two_drivers(self):
         data = {
