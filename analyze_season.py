@@ -17,45 +17,45 @@ tracer = trace.get_tracer(__name__)
 
 class Weekend:
     def __init__(self, gp_name: str):
-        self.gp_name = gp_name.replace('Grand Prix', '').strip()
-        self.grid_position: dict[str, int] = {}
-        self.position: dict[str, int] = {}
-        self.point: dict[str, int] = {}
-        self.sprint_point: dict[str, int] = {}
+        self.__gp_name = gp_name.replace('Grand Prix', '').strip()
+        self.__grid_position: dict[str, int] = {}
+        self.__position: dict[str, int] = {}
+        self.__point: dict[str, int] = {}
+        self.__sprint_point: dict[str, int] = {}
 
     def set_grid_position(self, abbreviation: str, v: int):
-        self.grid_position[abbreviation] = v
+        self.__grid_position[abbreviation] = v
 
     def set_position(self, abbreviation: str, v: int):
-        self.position[abbreviation] = v
+        self.__position[abbreviation] = v
 
     def set_point(self, abbreviation: str, v: int):
-        self.point[abbreviation] = v
+        self.__point[abbreviation] = v
 
     def set_sprint_point(self, abbreviation: str, v: int):
-        self.sprint_point[abbreviation] = v
+        self.__sprint_point[abbreviation] = v
 
     def get_gp_name(self):
-        return self.gp_name
+        return self.__gp_name
 
     def get_grid_position(self, abbreviation: str) -> int:
-        if abbreviation in self.grid_position:
-            return self.grid_position[abbreviation]
-        return len(self.grid_position) + 1
+        if abbreviation in self.__grid_position:
+            return self.__grid_position[abbreviation]
+        return len(self.__grid_position) + 1
 
     def get_position(self, abbreviation: str) -> int:
-        if abbreviation in self.position:
-            return self.position[abbreviation]
-        return len(self.position) + 1
+        if abbreviation in self.__position:
+            return self.__position[abbreviation]
+        return len(self.__position) + 1
 
     def get_point(self, abbreviation: str) -> int:
-        if abbreviation in self.point:
-            return self.point[abbreviation]
+        if abbreviation in self.__point:
+            return self.__point[abbreviation]
         return 0
 
     def get_sprint_point(self, abbreviation: str) -> int:
-        if abbreviation in self.sprint_point:
-            return self.sprint_point[abbreviation]
+        if abbreviation in self.__sprint_point:
+            return self.__sprint_point[abbreviation]
         return 0
 
 

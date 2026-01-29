@@ -44,18 +44,18 @@ def plot_tyres(stint_map: dict[int, dict[int, Stint]], order: list[int]):
         start = 0
         for i in stint_keys:
             stint = stints[i]
-            if stint.total_laps == 0:
+            if stint.get_total_laps() == 0:
                 continue
-            width = stint.total_laps
-            if stint.start_laps != 0:
-                width = width - stint.start_laps
+            width = stint.get_total_laps()
+            if stint.get_start_laps() != 0:
+                width = width - stint.get_start_laps()
             bar = ax.barh(y=y,
                           width=width,
                           left=start,
-                          color=constants.compound_color.get(stint.compound, 'gray'),
-                          edgecolor='black' if stint.is_new else 'gray'
+                          color=constants.compound_color.get(stint.get_compound(), 'gray'),
+                          edgecolor='black' if stint.get_is_new() else 'gray'
                           )
-            ax.bar_label(bar, labels=[str(stint.start_laps)],
+            ax.bar_label(bar, labels=[str(stint.get_start_laps())],
                          label_type="center")
             start += width
             if start > max_lap:
@@ -76,7 +76,7 @@ def plot_gap_to_top(dicts: dict[int, dict[int, Lap]], filename: str, d: int):
     for no, data in dicts.items():
         style = set_style(no)
         x = sorted(list(data.keys()))
-        y = [data[i].gap_to_top for i in x]
+        y = [data[i].get_gap_to_top() for i in x]
         ax.plot(x, y, **style)
     ax.grid(True)
     ax.legend(fontsize='small')
@@ -100,7 +100,7 @@ def plot_gap_to_ahead(dicts: dict[int, dict[int, Lap]], filename: str, d: int):
     for no, data in dicts.items():
         style = set_style(no)
         x = sorted(list(data.keys()))
-        y = [data[i].gap_to_ahead for i in x]
+        y = [data[i].get_gap_to_ahead() for i in x]
         ax.plot(x, y, **style)
     ax.grid(True)
     ax.legend(fontsize='small')
@@ -124,7 +124,7 @@ def plot_positions(dicts: dict[int, dict[int, Lap]], filename: str):
     for no, data in dicts.items():
         style = set_style(no)
         x = sorted(list(data.keys()))
-        y = [data[i].position for i in x]
+        y = [data[i].get_position() for i in x]
         ax.plot(x, y, **style)
     ax.grid(True)
     ax.legend(fontsize='small')
@@ -148,10 +148,10 @@ def plot_laptime(dicts: dict[int, dict[int, Lap]], filename: str, d: int):
             if i < 1:
                 continue
             lap = data[i]
-            if lap.time == 0:
+            if lap.get_time() == 0:
                 continue
             x.append(i)
-            y.append(lap.time)
+            y.append(lap.get_time())
         all_y += y
         ax.plot(x, y, **style)
     min_time = min(all_y) if len(all_y) > 0 else 0
@@ -197,7 +197,7 @@ def plot_laptime_diff(dicts: dict[int, dict[int, Lap]], order: list[int], filena
                 lap_times.append('---')
                 colors.append('#808080')  # gray
                 continue
-            diff = data[i].time - data[i - 1].time
+            diff = data[i].get_time() - data[i - 1].get_time()
             if diff < -10 or diff > 10:
                 lap_times.append("{:.3f}".format(diff))
                 colors.append('#808080')  # gray
@@ -225,7 +225,7 @@ def plot_laptime_diff(dicts: dict[int, dict[int, Lap]], order: list[int], filena
 def plot_weather(m: dict[datetime.datetime, Weather]):
     fig, ax = pyplot.subplots(figsize=(12.8, 7.2), dpi=150)
     x = [i for i in sorted(m.keys())]
-    y = [m[i].air_temp for i in x]
+    y = [m[i].get_air_temp() for i in x]
     ax.plot(x, y)
     ax.grid(True)
     output_path = f"{images_path}/air_temp.png"
@@ -236,7 +236,7 @@ def plot_weather(m: dict[datetime.datetime, Weather]):
 
     fig, ax = pyplot.subplots(figsize=(12.8, 7.2), dpi=150)
     x = [i for i in sorted(m.keys())]
-    y = [m[i].rain_fall for i in x]
+    y = [m[i].get_rain_fall() for i in x]
     ax.plot(x, y)
     ax.grid(True)
     output_path = f"{images_path}/rainfall.png"
@@ -247,7 +247,7 @@ def plot_weather(m: dict[datetime.datetime, Weather]):
 
     fig, ax = pyplot.subplots(figsize=(12.8, 7.2), dpi=150)
     x = [i for i in sorted(m.keys())]
-    y = [m[i].track_temp for i in x]
+    y = [m[i].get_track_temp() for i in x]
     ax.plot(x, y)
     ax.grid(True)
     output_path = f"{images_path}/track_temp.png"
@@ -258,7 +258,7 @@ def plot_weather(m: dict[datetime.datetime, Weather]):
 
     fig, ax = pyplot.subplots(figsize=(12.8, 7.2), dpi=150)
     x = [i for i in sorted(m.keys())]
-    y = [m[i].wind_speed for i in x]
+    y = [m[i].get_wind_speed() for i in x]
     ax.plot(x, y)
     ax.grid(True)
     output_path = f"{images_path}/wind_speed.png"

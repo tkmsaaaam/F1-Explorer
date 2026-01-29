@@ -43,8 +43,14 @@ def execute(session: Session, log: Logger, images_path: str, logs_path: str, lap
 
 class DriverLaps:
     def __init__(self, driver: Driver, laps: dict[int, Lap]):
-        self.driver = driver
-        self.laps = laps
+        self.__driver = driver
+        self.__laps = laps
+
+    def get_driver(self) -> Driver:
+        return self.__driver
+
+    def get_laps(self) -> dict[int, Lap]:
+        return self.__laps
 
 
 def make_driver_laps_set(laps: Laps) -> set[DriverLaps]:
@@ -88,13 +94,13 @@ def laptime(log: Logger, filepath: str, filename: str, session: Session, r: int,
     """
     fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
     for lap_log in lap_logs:
-        lap_numbers = sorted(lap_log.laps.keys())
-        lap_times = [lap_log.laps.get(i).get_time() for i in lap_numbers]
-        color = fastf1.plotting.get_team_color(lap_log.driver.get_team_name(), session)
+        lap_numbers = sorted(lap_log.get_laps().keys())
+        lap_times = [lap_log.get_laps().get(i).get_time() for i in lap_numbers]
+        color = fastf1.plotting.get_team_color(lap_log.get_driver().get_team_name(), session)
         ax.plot(lap_numbers, lap_times, color=color,
-                linestyle="solid" if constants.camera[session.event.year].get(lap_log.driver.get_number(),
+                linestyle="solid" if constants.camera[session.event.year].get(lap_log.get_driver().get_number(),
                                                                               'black') == "black" else "dashed",
-                label=lap_log.driver.get_name())
+                label=lap_log.get_driver().get_name())
     minimum = session.laps.sort_values(by='LapTime').iloc[0].LapTime.total_seconds()
     ax.legend(fontsize='small')
     ax.set_ylim(top=minimum, bottom=minimum + 15)
@@ -141,8 +147,8 @@ def gap(log: Logger, filepath: str, lap_logs: set[DriverLaps],
     for driver_laps in lap_logs:
         gaps = []
         colors = []
-        for i in range(1, len(driver_laps.laps)):
-            lap = driver_laps.laps.get(i)
+        for i in range(1, len(driver_laps.get_laps())):
+            lap = driver_laps.get_laps().get(i)
             if lap.get_position() == 1:
                 gaps.append("{:.3f}".format(0))
                 colors.append('#ffffff')
@@ -157,7 +163,7 @@ def gap(log: Logger, filepath: str, lap_logs: set[DriverLaps],
                 colors.append('#ffffff')
         if len(gaps) > max_laps:
             max_laps = len(gaps)
-        header.append(driver_laps.driver.get_name())
+        header.append(driver_laps.get_driver().get_name())
         all_gaps.append(gaps)
         fill_colors.append(colors)
 
@@ -188,13 +194,13 @@ def gap_to_ahead(log: Logger, filepath: str, filename: str, session: Session, r:
     """
     fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
     for driver_laps in lap_logs:
-        x = sorted(driver_laps.laps.keys())
-        y = [(driver_laps.laps.get(i).get_at() - position_logs.get(i).get(
-            driver_laps.laps.get(i).get_position() - 1)).total_seconds() for i in x]
-        line_style = "solid" if constants.camera[session.event.year].get(driver_laps.driver.get_number(),
+        x = sorted(driver_laps.get_laps().keys())
+        y = [(driver_laps.get_laps().get(i).get_at() - position_logs.get(i).get(
+            driver_laps.get_laps().get(i).get_position() - 1)).total_seconds() for i in x]
+        line_style = "solid" if constants.camera[session.event.year].get(driver_laps.get_driver().get_number(),
                                                                          'black') == "black" else "dashed"
-        ax.plot(x, y, color=fastf1.plotting.get_team_color(driver_laps.driver.get_team_name(), session),
-                label=driver_laps.driver.get_name(),
+        ax.plot(x, y, color=fastf1.plotting.get_team_color(driver_laps.get_driver().get_team_name(), session),
+                label=driver_laps.get_driver().get_name(),
                 linestyle=line_style, linewidth=1)
     ax.legend(fontsize='small')
     ax.set_ylim(top=0, bottom=30)
@@ -228,12 +234,12 @@ def gap_to_top(log: Logger, filepath: str, filename: str, session: Session, r: i
     top_time_map = make_top_time_map(session.laps)
     fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
     for lap_log in lap_logs:
-        color = fastf1.plotting.get_team_color(lap_log.driver.get_team_name(), session)
-        x = sorted(lap_log.laps.keys())
-        y = [(lap_log.laps.get(i).get_at() - top_time_map.get(i)).total_seconds() for i in x]
-        line_style = "solid" if constants.camera[session.event.year].get(lap_log.driver.get_number(),
+        color = fastf1.plotting.get_team_color(lap_log.get_driver().get_team_name(), session)
+        x = sorted(lap_log.get_laps().keys())
+        y = [(lap_log.get_laps().get(i).get_at() - top_time_map.get(i)).total_seconds() for i in x]
+        line_style = "solid" if constants.camera[session.event.year].get(lap_log.get_driver().get_number(),
                                                                          'black') == "black" else "dashed"
-        ax.plot(x, y, linewidth=1, color=color, label=lap_log.driver.get_name(), linestyle=line_style)
+        ax.plot(x, y, linewidth=1, color=color, label=lap_log.get_driver().get_name(), linestyle=line_style)
     ax.legend(fontsize='small')
     ax.invert_yaxis()
     ax.set_ylim(top=0, bottom=60)
@@ -265,12 +271,12 @@ def positions(log: Logger, filepath: str, session: Session, lap_logs: set[Driver
     """
     fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
     for lap_log in lap_logs:
-        color = fastf1.plotting.get_team_color(lap_log.driver.get_team_name(), session)
-        x = sorted(lap_log.laps.keys())
-        y = [lap_log.laps.get(i).get_position() for i in x]
-        line_style = "solid" if constants.camera[session.event.year].get(lap_log.driver.get_number(),
+        color = fastf1.plotting.get_team_color(lap_log.get_driver().get_team_name(), session)
+        x = sorted(lap_log.get_laps().keys())
+        y = [lap_log.get_laps().get(i).get_position() for i in x]
+        line_style = "solid" if constants.camera[session.event.year].get(lap_log.get_driver().get_number(),
                                                                          'black') == "black" else "dashed"
-        ax.plot(x, y, linewidth=1, color=color, label=lap_log.driver.get_name(), linestyle=line_style)
+        ax.plot(x, y, linewidth=1, color=color, label=lap_log.get_driver().get_name(), linestyle=line_style)
 
     ax.legend(fontsize='small')
     ax.invert_yaxis()
@@ -293,10 +299,10 @@ def tyres(log: Logger, filepath: str, lap_logs: set[DriverLaps]):
     fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
     y = 0
     for lap_log in lap_logs:
-        x = sorted(lap_log.laps.keys())
+        x = sorted(lap_log.get_laps().keys())
         start = 0
         for i in x:
-            if not lap_log.laps.get(i).get_pit_out() and i != max(x):
+            if not lap_log.get_laps().get(i).get_pit_out() and i != max(x):
                 continue
             j = i - 1
             if j < 1:
@@ -304,13 +310,13 @@ def tyres(log: Logger, filepath: str, lap_logs: set[DriverLaps]):
             ax.barh(y=y,
                     width=j - start,
                     left=start,
-                    color=constants.compound_color.get(lap_log.laps.get(j).get_tyre().get_compound(), 'gray'),
-                    edgecolor='black' if lap_log.laps.get(j).get_tyre().get_new() else 'gray'
+                    color=constants.compound_color.get(lap_log.get_laps().get(j).get_tyre().get_compound(), 'gray'),
+                    edgecolor='black' if lap_log.get_laps().get(j).get_tyre().get_new() else 'gray'
                     )
             start = j
         y += 1
     ax.set_yticks([i for i in range(0, len(lap_logs))])
-    ax.set_yticklabels([str(driver.driver.get_number()) for driver in lap_logs])
+    ax.set_yticklabels([str(driver.get_driver().get_number()) for driver in lap_logs])
     legend_elements = [Patch(facecolor=color, edgecolor='black', label=compound)
                        for compound, color in constants.compound_color.items()]
     ax.legend(handles=legend_elements, title='Compound', loc='upper right', fontsize='small')

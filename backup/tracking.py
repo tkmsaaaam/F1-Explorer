@@ -14,17 +14,38 @@ from backup.domain.weather import Weather
 
 class Config:
     def __init__(self, log: logging.Logger, logs_path: str, images_path: str):
-        self.log = log
-        self.logs_path = logs_path
-        self.images_path = images_path
+        self.__log = log
+        self.__logs_path = logs_path
+        self.__images_path = images_path
+
+    def get_log(self):
+        return self.__log
+
+    def get_logs_path(self):
+        return self.__logs_path
+
+    def get_images_path(self):
+        return self.__images_path
 
 
 class Race:
     def __init__(self, config: Config):
-        self.laptime_map: dict[int, dict[int, Lap]] = {}
-        self.stints_map: dict[int, dict[int, Stint]] = {}
-        self.weather_map: dict[datetime.datetime, Weather] = {}
-        self.config = config
+        self.__laptime_map: dict[int, dict[int, Lap]] = {}
+        self.__stints_map: dict[int, dict[int, Stint]] = {}
+        self.__weather_map: dict[datetime.datetime, Weather] = {}
+        self.__config = config
+
+    def get_laptime_map(self):
+        return self.__laptime_map
+
+    def get_stints_map(self):
+        return self.__stints_map
+
+    def get_weather_map(self):
+        return self.__weather_map
+
+    def get_config(self):
+        return self.__config
 
     def handle_timing_data(self, data):
         if not isinstance(data, dict):
@@ -34,38 +55,38 @@ class Race:
             if 'LastLapTime' in v and 'NumberOfLaps' in v:
                 lap_time: str = v["LastLapTime"]["Value"]
                 if lap_time != "":
-                    if driver_number not in self.laptime_map:
-                        self.laptime_map[driver_number] = {}
+                    if driver_number not in self.__laptime_map:
+                        self.__laptime_map[driver_number] = {}
                     lap = Lap()
-                    driver_laps = self.laptime_map[driver_number]
+                    driver_laps = self.__laptime_map[driver_number]
                     if len(driver_laps) > 0:
-                        lap.set_position(driver_laps[max(driver_laps.keys())].position)
+                        lap.set_position(driver_laps[max(driver_laps.keys())].get_position())
                     lap.set_time(str_to_seconds(lap_time))
                     lap_number = v["NumberOfLaps"]
                     driver_laps[lap_number] = lap
             if 'Position' in v:
                 position = int(v["Position"])
-                if driver_number not in self.laptime_map:
+                if driver_number not in self.__laptime_map:
                     lap = Lap()
-                    self.laptime_map[driver_number] = {0: lap}
-                driver_laps = self.laptime_map[driver_number]
+                    self.__laptime_map[driver_number] = {0: lap}
+                driver_laps = self.__laptime_map[driver_number]
                 driver_laps.get(max(driver_laps.keys())).set_position(position)
             if 'GapToLeader' in v:
                 if not 'L' in v["GapToLeader"]:
                     diff = str_to_seconds(v["GapToLeader"].replace("+", ""))
-                    if driver_number not in self.laptime_map:
+                    if driver_number not in self.__laptime_map:
                         lap = Lap()
-                        self.laptime_map[driver_number] = {0: lap}
-                    driver_laps = self.laptime_map[driver_number]
+                        self.__laptime_map[driver_number] = {0: lap}
+                    driver_laps = self.__laptime_map[driver_number]
                     driver_laps.get(max(driver_laps.keys())).set_gap_to_top(diff)
             if 'IntervalToPositionAhead' in v:
                 if 'Value' in v["IntervalToPositionAhead"]:
                     if not 'L' in v["IntervalToPositionAhead"]["Value"]:
                         diff = str_to_seconds(v["IntervalToPositionAhead"]["Value"].replace("+", ""))
-                        if driver_number not in self.laptime_map:
+                        if driver_number not in self.__laptime_map:
                             lap = Lap()
-                            self.laptime_map[driver_number] = {0: lap}
-                        driver_laps = self.laptime_map[driver_number]
+                            self.__laptime_map[driver_number] = {0: lap}
+                        driver_laps = self.__laptime_map[driver_number]
                         driver_laps.get(max(driver_laps.keys())).set_gap_to_ahead(diff)
 
     def handle_timing_app_data(self, data):
@@ -79,19 +100,19 @@ class Race:
                 driver_number = int(driver)
                 for stint_no, stint in stints.items():
                     if 'LapTime' in stint and 'LapNumber' in stint:
-                        if driver_number not in self.laptime_map:
-                            self.laptime_map[driver_number] = {}
+                        if driver_number not in self.__laptime_map:
+                            self.__laptime_map[driver_number] = {}
                         lap_number = stint["LapNumber"]
-                        driver_laps = self.laptime_map[driver_number]
+                        driver_laps = self.__laptime_map[driver_number]
                         if lap_number not in driver_laps:
                             lap = Lap()
                             if len(driver_laps) > 0:
-                                lap.set_position(driver_laps[max(driver_laps.keys())].position)
+                                lap.set_position(driver_laps[max(driver_laps.keys())].get_position())
                             lap.set_time(str_to_seconds(stint["LapTime"]))
                             driver_laps[lap_number] = lap
-                    if driver_number not in self.stints_map:
-                        self.stints_map[driver_number] = {}
-                    s = self.stints_map[driver_number]
+                    if driver_number not in self.__stints_map:
+                        self.__stints_map[driver_number] = {}
+                    s = self.__stints_map[driver_number]
                     stint_number = int(stint_no)
                     if stint_number not in s:
                         s[stint_number] = Stint()
@@ -107,12 +128,12 @@ class Race:
                 if len(stints) < 1:
                     continue
                 driver_number = int(driver)
-                if driver_number not in self.stints_map:
-                    self.stints_map[driver_number] = {}
-                stint_number = max(self.stints_map[driver_number].keys()) + 1 if len(
-                    self.stints_map[driver_number]) > 0 else 0
+                if driver_number not in self.__stints_map:
+                    self.__stints_map[driver_number] = {}
+                stint_number = max(self.__stints_map[driver_number].keys()) + 1 if len(
+                    self.__stints_map[driver_number]) > 0 else 0
                 stint = stints[0]
-                s = self.stints_map[driver_number]
+                s = self.__stints_map[driver_number]
                 if stint_number not in s:
                     s[stint_number] = Stint()
                 if 'Compound' in stint:
@@ -127,9 +148,9 @@ class Race:
     def handle_weather(self, data, t: datetime.datetime):
         if not isinstance(data, dict):
             return
-        if t not in self.weather_map:
-            self.weather_map[t] = Weather()
-        weather = self.weather_map[t]
+        if t not in self.__weather_map:
+            self.__weather_map[t] = Weather()
+        weather = self.__weather_map[t]
         if 'AirTemp' in data:
             air_temp: str = data["AirTemp"]
             if air_temp != "":
@@ -152,7 +173,7 @@ class Race:
         try:
             msg = json.loads(json_str)
         except (json.JSONDecodeError, ValueError):
-            self.config.log.warning("Json parse error %s", message)
+            self.get_config().get_log().warning("Json parse error %s", message)
             return
         category = msg[0]
         if category == "TimingAppData":
@@ -162,9 +183,9 @@ class Race:
         if category == "WeatherData":
             self.handle_weather(msg[1], datetime.datetime.fromisoformat(msg[2].replace("Z", "+00:00")))
         if category == "RaceControlMessages":
-            handle_race_control(msg[2], msg[1], self.config.logs_path)
+            handle_race_control(msg[2], msg[1], self.get_config().get_logs_path())
         if category == "TrackStatus":
-            handle_track_status(msg[2], msg[1], self.config.logs_path)
+            handle_track_status(msg[2], msg[1], self.get_config().get_logs_path())
 
 
 def str_to_seconds(param: str) -> float:
@@ -241,17 +262,17 @@ def main():
         # ファイルが更新されていた場合のみplotを実行
         if start != prev_start:
             order = sorted(
-                race.laptime_map.keys(),
-                key=lambda car: race.laptime_map[car][max(race.laptime_map[car].keys())].position
+                race.get_laptime_map().keys(),
+                key=lambda car: race.get_laptime_map()[car][max(race.get_laptime_map()[car].keys())].get_position()
             )
-            plotter.plot_tyres(race.stints_map, order)
-            plotter.plot_gap_to_ahead(race.laptime_map, "gap_ahead", 6)
-            plotter.plot_gap_to_top(race.laptime_map, "gap_top", 30)
-            plotter.plot_positions(race.laptime_map, "position")
-            plotter.plot_laptime(race.laptime_map, "laptime", 7)
-            plotter.plot_laptime_diff(race.laptime_map, order, "laptime_diffs")
+            plotter.plot_tyres(race.get_stints_map(), order)
+            plotter.plot_gap_to_ahead(race.get_laptime_map(), "gap_ahead", 6)
+            plotter.plot_gap_to_top(race.get_laptime_map(), "gap_top", 30)
+            plotter.plot_positions(race.get_laptime_map(), "position")
+            plotter.plot_laptime(race.get_laptime_map(), "laptime", 7)
+            plotter.plot_laptime_diff(race.get_laptime_map(), order, "laptime_diffs")
 
-            plotter.plot_weather(race.weather_map)
+            plotter.plot_weather(race.get_weather_map())
         else:
             log.info("plot is skipped")
         try:
