@@ -13,19 +13,15 @@ from backup.domain.weather import Weather
 
 
 class Config:
-    def __init__(self, log: logging.Logger, logs_path: str, images_path: str):
+    def __init__(self, log: logging.Logger, logs_path: str):
         self.__log = log
         self.__logs_path = logs_path
-        self.__images_path = images_path
 
     def get_log(self):
         return self.__log
 
     def get_logs_path(self):
         return self.__logs_path
-
-    def get_images_path(self):
-        return self.__images_path
 
 
 class Race:
@@ -227,8 +223,7 @@ def main():
 
     results_path = "../live/data/results"
     logs_path = results_path + "/logs"
-    images_path = results_path + "/images"
-    os.makedirs(images_path, exist_ok=True)
+    os.makedirs(results_path + "/images", exist_ok=True)
 
     try:
         os.remove(f"{logs_path}/race_control.txt")
@@ -242,7 +237,7 @@ def main():
     with open('../config.json', 'r', encoding='utf-8') as file:
         config = json.load(file)
 
-    race = Race(Config(log, logs_path, images_path))
+    race = Race(Config(log, logs_path))
 
     start = 0  # 最初に読み込んだ行数
     prev_start = -1  # 直前の読み込み行数（初期値は不一致にしておく）
