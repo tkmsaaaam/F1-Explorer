@@ -43,6 +43,10 @@ class Race:
     def get_config(self):
         return self.__config
 
+    def get_max_lap(self, driver_number: int) -> Lap:
+        driver_laps = self.__laptime_map[driver_number]
+        return driver_laps.get(max(driver_laps.keys()))
+
     def handle_timing_data(self, data):
         if not isinstance(data, dict):
             return
@@ -63,27 +67,20 @@ class Race:
             if 'Position' in v:
                 position = int(v["Position"])
                 if driver_number not in self.__laptime_map:
-                    lap = Lap()
-                    self.__laptime_map[driver_number] = {0: lap}
-                driver_laps = self.__laptime_map[driver_number]
-                driver_laps.get(max(driver_laps.keys())).set_position(position)
+                    self.__laptime_map[driver_number] = {0: Lap()}
+                self.get_max_lap(driver_number).set_position(position)
             if 'GapToLeader' in v:
                 if not 'L' in v["GapToLeader"]:
-                    diff = str_to_seconds(v["GapToLeader"].replace("+", ""))
                     if driver_number not in self.__laptime_map:
-                        lap = Lap()
-                        self.__laptime_map[driver_number] = {0: lap}
-                    driver_laps = self.__laptime_map[driver_number]
-                    driver_laps.get(max(driver_laps.keys())).set_gap_to_top(diff)
+                        self.__laptime_map[driver_number] = {0: Lap()}
+                    self.get_max_lap(driver_number).set_gap_to_top(str_to_seconds(v["GapToLeader"].replace("+", "")))
             if 'IntervalToPositionAhead' in v:
                 if 'Value' in v["IntervalToPositionAhead"]:
                     if not 'L' in v["IntervalToPositionAhead"]["Value"]:
-                        diff = str_to_seconds(v["IntervalToPositionAhead"]["Value"].replace("+", ""))
                         if driver_number not in self.__laptime_map:
-                            lap = Lap()
-                            self.__laptime_map[driver_number] = {0: lap}
-                        driver_laps = self.__laptime_map[driver_number]
-                        driver_laps.get(max(driver_laps.keys())).set_gap_to_ahead(diff)
+                            self.__laptime_map[driver_number] = {0: Lap()}
+                        self.get_max_lap(driver_number).set_gap_to_top(
+                            str_to_seconds(v["IntervalToPositionAhead"]["Value"].replace("+", "")))
 
     def handle_timing_app_data(self, data):
         if not isinstance(data, dict):
