@@ -1,6 +1,6 @@
 class Lap:
-    def __init__(self):
-        self.__time = 0
+    def __init__(self, time=0):
+        self.__time = time
         self.__position = 0
         self.__gap_to_ahead = 0
         self.__gap_to_top = 0
@@ -16,9 +16,6 @@ class Lap:
 
     def get_gap_to_top(self):
         return self.__gap_to_top
-
-    def set_time(self, time: float):
-        self.__time = time
 
     def set_position(self, position: int):
         self.__position = position

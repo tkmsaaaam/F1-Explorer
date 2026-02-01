@@ -57,11 +57,10 @@ class Race:
                 if lap_time != "":
                     if driver_number not in self.__laptime_map:
                         self.__laptime_map[driver_number] = {}
-                    lap = Lap()
+                    lap = Lap(str_to_seconds(lap_time))
                     driver_laps = self.__laptime_map[driver_number]
                     if len(driver_laps) > 0:
-                        lap.set_position(driver_laps[max(driver_laps.keys())].get_position())
-                    lap.set_time(str_to_seconds(lap_time))
+                        lap.set_position(self.get_max_lap(driver_number).get_position())
                     lap_number = v["NumberOfLaps"]
                     driver_laps[lap_number] = lap
             if 'Position' in v:
@@ -98,10 +97,9 @@ class Race:
                         lap_number = stint["LapNumber"]
                         driver_laps = self.__laptime_map[driver_number]
                         if lap_number not in driver_laps:
-                            lap = Lap()
+                            lap = Lap(str_to_seconds(stint["LapTime"]))
                             if len(driver_laps) > 0:
-                                lap.set_position(driver_laps[max(driver_laps.keys())].get_position())
-                            lap.set_time(str_to_seconds(stint["LapTime"]))
+                                lap.set_position(self.get_max_lap(driver_number).get_position())
                             driver_laps[lap_number] = lap
                     if driver_number not in self.__stints_map:
                         self.__stints_map[driver_number] = {}
