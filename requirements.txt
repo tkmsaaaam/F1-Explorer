@@ -1,8 +1,8 @@
-coverage==7.11.3 # https://pypi.org/project/coverage/
-fastf1==3.6.1 # https://pypi.org/project/fastf1/
+coverage==7.13.2 # https://pypi.org/project/coverage/
+fastf1==3.7.0 # https://pypi.org/project/fastf1/
 kaleido==1.2.0 # https://pypi.org/project/kaleido/
-matplotlib==3.10.7 # https://pypi.org/project/matplotlib/
-opentelemetry-api==1.38.0 # https://pypi.org/project/opentelemetry-api/
-opentelemetry-sdk==1.38.0 # https://pypi.org/project/opentelemetry-sdk/
+matplotlib==3.10.8 # https://pypi.org/project/matplotlib/
+opentelemetry-api==1.39.1 # https://pypi.org/project/opentelemetry-api/
+opentelemetry-sdk==1.39.1 # https://pypi.org/project/opentelemetry-sdk/
 pandas==2.3.3 # https://pypi.org/project/pandas/
-plotly==6.4.0 # https://pypi.org/project/plotly/
+plotly==6.5.2 # https://pypi.org/project/plotly/
