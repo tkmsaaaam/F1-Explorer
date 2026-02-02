@@ -43,15 +43,11 @@ def plot_by_tyre_age_and_tyre(session: Session, log: Logger):
         log: ロガー
 
     """
-    min_consecutive_laps = 2  # ロングランとみなす連続ラップ数のしきい値
-
-    all_laps: Laps = session.laps
-
-    compounds = all_laps.Compound.unique()
-    for compound in compounds:
+    for compound in session.laps.Compound.unique():
         fastf1.plotting.setup_mpl(mpl_timedelta_support=True, misc_mpl_mods=False, color_scheme='light')
         fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
-        stint_set = make_stint_set(min_consecutive_laps, all_laps, compound)
+        # ロングランとみなす連続ラップ数のしきい値は2
+        stint_set = make_stint_set(2, session.laps, compound)
         legends = set()
         for stint in stint_set:
             color = fastf1.plotting.get_team_color(stint.get_driver().get_team_name(), session)
@@ -62,7 +58,7 @@ def plot_by_tyre_age_and_tyre(session: Session, log: Logger):
             if stint.get_driver().get_number() in legends:
                 ax.plot(x, y, linewidth=1, color=color, linestyle=line_style)
             else:
-                ax.plot(x, y, linewidth=1, color=color, label=stint.get_driver().get_number(), linestyle=line_style)
+                ax.plot(x, y, linewidth=1, color=color, linestyle=line_style, label=stint.get_driver().get_number())
                 legends.add(stint.get_driver().get_number())
         ax.legend(fontsize='small')
         ax.invert_yaxis()

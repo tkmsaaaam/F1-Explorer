@@ -97,10 +97,9 @@ def laptime(log: Logger, filepath: str, filename: str, session: Session, r: int,
         lap_numbers = sorted(lap_log.get_laps().keys())
         lap_times = [lap_log.get_laps().get(i).get_time() for i in lap_numbers]
         color = fastf1.plotting.get_team_color(lap_log.get_driver().get_team_name(), session)
-        ax.plot(lap_numbers, lap_times, color=color,
+        ax.plot(lap_numbers, lap_times, color=color, label=lap_log.get_driver().get_name(),
                 linestyle="solid" if constants.camera[session.event.year].get(lap_log.get_driver().get_number(),
-                                                                              'black') == "black" else "dashed",
-                label=lap_log.get_driver().get_name())
+                                                                              'black') == "black" else "dashed")
     minimum = session.laps.sort_values(by='LapTime').iloc[0].LapTime.total_seconds()
     ax.legend(fontsize='small')
     ax.set_ylim(top=minimum, bottom=minimum + 15)
@@ -147,7 +146,7 @@ def gap(log: Logger, filepath: str, lap_logs: set[DriverLaps],
     for driver_laps in lap_logs:
         gaps = []
         colors = []
-        for i in range(1, len(driver_laps.get_laps())):
+        for i in range(min(driver_laps.get_laps()), max(driver_laps.get_laps()) + 1):
             lap = driver_laps.get_laps().get(i)
             if lap.get_position() == 1:
                 gaps.append("{:.3f}".format(0))
