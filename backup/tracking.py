@@ -213,7 +213,7 @@ def handle_track_status(t, data, logs_path: str):
     util.write_to_file_top(f"{logs_path}/track_status.txt", message)
 
 
-def main():
+def __main():
     log = setup.log()
 
     results_path = "../live/data/results"
@@ -274,4 +274,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    __main()

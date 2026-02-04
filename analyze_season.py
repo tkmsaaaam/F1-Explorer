@@ -60,7 +60,7 @@ class Weekend:
 
 
 @tracer.start_as_current_span("main")
-def main():
+def __main():
     log = setup.log()
     try:
         config = setup.load_config()
@@ -291,4 +291,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    __main()
