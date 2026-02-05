@@ -1,0 +1,21 @@
+{
+  "Year": 2025,
+  "Round": 21,
+  "Session": "R",
+  "FileName": "2025_AbuDhabi_Race.txt",
+  "Race": {
+    "LapTimeRange": 10,
+    "GapTopRange": 35,
+    "GapAheadRange": 8
+  },
+  "corners": {
+    "1": [
+      -50,
+      100
+    ]
+  },
+  "separator": [
+    500,
+    1000
+  ]
+}

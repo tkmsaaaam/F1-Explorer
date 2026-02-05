@@ -6,9 +6,9 @@ from matplotlib import pyplot
 from plotly import graph_objects
 
 import constants
-from backup.domain.lap import Lap
-from backup.domain.stint import Stint
-from backup.domain.weather import Weather
+from tracker.domain.lap import Lap
+from tracker.domain.stint import Stint
+from tracker.domain.weather import Weather
 
 logging.basicConfig(
     level=logging.INFO,

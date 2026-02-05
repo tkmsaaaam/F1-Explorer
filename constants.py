@@ -1,4 +1,4 @@
-# for backup
+# for tracker
 abbreviation: dict[int, dict[int, str]] = {
     2025: {
         1: "VER",
@@ -59,7 +59,7 @@ compound_color: dict[str, str] = {
     "WET": "blue"
 }
 
-# for backup
+# for tracker
 team_color: dict[int, dict[int, str]] = {
     2025: {
         1: "#0600ef",

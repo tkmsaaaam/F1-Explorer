@@ -6,10 +6,10 @@ import time
 
 import setup
 import util
-from backup import plotter
-from backup.domain.lap import Lap
-from backup.domain.stint import Stint
-from backup.domain.weather import Weather
+from tracker import plotter
+from tracker.domain.lap import Lap
+from tracker.domain.stint import Stint
+from tracker.domain.weather import Weather
 
 
 class Config:

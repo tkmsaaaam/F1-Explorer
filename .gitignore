@@ -1,8 +1,9 @@
-.coverage
 cache
+.coverage
 config.json
 examples
 htmlcov
 images
 live
+tmp
 **.pyc
