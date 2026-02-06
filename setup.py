@@ -17,9 +17,9 @@ class SessionCategory(Enum):
 
 
 class Config:
-    def __init__(self, year: int, round: int, session: str, corners: dict[str, list[float]], separator: list[int]):
+    def __init__(self, year: int, race_number: int, session: str, corners: dict[str, list[float]], separator: list[int]):
         self.year = year
-        self.round = round
+        self.round = race_number
         self.session = session
         self.corners = corners
         self.separator = separator
