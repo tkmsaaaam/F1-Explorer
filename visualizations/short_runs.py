@@ -72,7 +72,7 @@ def compute_and_save_segment_tables_plotly(
             continue
 
         car_data = laps.get_car_data().add_distance()
-        times = []
+        times: list[float | None] = []
         for dist in segment_boundaries:
             before_point = car_data[car_data['Distance'] < dist]
             if not before_point.empty:
@@ -98,7 +98,7 @@ def compute_and_save_segment_tables_plotly(
                 delta = round(times[i] - times[i - 1], 3)
                 row.append(delta)
             else:
-                row.append(None)
+                row.append(0)
         segment_rows.append(row)
 
     segment_header = ["segment", "distance", "corners"] + abbreviations
@@ -167,7 +167,7 @@ def compute_and_save_segment_tables_plotly(
                 gap = round((times[i] - times[i - 1]) - best_time, 3)
                 row.append(gap)
             else:
-                row.append(None)
+                row.append(0)
         gap_rows.append(row)
 
     gap_header = ["segment", "distance", "corners"] + abbreviations
