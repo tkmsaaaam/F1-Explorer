@@ -59,6 +59,12 @@ class Weekend:
         return 0
 
 
+def get_color(v: DriverResult) -> str:
+    if v.TeamColor == 'nan':
+        return '808080'
+    return v.TeamColor
+
+
 @tracer.start_as_current_span("main")
 def __main():
     log = setup.log()
@@ -109,7 +115,7 @@ def __main():
         y = [results[i].get_point(v.Abbreviation) + results[i].get_sprint_point(v.Abbreviation) for i in
              range(1, latest)]
         ax.plot([i for i in range(1, latest)], [sum(y[:i + 1]) for i in range(len(y))], label=v.Abbreviation,
-                color='#' + v.TeamColor, linewidth=1,
+                color='#' + get_color(v), linewidth=1,
                 linestyle="solid" if constants.camera.get(config.get_year(), {}).get(k,
                                                                                      'black') == "black" else "dashed")
     ax.legend(fontsize='small')
@@ -124,7 +130,7 @@ def __main():
     for k, v in drivers.items():
         y = [results[i].get_point(v.Abbreviation) + results[i].get_sprint_point(v.Abbreviation) for i in
              range(1, latest)]
-        ax.plot([i for i in range(1, latest)], y, label=v.Abbreviation, color='#' + v.TeamColor, linewidth=1,
+        ax.plot([i for i in range(1, latest)], y, label=v.Abbreviation, color='#' + get_color(v), linewidth=1,
                 linestyle="solid" if constants.camera.get(config.get_year(), {}).get(k,
                                                                                      'black') == "black" else "dashed")
     ax.legend(fontsize='small')
@@ -148,7 +154,7 @@ def __main():
         y = [results[i].get_point(v.Abbreviation) + results[i].get_sprint_point(v.Abbreviation) for i in
              range(1, latest)]
         diff = [a - b for a, b in zip(accumulate(y), accumulate(champion_points))]
-        ax.plot([i for i in range(1, latest)], diff, label=v.Abbreviation, color="#" + v.TeamColor, linewidth=1,
+        ax.plot([i for i in range(1, latest)], diff, label=v.Abbreviation, color="#" + get_color(v), linewidth=1,
                 linestyle="solid" if constants.camera.get(config.get_year(), {}).get(k,
                                                                                      'black') == "black" else "dashed")
     ax.legend(fontsize='small')
@@ -163,7 +169,7 @@ def __main():
     x = [i for i in range(1, latest)]
     for k, v in drivers.items():
         y = [results[i].get_grid_position(v.Abbreviation) for i in range(1, latest)]
-        ax.plot(x, y, label=v.Abbreviation, color='#' + v.TeamColor, linewidth=1,
+        ax.plot(x, y, label=v.Abbreviation, color='#' + get_color(v), linewidth=1,
                 linestyle="solid" if constants.camera.get(config.get_year(), {}).get(k,
                                                                                      'black') == "black" else "dashed")
     ax.legend(fontsize='small')
@@ -190,8 +196,8 @@ def __main():
             label=v.Abbreviation,
             s=20,
             marker='o',
-            facecolors=('#' + v.TeamColor) if is_black else 'none',
-            edgecolors='#' + v.TeamColor,
+            facecolors=('#' + get_color(v)) if is_black else 'none',
+            edgecolors='#' + get_color(v),
             linewidths=1,
             alpha=0.8,
         )
@@ -248,7 +254,7 @@ def __main():
     drivers_standing = [k for k, _ in sorted(sum_map.items(), key=lambda kk: kk[1], reverse=True)]
 
     headers = ["No", "name"] + [drivers[k].Abbreviation for k in drivers_standing]
-    header_colors = (['lightgrey', 'lightgrey'] + ['#' + drivers[k].TeamColor for k in drivers_standing])
+    header_colors = (['lightgrey', 'lightgrey'] + ['#' + get_color(drivers[k]) for k in drivers_standing])
 
     round_numbers = [sorted(results.keys()) + summaries + [f"{i}" for i in one_to_ten]]
     event_names = [
