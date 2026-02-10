@@ -1,6 +1,7 @@
 import datetime
 import os
 from itertools import accumulate
+from typing import Final
 
 import fastf1.plotting
 import numpy
@@ -214,10 +215,10 @@ def __main():
     sum_map = {}
     color_map = {}
 
-    color_master_map = {1: 'gold', 2: 'silver', 3: 'darkgoldenrod', 4: '#4B0000', 5: '#660000', 6: '#800000',
+    color_master_map: Final = {1: 'gold', 2: 'silver', 3: 'darkgoldenrod', 4: '#4B0000', 5: '#660000', 6: '#800000',
                         7: '#990000', 8: '#B20000', 9: '#CC0000', 10: '#E60000'}
     one_to_ten = sorted(color_master_map.keys())
-    summaries = ["", "point sum", "point", "order", "grid", "top10", "top3", "sprint", ""]
+    summaries: Final = ["", "point sum", "point", "order", "grid", "top10", "top3", "sprint", ""]
 
     for k, v in drivers.items():
         values = [
@@ -253,8 +254,8 @@ def __main():
 
     drivers_standing = [k for k, _ in sorted(sum_map.items(), key=lambda kk: kk[1], reverse=True)]
 
-    headers = ["No", "name"] + [drivers[k].Abbreviation for k in drivers_standing]
-    header_colors = (['lightgrey', 'lightgrey'] + ['#' + get_color(drivers[k]) for k in drivers_standing])
+    headers: Final = ["No", "name"] + [drivers[k].Abbreviation for k in drivers_standing]
+    header_colors: Final = (['lightgrey', 'lightgrey'] + ['#' + get_color(drivers[k]) for k in drivers_standing])
 
     round_numbers = [sorted(results.keys()) + summaries + [f"{i}" for i in one_to_ten]]
     event_names = [
