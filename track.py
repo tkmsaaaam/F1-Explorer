@@ -2,6 +2,7 @@ import json
 import logging
 import os
 import time
+from typing import Final
 
 import fastf1
 from fastf1.core import DataNotLoadedError
@@ -22,13 +23,13 @@ fastf1.Cache.enable_cache('./cache', force_renew=True)
 with open('./config.json', 'r', encoding='utf-8') as file:
     config = json.load(file)
 
-results_path = "./live/data/results"
-logs_path = results_path + "/logs"
-images_path = results_path + "/images"
+results_path: Final = "./live/data/results"
+logs_path: Final = results_path + "/logs"
+images_path: Final = results_path + "/images"
 os.makedirs(logs_path, exist_ok=True)
 os.makedirs(images_path, exist_ok=True)
 
-filepath = './live/data/source/' + config['FileName']
+filepath: Final = './live/data/source/' + config['FileName']
 log.info(filepath)
 
 while True:

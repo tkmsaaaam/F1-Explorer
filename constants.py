@@ -1,5 +1,7 @@
 # for tracker
-abbreviation: dict[int, dict[int, str]] = {
+from typing_extensions import Final
+
+abbreviation: Final[dict[int, dict[int, str]]] = {
     2025: {
         1: "VER",
         22: "TSU",
@@ -25,7 +27,7 @@ abbreviation: dict[int, dict[int, str]] = {
     }
 }
 
-camera: dict[int, dict[int, str]] = {
+camera: Final[dict[int, dict[int, str]]] = {
     2025: {
         1: "black",
         22: "yellow",
@@ -51,7 +53,7 @@ camera: dict[int, dict[int, str]] = {
     }
 }
 
-compound_color: dict[str, str] = {
+compound_color: Final[dict[str, str]] = {
     "HARD": "white",
     "MEDIUM": "yellow",
     "SOFT": "red",
@@ -60,7 +62,7 @@ compound_color: dict[str, str] = {
 }
 
 # for tracker
-team_color: dict[int, dict[int, str]] = {
+team_color: Final[dict[int, dict[int, str]]] = {
     2025: {
         1: "#0600ef",
         22: "#0600ef",

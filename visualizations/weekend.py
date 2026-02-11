@@ -1,5 +1,6 @@
 import os
 from logging import Logger
+from typing import Final
 
 import fastf1
 from fastf1.core import DataNotLoadedError
@@ -14,7 +15,7 @@ tracer = trace.get_tracer(__name__)
 @tracer.start_as_current_span("plot_tyre")
 def plot_tyre(year: int, race_number: int, log: Logger):
     drivers = {}
-    sessions = ['FP1', 'FP2', 'FP3', 'SQ', 'SR', 'Q', 'R']
+    sessions: Final[str] = ['FP1', 'FP2', 'FP3', 'SQ', 'SR', 'Q', 'R']
     for session_name in sessions:
         try:
             session = fastf1.get_session(year, race_number, session_name)
@@ -57,10 +58,10 @@ def plot_tyre(year: int, race_number: int, log: Logger):
     table_colors = []
 
     for name in driver_names:
-        sessions = drivers[name]["Sessions"]
+        s = drivers[name]["Sessions"]
         colors = drivers[name]["Colors"]
         # 足りないところは空白 + 白で埋める
-        padded_sessions = sessions + [""] * (max_rows - len(sessions))
+        padded_sessions = s + [""] * (max_rows - len(sessions))
         padded_colors = colors + ["white"] * (max_rows - len(colors))
         table_columns.append(padded_sessions)
         table_colors.append(padded_colors)

@@ -1,6 +1,7 @@
 import datetime
 import logging
 import os
+from typing import Final
 
 from matplotlib import pyplot
 from plotly import graph_objects
@@ -19,9 +20,9 @@ logging.basicConfig(
 )
 log = logging.getLogger(__name__)
 
-results_path = "../live/data/results"
-logs_path = results_path + "/logs"
-images_path = results_path + "/images"
+results_path: Final[str] = "../live/data/results"
+logs_path: Final[str] = results_path + "/logs"
+images_path: Final[str] = results_path + "/images"
 
 
 def set_style(no: int) -> dict[str, str]:
