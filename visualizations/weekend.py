@@ -15,7 +15,7 @@ tracer = trace.get_tracer(__name__)
 @tracer.start_as_current_span("plot_tyre")
 def plot_tyre(year: int, race_number: int, log: Logger):
     drivers = {}
-    sessions: Final[str] = ['FP1', 'FP2', 'FP3', 'SQ', 'SR', 'Q', 'R']
+    sessions: Final[list[str]] = ['FP1', 'FP2', 'FP3', 'SQ', 'SR', 'Q', 'R']
     for session_name in sessions:
         try:
             session = fastf1.get_session(year, race_number, session_name)

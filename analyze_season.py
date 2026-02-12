@@ -109,7 +109,7 @@ def __main():
         return
 
     latest = len(results) + 1
-    base_dir: Final[str] = f"./images/{config.get_year()}"
+    base_dir: Final = f"./images/{config.get_year()}"
 
     fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
     for k, v in drivers.items():

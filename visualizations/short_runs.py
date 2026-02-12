@@ -182,7 +182,7 @@ def compute_and_save_segment_tables_plotly(
     log.info(f"Gap table saved to {filename_base}_gaps_to_best.png")
 
 
-MINIMUM_LAPTIME: Final[int] = 135
+MINIMUM_LAPTIME: Final = 135
 
 
 @tracer.start_as_current_span("plot_best_laptime")

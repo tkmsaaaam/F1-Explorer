@@ -20,9 +20,9 @@ logging.basicConfig(
 )
 log = logging.getLogger(__name__)
 
-results_path: Final[str] = "../live/data/results"
-logs_path: Final[str] = results_path + "/logs"
-images_path: Final[str] = results_path + "/images"
+results_path: Final = "../live/data/results"
+logs_path: Final = results_path + "/logs"
+images_path: Final = results_path + "/images"
 
 
 def set_style(no: int) -> dict[str, str]:
