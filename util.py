@@ -6,8 +6,7 @@ def join_with_colon(*args) -> str:
 
 
 def write_to_file_top(filepath: str, content: str):
-    """
-    ファイルの先頭に文字列を書き込みます。
+    """ファイルの先頭に文字列を書き込みます。
     ファイルが存在しなければ新しく作成します。
 
     Parameters:

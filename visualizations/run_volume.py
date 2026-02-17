@@ -16,8 +16,7 @@ tracer = trace.get_tracer(__name__)
 
 @tracer.start_as_current_span("plot_lap_number_by_timing")
 def plot_lap_number_by_timing(session: Session, log: Logger):
-    """
-    y = ラップ番号
+    """y = ラップ番号
     x = 時間
     Args:
         session: 分析対象のセッション
@@ -36,12 +35,12 @@ def plot_lap_number_by_timing(session: Session, log: Logger):
         if stint_num == 1:
             ax.plot(lap_starts, lap_numbers, color=color,
                     linestyle="solid" if constants.camera[session.event.year].get(int(driver_number),
-                                                                     'black') == "black" else "dashed",
+                                                                                  'black') == "black" else "dashed",
                     label=driver_name)
         else:
             ax.plot(lap_starts, lap_numbers, color=color,
                     linestyle="solid" if constants.camera[session.event.year].get(int(driver_number),
-                                                                     'black') == "black" else "dashed")
+                                                                                  'black') == "black" else "dashed")
     ax.legend(fontsize='small')
     ax.grid(True)
     output_path = f"./images/{session.event.year}/{session.event.RoundNumber}_{session.event.Location}/{session.name.replace(' ', '')}/lap_number_by_timing.png"
@@ -53,8 +52,7 @@ def plot_lap_number_by_timing(session: Session, log: Logger):
 
 @tracer.start_as_current_span("plot_laptime")
 def plot_laptime(session: Session, log: Logger):
-    """
-    ラップごとのタイムの一覧を作成する
+    """ラップごとのタイムの一覧を作成する
     Args:
         session: セッション
         log: ロガー
@@ -118,7 +116,7 @@ def plot_laptime_by_lap_number(session: Session, log: Logger):
         lap_numbers = stint_laps['LapNumber']
         ax.plot(lap_numbers, lap_times, color=color,
                 linestyle="solid" if constants.camera[session.event.year].get(int(stint_laps.DriverNumber.iloc[0]),
-                                                                 'black') == "black" else "dashed",
+                                                                              'black') == "black" else "dashed",
                 label=driver_name)
     minimum = session.laps.LapTime.min().total_seconds()
     ax.set_ylim(top=minimum, bottom=minimum * 1.25)
@@ -160,7 +158,7 @@ def plot_laptime_by_timing(session: Session, log: Logger):
             continue
         ax.plot(lap_starts, lap_times, color=color,
                 linestyle="solid" if constants.camera[session.event.year].get(stint_laps.DriverNumber.iloc[0],
-                                                                 'black') == "black" else "dashed",
+                                                                              'black') == "black" else "dashed",
                 label=driver_name)
     minimum = session.laps.LapTime.min().seconds
     ax.set_ylim(top=minimum, bottom=minimum * 1.25)

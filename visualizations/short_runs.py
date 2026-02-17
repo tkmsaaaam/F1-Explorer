@@ -25,8 +25,7 @@ tracer = trace.get_tracer(__name__)
 
 @tracer.start_as_current_span("compute_competitive_drivers")
 def compute_competitive_drivers(session: Session, log: Logger, c: int) -> list[int]:
-    """
-    トップcチームの早い方のドライバーの車番を算出する
+    """トップcチームの早い方のドライバーの車番を算出する
     Args:
         session: セッション
         log: ログ
@@ -55,8 +54,7 @@ def compute_and_save_segment_tables_plotly(
         segment_boundaries: list[float],
         log: Logger
 ):
-    """
-    mini segmentごとのタイムをプロットする
+    """mini segmentごとのタイムをプロットする
     Args:
         session: セッション
         filename_base: ファイル名のprefix
@@ -187,8 +185,7 @@ MINIMUM_LAPTIME: Final = 135
 
 @tracer.start_as_current_span("plot_best_laptime")
 def plot_best_laptime(session: Session, log: Logger, key: str):
-    """
-    keyを順位で並べる
+    """keyを順位で並べる
     Args:
         session: セッション
         log: ロガー
@@ -244,8 +241,7 @@ def plot_best_laptime(session: Session, log: Logger, key: str):
 
 @tracer.start_as_current_span("plot_best_speed")
 def plot_best_speed(session: Session, log: Logger, key: str):
-    """
-    key（セクター）ごとの最高速をプロットする
+    """key（セクター）ごとの最高速をプロットする
     Args:
         session: セッション
         log: ロガー
@@ -299,8 +295,7 @@ def plot_best_speed(session: Session, log: Logger, key: str):
 
 @tracer.start_as_current_span("plot_flat_out")
 def plot_flat_out(session: Session, log: Logger):
-    """
-    全壊率をプロットする
+    """全開率をプロットする
     Args:
         session: セッション
         log: ロガー
@@ -346,8 +341,7 @@ def plot_flat_out(session: Session, log: Logger):
 
 @tracer.start_as_current_span("plot_ideal_best")
 def plot_ideal_best(session: Session, log: Logger):
-    """
-    y = 理論値
+    """y = 理論値
     x = ラップタイム
     Args:
         session: 分析対象のセッション
@@ -390,8 +384,7 @@ def plot_ideal_best(session: Session, log: Logger):
 
 @tracer.start_as_current_span("plot_ideal_best_diff")
 def plot_ideal_best_diff(session: Session, log: Logger):
-    """
-    y = ラップタイム - 理論値
+    """y = ラップタイム - 理論値
     x = ラップタイム
     Args:
         session: 分析対象のセッション
@@ -434,8 +427,7 @@ def plot_ideal_best_diff(session: Session, log: Logger):
 
 @tracer.start_as_current_span("plot_gear_shift_on_track")
 def plot_gear_shift_on_track(session: Session, log: Logger):
-    """
-    ドライバーごとに最速ラップのシフト変化をコースマップにプロットする
+    """ドライバーごとに最速ラップのシフト変化をコースマップにプロットする
     Args:
         session: 分析対象のセッション
         log: ロガー
@@ -475,8 +467,7 @@ def plot_gear_shift_on_track(session: Session, log: Logger):
 
 @tracer.start_as_current_span("plot_speed_and_laptime")
 def plot_speed_and_laptime(session: Session, log: Logger):
-    """
-    y = ラップタイム
+    """y = ラップタイム
     x = 最高速
     Args:
         session: 分析対象のセッション
@@ -509,8 +500,7 @@ def plot_speed_and_laptime(session: Session, log: Logger):
 
 @tracer.start_as_current_span("plot_speed_distance")
 def plot_speed_distance(session: Session, log: Logger):
-    """
-    y = スピード
+    """y = スピード
     x = 距離
     Args:
         session: 分析対象のセッション
@@ -549,8 +539,7 @@ def plot_speed_distance(session: Session, log: Logger):
 
 @tracer.start_as_current_span("plot_speed_distance_comparison")
 def plot_speed_distance_comparison(session: Session, log: Logger):
-    """
-    スピードを比較
+    """スピードを比較
     Args:
         session: セッション
         log: ロガー
@@ -613,8 +602,7 @@ def plot_speed_distance_comparison(session: Session, log: Logger):
 
 @tracer.start_as_current_span("plot_speed_on_track")
 def plot_speed_on_track(session: Session, log: Logger):
-    """
-    ドライバーごとに最速ラップのスピードをグラフにする
+    """ドライバーごとに最速ラップのスピードをグラフにする
     Args:
         session: 分析対象のセッション
         log: ロガー
@@ -665,8 +653,7 @@ def plot_speed_on_track(session: Session, log: Logger):
 
 @tracer.start_as_current_span("plot_time_distance_comparison")
 def plot_time_distance_comparison(session: Session, log: Logger):
-    """
-    以下を比較
+    """以下を比較
     y = ラップタイム
     x = 距離
     Args:
@@ -785,8 +772,7 @@ def _plot_driver_telemetry(session: Session, log: Logger,
 @tracer.start_as_current_span("make_mini_segment")
 def make_mini_segment(session: Session, log: Logger, corner_map: dict[str, list[int]], separators: list[int]) -> list[
     int]:
-    """
-    ミニセグメント作成する
+    """ミニセグメント作成する
     Args:
         session: 分析対象のセッション
         log: ロガー
@@ -814,8 +800,7 @@ def make_mini_segment(session: Session, log: Logger, corner_map: dict[str, list[
 
 @tracer.start_as_current_span("plot_mini_segment_on_circuit")
 def plot_mini_segment_on_circuit(session: Session, log: Logger, segment_boundaries: list[int], image_name: str):
-    """
-    ミニセグメントをプロットする
+    """ミニセグメントをプロットする
     Args:
         session: 分析対象のセッション
         log: ロガー
@@ -862,8 +847,7 @@ def plot_mini_segment_on_circuit(session: Session, log: Logger, segment_boundari
 
 @tracer.start_as_current_span("plot_throttle")
 def plot_throttle(session: Session, log: Logger):
-    """
-    y = スロットル
+    """y = スロットル
     x = 距離
     Args:
         session: 分析対象のセッション
@@ -881,8 +865,7 @@ def plot_throttle(session: Session, log: Logger):
 
 @tracer.start_as_current_span("plot_brake")
 def plot_brake(session: Session, log: Logger):
-    """
-    y = ブレーキ
+    """y = ブレーキ
     x = 距離
     Args:
         session: 分析対象のセッション
@@ -900,8 +883,7 @@ def plot_brake(session: Session, log: Logger):
 
 @tracer.start_as_current_span("plot_drs")
 def plot_drs(session: Session, log: Logger):
-    """
-    y = DRS
+    """y = DRS
     x = 距離
     Args:
         session: 分析対象のセッション
@@ -919,8 +901,7 @@ def plot_drs(session: Session, log: Logger):
 @tracer.start_as_current_span("plot_telemetry")
 def plot_telemetry(session: Session, log: Logger,
                    driver_numbers: list[int], key: str, label, value_func):
-    """
-    y = key
+    """y = key
     x = 距離
     Args:
         session: 分析対象のセッション
@@ -981,8 +962,7 @@ def plot_telemetry(session: Session, log: Logger,
 
 @tracer.start_as_current_span("plot_tyre_age_and_laptime")
 def plot_tyre_age_and_laptime(session: Session, log: Logger):
-    """
-    y = ラップタイム
+    """y = ラップタイム
     x = タイヤ使用歴
     Args:
         session: 分析対象のセッション

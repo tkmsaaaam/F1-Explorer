@@ -36,8 +36,7 @@ def make_stint_set(min_consecutive_laps: int, all_laps: Laps, compound: str) -> 
 
 @tracer.start_as_current_span("plot_by_tyre_age_and_tyre")
 def plot_by_tyre_age_and_tyre(session: Session, log: Logger):
-    """
-    タイヤ別のファイルにロングランのラップタイム(y)推移をタイヤエイジ(x)でプロットする
+    """タイヤ別のファイルにロングランのラップタイム(y)推移をタイヤエイジ(x)でプロットする
     Args:
         session: プロットするセッション
         log: ロガー

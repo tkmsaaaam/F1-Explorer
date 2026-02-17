@@ -82,8 +82,7 @@ def make_lap_start_by_position_by_number(laps: Laps) -> dict[int, dict[int, date
 
 @tracer.start_as_current_span("laptime")
 def laptime(log: Logger, filepath: str, filename: str, session: Session, r: int, lap_logs: set[DriverLaps]):
-    """
-    x = ラップ番号, y = ラップタイムのドライバーごとの推移
+    """x = ラップ番号, y = ラップタイムのドライバーごとの推移
     Args:
         log: ロガー
         filepath: 画像を保存する先のpath
@@ -131,8 +130,7 @@ def make_top_time_map(all_laps: Laps) -> dict[int, datetime.datetime]:
 @tracer.start_as_current_span("gap")
 def gap(log: Logger, filepath: str, lap_logs: set[DriverLaps],
         position_logs: dict[int, dict[int, datetime.datetime]]):
-    """
-    ラップごとのギャップの一覧を作成する
+    """ラップごとのギャップの一覧を作成する
     Args:
         log: ロガー
         filepath: 画像を保存する先のpathとファイル名
@@ -180,8 +178,7 @@ def gap(log: Logger, filepath: str, lap_logs: set[DriverLaps],
 @tracer.start_as_current_span("gap_to_ahead")
 def gap_to_ahead(log: Logger, filepath: str, filename: str, session: Session, r: int, lap_logs: set[DriverLaps],
                  position_logs: dict[int, dict[int, datetime.datetime]]):
-    """
-    x = ラップ番号, y = 前走とのギャップのドライバーごとの推移
+    """x = ラップ番号, y = 前走とのギャップのドライバーごとの推移
     Args:
         log: ロガー
         filepath: 画像を保存する先のpath
@@ -220,8 +217,7 @@ def gap_to_ahead(log: Logger, filepath: str, filename: str, session: Session, r:
 
 @tracer.start_as_current_span("gap_to_top")
 def gap_to_top(log: Logger, filepath: str, filename: str, session: Session, r: int, lap_logs: set[DriverLaps]):
-    """
-    x = ラップ番号, y = トップとのギャップのドライバーごとの推移
+    """x = ラップ番号, y = トップとのギャップのドライバーごとの推移
     Args:
         log: ロガー
         filepath: 画像を保存する先のpath
@@ -260,8 +256,7 @@ def gap_to_top(log: Logger, filepath: str, filename: str, session: Session, r: i
 
 @tracer.start_as_current_span("positions")
 def positions(log: Logger, filepath: str, session: Session, lap_logs: set[DriverLaps]):
-    """
-    x = ラップ番号, y = ポジションのドライバーごとの推移
+    """x = ラップ番号, y = ポジションのドライバーごとの推移
     Args:
         log: ロガー
         filepath: 画像を保存する先のpathとファイル名
@@ -288,8 +283,7 @@ def positions(log: Logger, filepath: str, session: Session, lap_logs: set[Driver
 
 @tracer.start_as_current_span("tyres")
 def tyres(log: Logger, filepath: str, lap_logs: set[DriverLaps]):
-    """
-    x = ラップ番号, y = 使用タイヤのドライバーごとの推移
+    """x = ラップ番号, y = 使用タイヤのドライバーごとの推移
     Args:
         log: ロガー
         filepath:

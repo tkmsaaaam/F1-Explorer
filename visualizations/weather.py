@@ -18,8 +18,7 @@ def execute(session: Session, log: Logger, dir_path: str):
 
 @tracer.start_as_current_span("plot_weather")
 def plot_weather(session: Session, log: Logger, key: str, filepath: str):
-    """
-    気象情報をプロット
+    """気象情報をプロット
     Args:
         session: セッション
         log: ロガー
