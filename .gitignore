@@ -6,4 +6,5 @@ htmlcov
 images
 live
 tmp
+.venv
 **.pyc
