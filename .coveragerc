@@ -1,0 +1,6 @@
+[run]
+omit =
+    */test_*.py
+    analyze_*.py
+    live.py
+    track.py
