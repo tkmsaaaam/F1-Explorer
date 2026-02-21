@@ -10,7 +10,6 @@ import numpy as np
 import pandas
 import plotly.express as px
 import plotly.graph_objects as go
-from fastf1 import plotting
 from fastf1.core import Session
 from matplotlib import pyplot as plt
 from matplotlib.collections import LineCollection

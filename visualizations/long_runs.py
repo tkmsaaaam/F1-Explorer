@@ -2,7 +2,6 @@ import os
 from logging import Logger
 
 import fastf1
-import fastf1.plotting
 from fastf1.core import Session, Laps
 from matplotlib import pyplot as plt
 from opentelemetry import trace

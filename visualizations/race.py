@@ -4,7 +4,6 @@ from logging import Logger
 
 import fastf1
 import pandas
-from fastf1 import plotting
 from fastf1.core import Session, Laps
 from matplotlib import pyplot as plt
 from matplotlib.patches import Patch
