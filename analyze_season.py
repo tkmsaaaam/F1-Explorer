@@ -267,11 +267,11 @@ def __main():
     topic_colors = [['lightgrey'] * (len(schedule) + 1)]
 
     fig = graph_objects.Figure(data=[graph_objects.Table(
-        header=dict(values=headers, fill_color=header_colors, align='center'),
-        cells=dict(values=round_numbers + event_names + [values_map[k] for k in drivers_standing],
-                   fill_color=topic_colors + topic_colors + [color_map[k] for k in drivers_standing],
-                   align='center', font_color='darkgrey')
-    )], layout=dict(autosize=True, margin=dict(autoexpand=True)))
+        header={'values': headers, 'fill_color': header_colors, 'align': 'center'},
+        cells={'values': round_numbers + event_names + [values_map[k] for k in drivers_standing],
+                   'fill_color': topic_colors + topic_colors + [color_map[k] for k in drivers_standing],
+                   'align': 'center', 'font_color': 'darkgrey'}
+    )], layout={'autosize': True, 'margin': {'autoexpand': True}})
 
     output_path = f"{base_dir}/points.png"
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
@@ -282,15 +282,15 @@ def __main():
     if os.path.exists(output_path):
         return
     fig = graph_objects.Figure(data=[graph_objects.Table(
-        header=dict(values=["number", "name", "sprint", "date"], fill_color='lightgrey', align='center'),
-        cells=dict(values=[[event.RoundNumber for _, event in schedule.iterrows()],
+        header={'values': ["number", "name", "sprint", "date"], 'fill_color': 'lightgrey', 'align': 'center'},
+        cells={'values': [[event.RoundNumber for _, event in schedule.iterrows()],
                            [event.EventName for _, event in schedule.iterrows()],
                            [event.EventFormat == "sprint_qualifying" for _, event in schedule.iterrows()],
                            [event.EventDate for _, event in schedule.iterrows()]],
-                   fill_color=[
+                   'fill_color': [
                        ["white" if event.RoundNumber % 2 == 0 else "#f2f2f2" for _, event in schedule.iterrows()]],
-                   align='center')
-    )], layout=dict(autosize=True, margin=dict(autoexpand=True)))
+                   'align': 'center'}
+    )], layout={'autosize': True, 'margin': {'autoexpand': True}})
 
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     fig.write_image(output_path, width=1920, height=2160)

@@ -103,8 +103,8 @@ def compute_and_save_segment_tables_plotly(
     segment_data = list(zip(*segment_rows))
 
     fig_segment = go.Figure(data=[go.Table(
-        header=dict(values=segment_header, fill_color='lightgrey', align='center'),
-        cells=dict(values=segment_data, align='center')
+        header={'values': segment_header, 'fill_color': 'lightgrey', 'align': 'center'},
+        cells={'values': segment_data, 'align': 'center'}
     )])
     fig_segment.write_image(f"{filename_base}_durations.png", width=1920, height=1080)
     log.info(f"Segment table saved to {filename_base}_durations.png")
@@ -126,8 +126,8 @@ def compute_and_save_segment_tables_plotly(
     rank_data = list(zip(*segment_rank_rows))
 
     fig_ranks = go.Figure(data=[go.Table(
-        header=dict(values=rank_header, fill_color='lightgrey', align='center'),
-        cells=dict(values=rank_data, align='center')
+        header={'values': rank_header, 'fill_color': 'lightgrey', 'align': 'center'},
+        cells={'values': rank_data, 'align': 'center'}
     )])
     fig_ranks.write_image(f"{filename_base}_ranks.png", width=1920, height=1080)
     log.info(f"Segment rank table saved to {filename_base}_ranks.png")
@@ -172,8 +172,8 @@ def compute_and_save_segment_tables_plotly(
     gap_data = list(zip(*gap_rows))
 
     fig_gap = go.Figure(data=[go.Table(
-        header=dict(values=gap_header, fill_color='lightgrey', align='center'),
-        cells=dict(values=gap_data, align='center')
+        header={'values': gap_header, 'fill_color': 'lightgrey', 'align': 'center'},
+        cells={'values': gap_data, 'align': 'center'}
     )])
     fig_gap.write_image(f"{filename_base}_gaps_to_best.png", width=1920, height=1080)
     log.info(f"Gap table saved to {filename_base}_gaps_to_best.png")

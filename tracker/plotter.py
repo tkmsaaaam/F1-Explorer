@@ -214,9 +214,9 @@ def plot_laptime_diff(dicts: dict[int, dict[int, Lap]], order: list[int], filena
         data_rows.append(lap_times)
         fill_colors.append(colors)
     fig = graph_objects.Figure(data=[graph_objects.Table(
-        header=dict(values=header, fill_color='lightgrey', align='center'),
-        cells=dict(values=data_rows, fill_color=fill_colors, align='center')
-    )], layout=dict(width=1920, height=1080, margin=dict(l=20, r=20, t=20, b=20)))
+        header={'values': header, 'fill_color': 'lightgrey', 'align': 'center'},
+        cells={'values': data_rows, 'fill_color': fill_colors, 'align': 'center'}
+    )], layout={'width': 1920, 'height': 1080, 'margin': {'l': 20, 'r': 20, 't': 20, 'b': 20}})
     output_path: str = f"{images_path}/{filename}.png"
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     fig.write_image(output_path, width=1920, height=1080)

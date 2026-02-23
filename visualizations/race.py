@@ -164,10 +164,10 @@ def gap(log: Logger, filepath: str, lap_logs: set[DriverLaps],
         fill_colors.append(colors)
 
     fig = graph_objects.Figure(data=[graph_objects.Table(
-        header=dict(values=header, fill_color='lightgrey', align='center'),
-        cells=dict(values=[list(range(1, max_laps + 1))] + all_gaps, fill_color=[["#f0f0f0"] * max_laps] + fill_colors,
-                   align='center')
-    )], layout=dict(autosize=True, margin=dict(autoexpand=True)))
+        header={'values': header, 'fill_color': 'lightgrey', 'align': 'center'},
+        cells={'values': [list(range(1, max_laps + 1))] + all_gaps, 'fill_color': [["#f0f0f0"] * max_laps] + fill_colors,
+                   'align': 'center'}
+    )], layout={'autosize': True, 'margin': {'autoexpand': True}})
 
     os.makedirs(os.path.dirname(filepath), exist_ok=True)
     fig.write_image(filepath, width=1920, height=1620)

@@ -68,8 +68,8 @@ def plot_tyre(year: int, race_number: int, log: Logger):
 
     # 表を作成
     fig = graph_objects.Figure(data=[graph_objects.Table(
-        header=dict(values=driver_names, fill_color='lightgrey', align='center'),
-        cells=dict(values=table_columns, fill_color=table_colors, align='center')
+        header={'values': driver_names, 'fill_color': 'lightgrey', 'align': 'center'},
+        cells={'values': table_columns, 'fill_color': table_colors, 'align': 'center'}
     )])
 
     session = fastf1.get_session(year, race_number, 'FP1')
