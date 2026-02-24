@@ -1,11 +1,13 @@
 import datetime
 import os
 from itertools import accumulate
+from logging import Logger
 from typing import Final
 
 import fastf1.plotting
 import numpy
 from fastf1.core import DriverResult
+from fastf1.events import EventSchedule
 from matplotlib import pyplot as plt
 from opentelemetry import trace
 from plotly import graph_objects
@@ -65,6 +67,24 @@ def get_color(v: DriverResult) -> str:
         return '808080'
     return v.TeamColor
 
+def __save_events(base_dir: str, log: Logger, schedule: EventSchedule):
+    output_path = f"{base_dir}/events.png"
+    if os.path.exists(output_path):
+        return
+    fig = graph_objects.Figure(data=[graph_objects.Table(
+        header={'values': ["number", "name", "sprint", "date"], 'fill_color': 'lightgrey', 'align': 'center'},
+        cells={'values': [[event.RoundNumber for _, event in schedule.iterrows()],
+                           [event.EventName for _, event in schedule.iterrows()],
+                           [event.EventFormat == "sprint_qualifying" for _, event in schedule.iterrows()],
+                           [event.EventDate for _, event in schedule.iterrows()]],
+                   'fill_color': [
+                       ["white" if event.RoundNumber % 2 == 0 else "#f2f2f2" for _, event in schedule.iterrows()]],
+                   'align': 'center'}
+    )], layout={'autosize': True, 'margin': {'autoexpand': True}})
+
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+    fig.write_image(output_path, width=1920, height=2160)
+    log.info(f"Saved plot to {output_path}")
 
 @tracer.start_as_current_span("main")
 def __main():
@@ -105,11 +125,12 @@ def __main():
             if driver_row.DriverNumber not in drivers:
                 drivers[int(driver_row.DriverNumber)] = race.get_driver(abbreviation)
 
+    base_dir: Final = f"./images/{config.get_year()}"
     if len(results) == 0:
+        __save_events(base_dir, log, schedule)
         return
 
     latest = len(results) + 1
-    base_dir: Final = f"./images/{config.get_year()}"
 
     fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
     for k, v in drivers.items():
@@ -278,24 +299,7 @@ def __main():
     fig.write_image(output_path, width=1920, height=2160)
     log.info(f"Saved plot to {output_path}")
 
-    output_path = f"{base_dir}/events.png"
-    if os.path.exists(output_path):
-        return
-    fig = graph_objects.Figure(data=[graph_objects.Table(
-        header={'values': ["number", "name", "sprint", "date"], 'fill_color': 'lightgrey', 'align': 'center'},
-        cells={'values': [[event.RoundNumber for _, event in schedule.iterrows()],
-                           [event.EventName for _, event in schedule.iterrows()],
-                           [event.EventFormat == "sprint_qualifying" for _, event in schedule.iterrows()],
-                           [event.EventDate for _, event in schedule.iterrows()]],
-                   'fill_color': [
-                       ["white" if event.RoundNumber % 2 == 0 else "#f2f2f2" for _, event in schedule.iterrows()]],
-                   'align': 'center'}
-    )], layout={'autosize': True, 'margin': {'autoexpand': True}})
-
-    os.makedirs(os.path.dirname(output_path), exist_ok=True)
-    fig.write_image(output_path, width=1920, height=2160)
-    log.info(f"Saved plot to {output_path}")
-
+    __save_events()
 
 if __name__ == "__main__":
     __main()
