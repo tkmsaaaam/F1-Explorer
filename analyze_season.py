@@ -67,6 +67,7 @@ def get_color(v: DriverResult) -> str:
         return '808080'
     return v.TeamColor
 
+
 def __save_events(base_dir: str, log: Logger, schedule: EventSchedule):
     output_path = f"{base_dir}/events.png"
     if os.path.exists(output_path):
@@ -74,17 +75,18 @@ def __save_events(base_dir: str, log: Logger, schedule: EventSchedule):
     fig = graph_objects.Figure(data=[graph_objects.Table(
         header={'values': ["number", "name", "sprint", "date"], 'fill_color': 'lightgrey', 'align': 'center'},
         cells={'values': [[event.RoundNumber for _, event in schedule.iterrows()],
-                           [event.EventName for _, event in schedule.iterrows()],
-                           [event.EventFormat == "sprint_qualifying" for _, event in schedule.iterrows()],
-                           [event.EventDate for _, event in schedule.iterrows()]],
-                   'fill_color': [
-                       ["white" if event.RoundNumber % 2 == 0 else "#f2f2f2" for _, event in schedule.iterrows()]],
-                   'align': 'center'}
+                          [event.EventName for _, event in schedule.iterrows()],
+                          [event.EventFormat == "sprint_qualifying" for _, event in schedule.iterrows()],
+                          [event.EventDate for _, event in schedule.iterrows()]],
+               'fill_color': [
+                   ["white" if event.RoundNumber % 2 == 0 else "#f2f2f2" for _, event in schedule.iterrows()]],
+               'align': 'center'}
     )], layout={'autosize': True, 'margin': {'autoexpand': True}})
 
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     fig.write_image(output_path, width=1920, height=2160)
     log.info(f"Saved plot to {output_path}")
+
 
 @tracer.start_as_current_span("main")
 def __main():
@@ -237,7 +239,7 @@ def __main():
     color_map = {}
 
     color_master_map: Final = {1: 'gold', 2: 'silver', 3: 'darkgoldenrod', 4: '#4B0000', 5: '#660000', 6: '#800000',
-                        7: '#990000', 8: '#B20000', 9: '#CC0000', 10: '#E60000'}
+                               7: '#990000', 8: '#B20000', 9: '#CC0000', 10: '#E60000'}
     one_to_ten = sorted(color_master_map.keys())
     summaries: Final = ["", "point sum", "point", "order", "grid", "top10", "top3", "sprint", ""]
 
@@ -290,8 +292,8 @@ def __main():
     fig = graph_objects.Figure(data=[graph_objects.Table(
         header={'values': headers, 'fill_color': header_colors, 'align': 'center'},
         cells={'values': round_numbers + event_names + [values_map[k] for k in drivers_standing],
-                   'fill_color': topic_colors + topic_colors + [color_map[k] for k in drivers_standing],
-                   'align': 'center', 'font_color': 'darkgrey'}
+               'fill_color': topic_colors + topic_colors + [color_map[k] for k in drivers_standing],
+               'align': 'center', 'font_color': 'darkgrey'}
     )], layout={'autosize': True, 'margin': {'autoexpand': True}})
 
     output_path = f"{base_dir}/points.png"
@@ -299,7 +301,8 @@ def __main():
     fig.write_image(output_path, width=1920, height=2160)
     log.info(f"Saved plot to {output_path}")
 
-    __save_events()
+    __save_events(base_dir, log, schedule)
+
 
 if __name__ == "__main__":
     __main()
