@@ -1,5 +1,6 @@
 import datetime
 import os
+import zoneinfo
 from itertools import accumulate
 from logging import Logger
 from typing import Final
@@ -77,7 +78,7 @@ def __save_events(base_dir: str, log: Logger, schedule: EventSchedule):
         cells={'values': [[event.RoundNumber for _, event in schedule.iterrows()],
                           [event.EventName for _, event in schedule.iterrows()],
                           [event.EventFormat == "sprint_qualifying" for _, event in schedule.iterrows()],
-                          [event.EventDate for _, event in schedule.iterrows()]],
+                          [datetime.datetime.fromtimestamp(event.Session5Date.timestamp(), tz=zoneinfo.ZoneInfo("Asia/Tokyo")) for _, event in schedule.iterrows()]],
                'fill_color': [
                    ["white" if event.RoundNumber % 2 == 0 else "#f2f2f2" for _, event in schedule.iterrows()]],
                'align': 'center'}
