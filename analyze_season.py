@@ -74,7 +74,7 @@ def __save_events(base_dir: str, log: Logger, schedule: EventSchedule):
     if os.path.exists(output_path):
         return
     fig = graph_objects.Figure(data=[graph_objects.Table(
-        header={'values': ["number", "name", "sprint", "date"], 'fill_color': 'lightgrey', 'align': 'center'},
+        header={'values': ["number", "name", "sprint", "datetime"], 'fill_color': 'lightgrey', 'align': 'center'},
         cells={'values': [[event.RoundNumber for _, event in schedule.iterrows()],
                           [event.EventName for _, event in schedule.iterrows()],
                           [event.EventFormat == "sprint_qualifying" for _, event in schedule.iterrows()],
