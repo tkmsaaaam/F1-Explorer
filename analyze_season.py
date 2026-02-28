@@ -78,7 +78,9 @@ def __save_events(base_dir: str, log: Logger, schedule: EventSchedule):
         cells={'values': [[event.RoundNumber for _, event in schedule.iterrows()],
                           [event.EventName for _, event in schedule.iterrows()],
                           [event.EventFormat == "sprint_qualifying" for _, event in schedule.iterrows()],
-                          [datetime.datetime.fromtimestamp(event.Session5Date.timestamp(), tz=zoneinfo.ZoneInfo("Asia/Tokyo")) for _, event in schedule.iterrows()]],
+                          [datetime.datetime.fromtimestamp(event.Session5Date.timestamp(),
+                                                           tz=zoneinfo.ZoneInfo("Asia/Tokyo")) for _, event in
+                           schedule.iterrows()]],
                'fill_color': [
                    ["white" if event.RoundNumber % 2 == 0 else "#f2f2f2" for _, event in schedule.iterrows()]],
                'align': 'center'}
@@ -130,8 +132,9 @@ def __main():
 
     base_dir: Final = f"./images/{config.get_year()}"
     if len(results) == 0:
-        if config.get_year() <= now.year:
-            __save_events(base_dir, log, schedule)
+        if config.get_year() > now.year:
+            return
+        __save_events(base_dir, log, schedule)
         return
 
     latest = len(results) + 1
@@ -303,8 +306,9 @@ def __main():
     fig.write_image(output_path, width=1920, height=2160)
     log.info(f"Saved plot to {output_path}")
 
-    if config.get_year() <= now.year:
-        __save_events(base_dir, log, schedule)
+    if config.get_year() > now.year:
+        return
+    __save_events(base_dir, log, schedule)
 
 
 if __name__ == "__main__":
