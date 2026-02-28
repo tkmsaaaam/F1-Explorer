@@ -130,7 +130,8 @@ def __main():
 
     base_dir: Final = f"./images/{config.get_year()}"
     if len(results) == 0:
-        __save_events(base_dir, log, schedule)
+        if config.get_year() <= now.year:
+            __save_events(base_dir, log, schedule)
         return
 
     latest = len(results) + 1
@@ -302,7 +303,8 @@ def __main():
     fig.write_image(output_path, width=1920, height=2160)
     log.info(f"Saved plot to {output_path}")
 
-    __save_events(base_dir, log, schedule)
+    if config.get_year() <= now.year:
+        __save_events(base_dir, log, schedule)
 
 
 if __name__ == "__main__":
