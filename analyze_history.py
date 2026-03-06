@@ -151,6 +151,17 @@ def __save_winners(log, start_year: int = 2000):
     color_matrix = [["lightgrey"] * (len(years) + 1)]
 
     for yr in years:
+        # Calculate winner counts for the year
+        winner_counts = {}
+        for rnd in winners[yr]:
+            abbr = winners[yr][rnd]
+            if abbr:
+                winner_counts[abbr] = winner_counts.get(abbr, 0) + 1
+        # Sort by count descending
+        sorted_winners = sorted(winner_counts.items(), key=lambda x: x[1], reverse=True)
+        win_list = [f"{abbr}: {count}" for abbr, count in sorted_winners]
+        win_list_str = "<br>".join(win_list)
+
         cols = []
         colors = []
         for r in rounds:
@@ -163,8 +174,15 @@ def __save_winners(log, start_year: int = 2000):
             cell_text = f"{winner} {gp_name}".strip()
             cols.append(cell_text)
             colors.append(color)
+        # Insert win_list_str at the beginning of cols
+        cols.insert(0, win_list_str)
+        colors.insert(0, 'lightgrey')  # Color for the wins cell
         cell_values.append(cols)
         color_matrix.append(colors)
+
+    # Insert "Wins" at the beginning of rounds
+    cell_values[0].insert(0, "Wins")
+    color_matrix[0].insert(0, "lightgrey")  # For the "Wins" header
 
     headers = ["Round"] + [str(y) for y in years]
     fig = graph_objects.Figure(data=[graph_objects.Table(
