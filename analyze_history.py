@@ -12,7 +12,7 @@ import setup
 
 def load_gp_data() -> dict:
     """Load GP data from JSON cache file."""
-    gp_data_path = "./gp_data.json"
+    gp_data_path = "./cache/gp_data.json"
     if os.path.exists(gp_data_path):
         try:
             with open(gp_data_path, 'r') as f:
