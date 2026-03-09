@@ -63,7 +63,9 @@ def make_driver_laps_set(laps: Laps) -> set[DriverLaps]:
             lap: Lap = Lap(stint_laps.LapTime.iloc[i].total_seconds(), stint_laps.Time.iloc[i],
                            stint_laps.Position.iloc[i], pandas.isna(stint_laps.PitOutTime.iloc[i]),
                            Tyre(stint_laps.Compound.iloc[i], stint_laps.FreshTyre.iloc[i]))
-            laps[stint_laps.LapNumber.iloc[i]] = lap
+            # convert lap number to native int to avoid numpy float/int issues later
+            lap_num = int(stint_laps.LapNumber.iloc[i])
+            laps[lap_num] = lap
         result.add(DriverLaps(driver, laps))
     return result
 
@@ -143,7 +145,11 @@ def gap(log: Logger, filepath: str, lap_logs: set[DriverLaps],
     for driver_laps in lap_logs:
         gaps = []
         colors = []
-        for i in range(min(driver_laps.get_laps()), max(driver_laps.get_laps()) + 1):
+        # ensure we iterate over integer lap numbers; keys may be numpy types
+        lap_keys = driver_laps.get_laps().keys()
+        start = int(min(lap_keys))
+        end = int(max(lap_keys))
+        for i in range(start, end):
             lap = driver_laps.get_laps().get(i)
             if lap.get_position() == 1:
                 gaps.append("{:.3f}".format(0))
