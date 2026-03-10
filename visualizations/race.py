@@ -171,8 +171,9 @@ def gap(log: Logger, filepath: str, lap_logs: set[DriverLaps],
 
     fig = graph_objects.Figure(data=[graph_objects.Table(
         header={'values': header, 'fill_color': 'lightgrey', 'align': 'center'},
-        cells={'values': [list(range(1, max_laps + 1))] + all_gaps, 'fill_color': [["#f0f0f0"] * max_laps] + fill_colors,
-                   'align': 'center'}
+        cells={'values': [list(range(1, max_laps + 1))] + all_gaps,
+               'fill_color': [["#f0f0f0"] * max_laps] + fill_colors,
+               'align': 'center'}
     )], layout={'autosize': True, 'margin': {'autoexpand': True}})
 
     os.makedirs(os.path.dirname(filepath), exist_ok=True)
