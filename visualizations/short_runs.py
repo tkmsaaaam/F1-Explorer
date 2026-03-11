@@ -698,6 +698,8 @@ def plot_time_distance_comparison(session: Session, log: Logger):
         ax.vlines(x=circuit_info.corners.Distance, ymin=v_min, ymax=v_max,
                   linestyles='dotted', colors='grey')
 
+        if v_min == float('inf') or v_max == float('-inf'):
+            continue
         for _, corner in circuit_info.corners.iterrows():
             txt = f"{corner.Number}{corner.Letter}"
             ax.text(corner.Distance, v_min, txt,
