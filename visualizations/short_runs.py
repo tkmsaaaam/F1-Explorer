@@ -549,11 +549,11 @@ def plot_speed_distance_comparison(session: Session, log: Logger):
     circuit_info = session.get_circuit_info()
     for group_index in range(num_groups):
         fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
-
         start = group_index * drivers_per_fig
-        end = start + drivers_per_fig
-        driver_group = driver_numbers[start:end]
-
+        if group_index == num_groups - 1:
+            driver_group = driver_numbers[start:]
+        else:
+            driver_group = driver_numbers[start:start + drivers_per_fig]
         for driver_number in driver_group:
             laps = session.laps.pick_drivers(driver_number).pick_fastest()
             if laps is None:
@@ -578,6 +578,9 @@ def plot_speed_distance_comparison(session: Session, log: Logger):
             v_min = min(v_min, car_data.Speed.min())
             v_max = max(v_max, car_data.Speed.max())
 
+        if v_min == float('inf') or v_max == float('-inf'):
+            continue
+
         ax.vlines(x=circuit_info.corners.Distance, ymin=v_min - 20, ymax=v_max + 20,
                   linestyles='dotted', colors='grey')
 
@@ -591,7 +594,7 @@ def plot_speed_distance_comparison(session: Session, log: Logger):
         ax.grid(True)
         output_path = (
             f"./images/{session.event.year}/{session.event.RoundNumber}_{session.event.Location}/"
-            f"{session.name.replace(' ', '')}/speed_distance/comparison/{start + 1}_{min(end, len(driver_numbers))}.png"
+            f"{session.name.replace(' ', '')}/speed_distance/comparison/{start + 1}_.png"
         )
         os.makedirs(os.path.dirname(output_path), exist_ok=True)
         fig.savefig(output_path, bbox_inches='tight')
@@ -664,11 +667,12 @@ def plot_time_distance_comparison(session: Session, log: Logger):
     num_groups = math.ceil(len(driver_numbers) / drivers_per_fig)
     circuit_info = session.get_circuit_info()
     for group_index in range(num_groups):
-        fig, ax = plt.subplots(figsize=(7.2, 12.8), dpi=150, layout='tight')
-
+        fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
         start = group_index * drivers_per_fig
-        end = start + drivers_per_fig
-        driver_group = driver_numbers[start:end]
+        if group_index == num_groups - 1:
+            driver_group = driver_numbers[start:]
+        else:
+            driver_group = driver_numbers[start:start + drivers_per_fig]
 
         for driver_number in driver_group:
             laps = session.laps.pick_drivers(driver_number).pick_fastest()
@@ -710,7 +714,7 @@ def plot_time_distance_comparison(session: Session, log: Logger):
         ax.grid(True)
         output_path = (
             f"./images/{session.event.year}/{session.event.RoundNumber}_{session.event.Location}/"
-            f"{session.name.replace(' ', '')}/time_distance/comparison/{start + 1}_{min(end, len(driver_numbers))}.png"
+            f"{session.name.replace(' ', '')}/time_distance/comparison/{start + 1}_.png"
         )
         os.makedirs(os.path.dirname(output_path), exist_ok=True)
         fig.savefig(output_path, bbox_inches='tight')
@@ -722,9 +726,11 @@ def _plot_driver_telemetry(session: Session, log: Logger,
                            driver_numbers: list[int], key: str, label, value_func):
     group_size = 5
     for i in range(0, len(driver_numbers), group_size):
-        group = driver_numbers[i:i + group_size]
+        if i + group_size >= len(driver_numbers):
+            group = driver_numbers[i:]
+        else:
+            group = driver_numbers[i:i + group_size]
         fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
-
         v_min, v_max = float('inf'), float('-inf')
 
         for driver_number in group:
