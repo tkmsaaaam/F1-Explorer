@@ -751,6 +751,9 @@ def _plot_driver_telemetry(session: Session, log: Logger,
             v_min = min(v_min, y_data.min())
             v_max = max(v_max, y_data.max())
 
+        if v_min == float('inf') or v_max == float('-inf'):
+            continue
+
         # コーナー線と番号
         for _, corner in session.get_circuit_info().corners.iterrows():
             ax.axvline(x=corner.Distance, linestyle='dotted', color='grey', linewidth=0.8)
