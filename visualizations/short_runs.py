@@ -548,35 +548,29 @@ def plot_speed_distance_comparison(session: Session, log: Logger):
     num_groups = math.ceil(len(driver_numbers) / drivers_per_fig)
     circuit_info = session.get_circuit_info()
     for group_index in range(num_groups):
-        fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
         start = group_index * drivers_per_fig
         if group_index == num_groups - 1:
             driver_group = driver_numbers[start:]
         else:
             driver_group = driver_numbers[start:start + drivers_per_fig]
+        fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
         for driver_number in driver_group:
             laps = session.laps.pick_drivers(driver_number).pick_fastest()
             if laps is None:
                 continue
             car_data = laps.get_car_data().add_distance()
-
             team_color = fastf1.plotting.get_team_color(laps.Team, session)
             style = "solid" if constants.camera[session.event.year].get(int(driver_number),
                                                                         'black') == "black" else "dashed"
-
             ax.plot(car_data.Distance, car_data.Speed,
                     color=team_color, label=laps.Driver, linestyle=style)
-
-        v_min = float('inf')
-        v_max = float('-inf')
-
+        v_min, v_max = float('inf'), float('-inf')
         for driver_number in driver_group:
             laps = session.laps.pick_drivers(driver_number).pick_fastest()
             if laps is None:
                 continue
             car_data = laps.get_car_data().add_distance()
-            v_min = min(v_min, car_data.Speed.min())
-            v_max = max(v_max, car_data.Speed.max())
+            v_min, v_max = min(v_min, car_data.Speed.min()), max(v_max, car_data.Speed.max())
 
         if v_min == float('inf') or v_max == float('-inf'):
             continue
@@ -667,13 +661,13 @@ def plot_time_distance_comparison(session: Session, log: Logger):
     num_groups = math.ceil(len(driver_numbers) / drivers_per_fig)
     circuit_info = session.get_circuit_info()
     for group_index in range(num_groups):
-        fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
         start = group_index * drivers_per_fig
         if group_index == num_groups - 1:
             driver_group = driver_numbers[start:]
         else:
             driver_group = driver_numbers[start:start + drivers_per_fig]
 
+        fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
         for driver_number in driver_group:
             laps = session.laps.pick_drivers(driver_number).pick_fastest()
             if laps is None:
@@ -688,16 +682,15 @@ def plot_time_distance_comparison(session: Session, log: Logger):
             ax.plot(car_data.Distance, y,
                     color=team_color, label=laps.Driver, linestyle=style)
 
-        v_min = float('inf')
-        v_max = float('-inf')
+        v_min, v_max = float('inf'), float('-inf')
 
         for driver_number in driver_group:
             laps = session.laps.pick_drivers(driver_number).pick_fastest()
             if laps is None:
                 continue
             car_data = laps.get_car_data()
-            v_min = min(v_min, car_data.Time.min().total_seconds())
-            v_max = max(v_max, car_data.Time.max().total_seconds())
+            v_min, v_max = min(v_min, car_data.Time.min().total_seconds()), max(v_max,
+                                                                                car_data.Time.max().total_seconds())
 
         ax.vlines(x=circuit_info.corners.Distance, ymin=v_min, ymax=v_max,
                   linestyles='dotted', colors='grey')
@@ -747,9 +740,7 @@ def _plot_driver_telemetry(session: Session, log: Logger,
             y_data = value_func(car_data)
             ax.plot(car_data.Distance, y_data, label=driver_name,
                     color=team_color, linestyle=line_style)
-
-            v_min = min(v_min, y_data.min())
-            v_max = max(v_max, y_data.max())
+            v_min, v_max = min(v_min, y_data.min()), max(v_max, y_data.max())
 
         if v_min == float('inf') or v_max == float('-inf'):
             continue
@@ -941,8 +932,7 @@ def plot_telemetry(session: Session, log: Logger,
         ax.plot(car_data.Distance, y_data, label=driver_name,
                 color=team_color, linestyle=line_style)
 
-        v_min = min(v_min, y_data.min())
-        v_max = max(v_max, y_data.max())
+        v_min, v_max = min(v_min, y_data.min()), max(v_max, y_data.max())
         name = name + f"{driver_name}_"
 
     # コーナー線と番号
