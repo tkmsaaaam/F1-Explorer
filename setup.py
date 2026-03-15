@@ -17,17 +17,18 @@ class SessionCategory(Enum):
 
 
 class Config:
-    def __init__(self, year: int, race_number: int, session: str, corners: dict[str, list[float]], separator: list[int]):
+    def __init__(self, year: int, race_number: int, session: str, corners: dict[str, list[float]],
+                 separator: list[int]):
         self.year = year
         self.round = race_number
         self.session = session
         self.corners = corners
         self.separator = separator
-        if session == 'FP1' or session == 'FP2' or session == 'FP3':
+        if session in {'FP1', 'FP2', 'FP3'}:
             self.session_category = SessionCategory.FreePractice
-        elif session == 'SQ' or session == 'Q':
+        elif session in {'SQ', 'Q'}:
             self.session_category = SessionCategory.Qualifying
-        elif session == 'SR' or session == 'R':
+        elif session in {'R', 'SR'}:
             self.session_category = SessionCategory.Race
         else:
             raise Exception("Session is invalid")
