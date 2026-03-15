@@ -62,7 +62,7 @@ def validate_config(config: dict[str, Any]):
         raise Exception("Round must be provided")
     if 'Session' not in config:
         raise Exception("Session must be provided")
-    if not config['Session'] != 'FP1' and 'FP2' and 'FP3' and 'SQ' and 'Q' and 'R' and 'SR':
+    if config['Session'] not in {'FP1', 'FP2', 'FP3', 'SQ', 'Q', 'R', 'SR'}:
         raise Exception("Session is invalid")
 
 
