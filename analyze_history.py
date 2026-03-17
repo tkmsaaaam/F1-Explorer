@@ -50,12 +50,6 @@ tracer = trace.get_tracer(__name__)
 @tracer.start_as_current_span("main")
 def __main():
     log = setup.log()
-    try:
-        config = setup.load_config()
-    except Exception as exception:
-        log.warning(exception.args)
-        return
-    config.set_attribute_to_span()
     setup.fast_f1()
 
     # ----------------------------------------------------------------------
