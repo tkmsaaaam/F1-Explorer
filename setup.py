@@ -28,7 +28,7 @@ class Config:
             self.session_category = SessionCategory.FreePractice
         elif session in {'SQ', 'Q'}:
             self.session_category = SessionCategory.Qualifying
-        elif session in {'R', 'SR'}:
+        elif session in {'S', 'R'}:
             self.session_category = SessionCategory.Race
         else:
             raise Exception("Session is invalid")
@@ -63,7 +63,7 @@ def validate_config(config: dict[str, Any]):
         raise Exception("Round must be provided")
     if 'Session' not in config:
         raise Exception("Session must be provided")
-    if config['Session'] not in {'FP1', 'FP2', 'FP3', 'SQ', 'Q', 'R', 'SR'}:
+    if config['Session'] not in {'FP1', 'FP2', 'FP3', 'SQ', 'S', 'Q', 'R'}:
         raise Exception("Session is invalid")
 
 
