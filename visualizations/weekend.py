@@ -3,7 +3,6 @@ from logging import Logger
 from typing import Final
 
 import fastf1
-from fastf1.core import DataNotLoadedError
 from opentelemetry import trace
 from plotly import graph_objects
 
@@ -21,11 +20,8 @@ def plot_tyre(year: int, race_number: int, log: Logger):
             session = fastf1.get_session(year, race_number, session_name)
         except ValueError:
             continue
-        try:
-            session.load(weather=False, messages=False, telemetry=False)
-            laps = session.laps
-        except DataNotLoadedError:
-            continue
+        session.load(weather=False, messages=False, telemetry=False)
+        laps = session.laps
         for driver in session.drivers:
             driver_laps = laps[laps['DriverNumber'] == driver]
             session_names = []
