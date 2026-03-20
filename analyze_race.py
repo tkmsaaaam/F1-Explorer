@@ -21,7 +21,11 @@ def main():
         return
     config.set_attribute_to_span()
     setup.fast_f1()
-    session = fastf1.get_session(config.get_year(), config.get_round(), config.get_session())
+    try:
+        session = fastf1.get_session(config.get_year(), config.get_round(), config.get_session())
+    except Exception as exception:
+        log.warning(exception.args)
+        return
     session.load(telemetry=False)
 
     log.info(f"{session.event.year} Race {session.event.RoundNumber} {session.event.EventName} Race")
