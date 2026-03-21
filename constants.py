@@ -1,5 +1,5 @@
 # for tracker
-from typing_extensions import Final
+from typing import Final
 
 abbreviation: Final[dict[int, dict[int, str]]] = {
     2025: {
