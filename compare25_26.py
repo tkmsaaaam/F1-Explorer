@@ -60,7 +60,7 @@ def plot_speed_distance_comparison(log: Logger, gp: str, session: str):
     ax.set_ylim(v_min - 10, v_max + 10)
     ax.legend(fontsize='small')
     ax.grid(True)
-    output_path = f"./images/comparison/{gp}/speed_distance.png"
+    output_path = f"./images/comparison/{gp}/{session}/speed_distance.png"
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     fig.savefig(output_path, bbox_inches='tight')
     log.info(f"Saved plot to {output_path}")
