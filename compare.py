@@ -242,16 +242,17 @@ def __main():
 
     setup.fast_f1()
 
-    round = config['Comparison']['Round']
-    session = config['Comparison']['Session']
+    year = config['Year']
+    round = config['RoundName']
+    session = config['Session']
     try:
-        current = fastf1.get_session(2026, round, session)
+        current = fastf1.get_session(year, round, session)
     except Exception as exception:
         log.warning(exception.args)
         return
     current.load(messages=False)
     try:
-        previous = fastf1.get_session(2025, round, session)
+        previous = fastf1.get_session(year - 1, round, session)
     except Exception as exception:
         log.warning(exception.args)
         return
