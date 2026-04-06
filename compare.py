@@ -173,6 +173,7 @@ def plot_speed_distance(log: Logger, current: Session, previous: Session, gp: st
     v_min = min(previous_car_data.Speed.min(), current_car_data.Speed.min())
     v_max = max(previous_car_data.Speed.max(), current_car_data.Speed.max())
     ax.vlines(x=circuit_info.corners.Distance, ymin=v_min, ymax=v_max, linestyles='dotted', colors='grey')
+    ax.hlines(y=list(range(0, int(v_max), 25)), xmin=0, xmax=previous_car_data.Distance.max(), colors='lightgrey')
 
     for _, corner in circuit_info.corners.iterrows():
         txt = f"{corner.Number}{corner.Letter}"
@@ -217,6 +218,7 @@ def plot_throttle_distance(log: Logger, current: Session, previous: Session, gp:
     v_min = min(previous_car_data.Throttle.min(), current_car_data.Throttle.min())
     v_max = max(previous_car_data.Throttle.max(), current_car_data.Throttle.max())
     ax.vlines(x=circuit_info.corners.Distance, ymin=v_min, ymax=v_max, linestyles='dotted', colors='grey')
+    ax.hlines(y=[10, 20, 30, 40, 50, 60, 70, 80, 90], xmin=0, xmax=previous_car_data.Distance.max(), colors='lightgrey')
 
     for _, corner in circuit_info.corners.iterrows():
         txt = f"{corner.Number}{corner.Letter}"
