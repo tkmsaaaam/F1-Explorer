@@ -30,6 +30,8 @@ def execute(session: Session, log: Logger, images_path: str, logs_path: str, lap
     gap_to_ahead(log, images_path, "gap_ahead", session, gap_ahead_range, driver_laps_set, start_by_position_by_number)
     gap_to_top(log, images_path, "gap_top", session, gap_top_range, driver_laps_set)
     positions(log, f"{images_path}/position.png", session, driver_laps_set)
+    speed_first_10s(log, f"{images_path}/speed_first_10s.png", session)
+    speed_until_turn1(log, f"{images_path}/speed_until_turn1.png", session)
     tyres(log, f"{images_path}/tyres.png", driver_laps_set)
     write_messages(session, logs_path)
     write_track_status(session, logs_path)
@@ -281,6 +283,83 @@ def positions(log: Logger, filepath: str, session: Session, lap_logs: set[Driver
     ax.legend(fontsize='small')
     ax.invert_yaxis()
     ax.grid(True)
+    os.makedirs(os.path.dirname(filepath), exist_ok=True)
+    fig.savefig(filepath, bbox_inches='tight')
+    log.info(f"Saved plot to {filepath}")
+    plt.close(fig)
+
+
+@tracer.start_as_current_span("speed_first_10s")
+def speed_first_10s(log: Logger, filepath: str, session: Session) -> None:
+    fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
+    v_min = float('inf')
+    v_max = float('-inf')
+    for driver in session.drivers:
+        laps = session.laps.pick_driver(driver)
+        lap = laps.pick_fastest()
+        if lap is None:
+            continue
+        car_data = lap.get_car_data().copy()
+        car_data["TimeSeconds"] = car_data["Time"].dt.total_seconds()
+        car_data = car_data[car_data.TimeSeconds <= 10]
+        driver_number = int(lap.DriverNumber)
+        color = constants.team_color[session.event.EventDate.year][driver_number]
+        line_style = "solid" if constants.camera[session.event.year].get(driver_number,
+                                                                         'black') == "black" else "dashed"
+        ax.plot(
+            car_data.TimeSeconds,
+            car_data.Speed,
+            label=lap.Driver,
+            color=color,
+            linestyle=line_style
+        )
+        v_min = min(v_min, car_data.Speed.min()+50)
+        v_max = max(v_max, car_data.Speed.max()+10)
+
+    ax.set_xlabel("Time (s)")
+    ax.set_ylabel("Speed (km/h)")
+    ax.set_title("Speed for First 10 Seconds")
+    ax.set_ylim(v_min, v_max)
+    ax.legend()
+    os.makedirs(os.path.dirname(filepath), exist_ok=True)
+    fig.savefig(filepath, bbox_inches='tight')
+    log.info(f"Saved plot to {filepath}")
+    plt.close(fig)
+
+
+@tracer.start_as_current_span("speed_until_turn1")
+def speed_until_turn1(log: Logger, filepath: str, session: Session) -> None:
+    fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
+    first_corner_distance = session.get_circuit_info().corners.iloc[0].Distance
+    v_min = float('inf')
+    v_max = float('-inf')
+
+    for driver in session.drivers:
+        laps = session.laps.pick_driver(driver)
+        lap = laps.pick_fastest()
+        if lap is None:
+            continue
+        car_data = lap.get_car_data().add_distance()
+        car_data = car_data[car_data.Distance <= first_corner_distance]
+        driver_number = int(lap.DriverNumber)
+        color = constants.team_color[session.event.EventDate.year][driver_number]
+        line_style = "solid" if constants.camera[session.event.year].get(driver_number,
+                                                                         'black') == "black" else "dashed"
+        ax.plot(
+            car_data.Distance,
+            car_data.Speed,
+            label=lap.Driver,
+            color=color,
+            linestyle=line_style
+        )
+        v_min = min(v_min, car_data.Speed.min()+50)
+        v_max = max(v_max, car_data.Speed.max()+10)
+    ax.set_xlabel("Distance (m)")
+    ax.set_ylabel("Speed (km/h)")
+    ax.set_title("Speed until Turn 1")
+    ax.set_ylim(v_min, v_max)
+    ax.axvline(first_corner_distance, linestyle='dotted', color='grey')
+    ax.legend()
     os.makedirs(os.path.dirname(filepath), exist_ok=True)
     fig.savefig(filepath, bbox_inches='tight')
     log.info(f"Saved plot to {filepath}")

@@ -26,7 +26,7 @@ def main():
     except Exception as exception:
         log.warning(exception.args)
         return
-    session.load(telemetry=False)
+    session.load()
 
     log.info(f"{session.event.year} Race {session.event.RoundNumber} {session.event.EventName} Race")
 
