@@ -295,7 +295,7 @@ def speed_first_10s(log: Logger, filepath: str, session: Session) -> None:
     v_min = float('inf')
     v_max = float('-inf')
     for driver in session.drivers:
-        laps = session.laps.pick_driver(driver)
+        laps = session.laps.pick_drivers(driver)
         lap = laps.pick_fastest()
         if lap is None:
             continue
@@ -313,8 +313,8 @@ def speed_first_10s(log: Logger, filepath: str, session: Session) -> None:
             color=color,
             linestyle=line_style
         )
-        v_min = min(v_min, car_data.Speed.min()+50)
-        v_max = max(v_max, car_data.Speed.max()+10)
+        v_min = min(v_min, car_data.Speed.min() + 50)
+        v_max = max(v_max, car_data.Speed.max() + 10)
 
     ax.set_xlabel("Time (s)")
     ax.set_ylabel("Speed (km/h)")
@@ -335,7 +335,7 @@ def speed_until_turn1(log: Logger, filepath: str, session: Session) -> None:
     v_max = float('-inf')
 
     for driver in session.drivers:
-        laps = session.laps.pick_driver(driver)
+        laps = session.laps.pick_drivers(driver)
         lap = laps.pick_fastest()
         if lap is None:
             continue
@@ -352,8 +352,8 @@ def speed_until_turn1(log: Logger, filepath: str, session: Session) -> None:
             color=color,
             linestyle=line_style
         )
-        v_min = min(v_min, car_data.Speed.min()+50)
-        v_max = max(v_max, car_data.Speed.max()+10)
+        v_min = min(v_min, car_data.Speed.min() + 50)
+        v_max = max(v_max, car_data.Speed.max() + 10)
     ax.set_xlabel("Distance (m)")
     ax.set_ylabel("Speed (km/h)")
     ax.set_title("Speed until Turn 1")
