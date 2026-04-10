@@ -303,19 +303,16 @@ def speed_first_10s(log: Logger, filepath: str, session: Session) -> None:
         car_data["TimeSeconds"] = car_data["Time"].dt.total_seconds()
         car_data = car_data[car_data.TimeSeconds <= 10]
         driver_number = int(lap.DriverNumber)
-        color = constants.team_color[session.event.EventDate.year][driver_number]
-        line_style = "solid" if constants.camera[session.event.year].get(driver_number,
-                                                                         'black') == "black" else "dashed"
         ax.plot(
             car_data.TimeSeconds,
             car_data.Speed,
             label=lap.Driver,
-            color=color,
-            linestyle=line_style
+            color=constants.team_color[session.event.EventDate.year][driver_number],
+            linestyle="solid" if constants.camera[session.event.year].get(driver_number,
+                                                                          'black') == "black" else "dashed"
         )
-        v_min = min(v_min, car_data.Speed.min() + 50)
-        v_max = max(v_max, car_data.Speed.max() + 10)
-
+        v_min = min(v_min, int(car_data.Speed.min()) + 50)
+        v_max = max(v_max, int(car_data.Speed.max()) + 10)
     ax.set_xlabel("Time (s)")
     ax.set_ylabel("Speed (km/h)")
     ax.set_title("Speed for First 10 Seconds")
@@ -334,27 +331,24 @@ def speed_until_turn1(log: Logger, filepath: str, session: Session) -> None:
     first_corner_distance = session.get_circuit_info().corners.iloc[0].Distance
     v_min = float('inf')
     v_max = float('-inf')
-
     for driver in session.drivers:
         laps = session.laps.pick_drivers(driver)
         lap = laps.pick_fastest()
         if lap is None:
             continue
-        car_data = lap.get_car_data().add_distance()
-        car_data = car_data[car_data.Distance <= first_corner_distance]
+        car_data = lap.get_car_data().add_distance()[
+            lap.get_car_data().add_distance().Distance <= first_corner_distance]
         driver_number = int(lap.DriverNumber)
-        color = constants.team_color[session.event.EventDate.year][driver_number]
-        line_style = "solid" if constants.camera[session.event.year].get(driver_number,
-                                                                         'black') == "black" else "dashed"
         ax.plot(
             car_data.Distance,
             car_data.Speed,
             label=lap.Driver,
-            color=color,
-            linestyle=line_style
+            color=constants.team_color[session.event.EventDate.year][driver_number],
+            linestyle="solid" if constants.camera[session.event.year].get(driver_number,
+                                                                          'black') == "black" else "dashed"
         )
-        v_min = min(v_min, car_data.Speed.min() + 50)
-        v_max = max(v_max, car_data.Speed.max() + 10)
+        v_min = min(v_min, int(car_data.Speed.min()) + 50)
+        v_max = max(v_max, int(car_data.Speed.max()) + 10)
     ax.set_xlabel("Distance (m)")
     ax.set_ylabel("Speed (km/h)")
     ax.set_title("Speed until Turn 1")
