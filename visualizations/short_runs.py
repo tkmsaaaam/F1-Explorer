@@ -649,68 +649,134 @@ def plot_speed_on_track(session: Session, log: Logger):
 
 @tracer.start_as_current_span("plot_time_distance_comparison")
 def plot_time_distance_comparison(session: Session, log: Logger):
-    """以下を比較
-    y = ラップタイム
-    x = 距離
-    Args:
-        session: セッション
-        log: ロガー
+    """driver_group 内最速との差分を表示する
+
+    x = 距離（group内最速ドライバー基準）
+    y = 最速との差分秒数
+
+    各ドライバーの car_data は計測点が異なるため、
+    5m ごとに線形補間して共通距離軸へ再サンプリングする。
     """
+    import math
+    import os
+    import numpy as np
+    import matplotlib.pyplot as plt
+
     drivers_per_fig = 5
+    resample_step = 5.0  # 1 / 5 / 10 など変更可
+
     driver_numbers = session.drivers
     num_groups = math.ceil(len(driver_numbers) / drivers_per_fig)
     circuit_info = session.get_circuit_info()
+
     for group_index in range(num_groups):
         start = group_index * drivers_per_fig
-        if group_index == num_groups - 1:
-            driver_group = driver_numbers[start:]
-        else:
-            driver_group = driver_numbers[start:start + drivers_per_fig]
-
-        fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
+        driver_group = driver_numbers[start:start + drivers_per_fig]
+        lap_map: dict[str, any] = {}
         for driver_number in driver_group:
-            laps = session.laps.pick_drivers(driver_number).pick_fastest()
-            if laps is None:
-                continue
-            car_data = laps.get_car_data().add_distance()
-
-            team_color = fastf1.plotting.get_team_color(laps.Team, session)
-            style = "solid" if constants.camera[session.event.year].get(int(driver_number),
-                                                                        'black') == "black" else "dashed"
-
-            y = [d.total_seconds() for d in car_data.Time]
-            ax.plot(car_data.Distance, y,
-                    color=team_color, label=laps.Driver, linestyle=style)
-
-        v_min, v_max = float('inf'), float('-inf')
-
-        for driver_number in driver_group:
-            laps = session.laps.pick_drivers(driver_number).pick_fastest()
-            if laps is None:
-                continue
-            car_data = laps.get_car_data()
-            v_min, v_max = min(v_min, car_data.Time.min().total_seconds()), max(v_max,
-                                                                                car_data.Time.max().total_seconds())
-
-        ax.vlines(x=circuit_info.corners.Distance, ymin=v_min, ymax=v_max,
-                  linestyles='dotted', colors='grey')
-
-        if v_min == float('inf') or v_max == float('-inf'):
+            lap = session.laps.pick_drivers(driver_number).pick_fastest()
+            if lap is not None:
+                lap_map[str(driver_number)] = lap
+        if not lap_map:
             continue
-        for _, corner in circuit_info.corners.iterrows():
-            txt = f"{corner.Number}{corner.Letter}"
-            ax.text(corner.Distance, v_min, txt,
-                    va='center_baseline', ha='center', size='small')
+        fastest_driver_number = min(
+            lap_map.keys(),
+            key=lambda dn: lap_map[dn].LapTime.total_seconds()
+        )
+        fastest_lap = lap_map[fastest_driver_number]
+        fastest_car_data = fastest_lap.get_car_data().add_distance()
+        fastest_dist = fastest_car_data["Distance"].to_numpy()
+        fastest_time = np.array(
+            [t.total_seconds() for t in fastest_car_data["Time"]],
+            dtype=float
+        )
+        uniq_idx = np.unique(fastest_dist, return_index=True)[1]
+        fastest_dist = fastest_dist[np.sort(uniq_idx)]
+        fastest_time = fastest_time[np.sort(uniq_idx)]
+        max_distance = fastest_dist.max()
+        common_distance = np.arange(0.0, max_distance, resample_step)
+        ref_time = np.interp(common_distance, fastest_dist, fastest_time)
+        fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout="tight")
+        v_min = 0.0
+        v_max = 0.0
+        for driver_number, lap in lap_map.items():
+            car_data = lap.get_car_data().add_distance()
+            dist = car_data["Distance"].to_numpy()
+            tm = np.array(
+                [t.total_seconds() for t in car_data["Time"]],
+                dtype=float
+            )
+            uniq_idx = np.unique(dist, return_index=True)[1]
+            dist = dist[np.sort(uniq_idx)]
+            tm = tm[np.sort(uniq_idx)]
+            interp_time = np.interp(common_distance, dist, tm)
+            delta = interp_time - ref_time
+            team_color = fastf1.plotting.get_team_color(lap.Team, session)
+            style = (
+                "solid"
+                if constants.camera[session.event.year].get(
+                    int(driver_number), "black"
+                ) == "black"
+                else "dashed"
+            )
+            label = lap.Driver
+            if driver_number == fastest_driver_number:
+                label += " (FASTEST)"
+            ax.plot(
+                common_distance,
+                delta,
+                color=team_color,
+                linestyle=style,
+                label=label
+            )
+            v_min = min(v_min, float(delta.min()))
+            v_max = max(v_max, float(delta.max()))
+        valid_corners = circuit_info.corners[
+            circuit_info.corners.Distance <= max_distance
+            ]
+        if v_max > 3:
+            v_max = 3
+        if v_min < -3:
+            v_min = -3
+        ax.vlines(
+            x=valid_corners.Distance,
+            ymin=v_min,
+            ymax=v_max,
+            linestyles="dotted",
+            colors="grey"
+        )
 
+        for _, corner in valid_corners.iterrows():
+            txt = f"{corner.Number}{corner.Letter}"
+            ax.text(
+                corner.Distance,
+                v_min,
+                txt,
+                va="bottom",
+                ha="center",
+                size="small"
+            )
+        ax.axhline(0, linestyle="--", linewidth=1)
+        ax.set_xlabel(
+            f"Distance (m) - {fastest_lap.Driver} reference"
+        )
+        ax.set_ylabel("Delta Time (s)")
+        ax.set_title(
+            f"{session.event['EventName']} {session.name}\n"
+            f"Delta to fastest in group ({fastest_lap.Driver})"
+        )
+        ax.set_xlim(0, max_distance)
         ax.set_ylim(v_min, v_max)
-        ax.legend(fontsize='small')
         ax.grid(True)
+        ax.legend(fontsize="small")
         output_path = (
-            f"./images/{session.event.year}/{session.event.RoundNumber}_{session.event.Location}/"
-            f"{session.name.replace(' ', '')}/time_distance/comparison/{start + 1}_.png"
+            f"./images/{session.event.year}/"
+            f"{session.event.RoundNumber}_{session.event.Location}/"
+            f"{session.name.replace(' ', '')}/"
+            f"time_distance_delta/{start + 1}_.png"
         )
         os.makedirs(os.path.dirname(output_path), exist_ok=True)
-        fig.savefig(output_path, bbox_inches='tight')
+        fig.savefig(output_path, bbox_inches="tight")
         log.info(f"Saved plot to {output_path}")
         plt.close(fig)
 
