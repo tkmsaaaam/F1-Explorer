@@ -657,11 +657,6 @@ def plot_time_distance_comparison(session: Session, log: Logger):
     各ドライバーの car_data は計測点が異なるため、
     5m ごとに線形補間して共通距離軸へ再サンプリングする。
     """
-    import math
-    import os
-    import numpy as np
-    import matplotlib.pyplot as plt
-
     drivers_per_fig = 5
     resample_step = 5.0  # 1 / 5 / 10 など変更可
 
