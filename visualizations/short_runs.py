@@ -10,7 +10,7 @@ import numpy as np
 import pandas
 import plotly.express as px
 import plotly.graph_objects as go
-from fastf1.core import Session
+from fastf1.core import Session, Lap
 from matplotlib import pyplot as plt
 from matplotlib.collections import LineCollection
 from matplotlib.colorbar import ColorbarBase
@@ -667,7 +667,7 @@ def plot_time_distance_comparison(session: Session, log: Logger):
     for group_index in range(num_groups):
         start = group_index * drivers_per_fig
         driver_group = driver_numbers[start:start + drivers_per_fig]
-        lap_map: dict[str, any] = {}
+        lap_map: dict[str, Lap] = {}
         for driver_number in driver_group:
             lap = session.laps.pick_drivers(driver_number).pick_fastest()
             if lap is not None:
