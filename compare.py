@@ -18,8 +18,8 @@ tracer = trace.get_tracer(__name__)
 def plot_brake_distance(log: Logger, current: Session, previous: Session, gp: str, session: str):
     """brakeを比較
     Args:
-        current: 2026 Session
-        previous: 2025 Session
+        current: current Session
+        previous: previous Session
         session: session
         gp: Grand Prix name
         log: ロガー
@@ -30,14 +30,16 @@ def plot_brake_distance(log: Logger, current: Session, previous: Session, gp: st
     if current_lap is None:
         return
     current_car_data = current_lap.get_car_data().add_distance()
-    ax.plot(current_car_data.Distance, current_car_data.Brake, label=f"2026: {current_lap.Driver}", linestyle="solid",
-            color=constants.team_color[2026].get(int(current_lap.DriverNumber), '#808080'))
+    ax.plot(current_car_data.Distance, current_car_data.Brake, label=f"{current.event.year}: {current_lap.Driver}",
+            linestyle="solid",
+            color=constants.team_color[current.event.year].get(int(current_lap.DriverNumber), '#808080'))
     previous_lap = previous.laps.pick_fastest()
     if previous_lap is None:
         return
     previous_car_data = previous_lap.get_car_data().add_distance()
-    ax.plot(previous_car_data.Distance, previous_car_data.Brake, label=f"2025: {previous_lap.Driver}",
-            linestyle="dashed", color=constants.team_color[2025].get(int(previous_lap.DriverNumber), '#808080'))
+    ax.plot(previous_car_data.Distance, previous_car_data.Brake, label=f"{previous.event.year}: {previous_lap.Driver}",
+            linestyle="dashed",
+            color=constants.team_color[previous.event.year].get(int(previous_lap.DriverNumber), '#808080'))
 
     v_min = min(previous_car_data.Brake.min(), current_car_data.Brake.min())
     v_max = max(previous_car_data.Brake.max(), current_car_data.Brake.max())
@@ -61,8 +63,8 @@ def plot_brake_distance(log: Logger, current: Session, previous: Session, gp: st
 def plot_n_gear_distance(log: Logger, current: Session, previous: Session, gp: str, session: str):
     """nGearを比較
     Args:
-        current: 2026 Session
-        previous: 2025 Session
+        current: current Session
+        previous: previous Session
         session: session
         gp: Grand Prix name
         log: ロガー
@@ -73,15 +75,16 @@ def plot_n_gear_distance(log: Logger, current: Session, previous: Session, gp: s
     if current_lap is None:
         return
     current_car_data = current_lap.get_car_data().add_distance()
-    ax.plot(current_car_data.Distance, current_car_data.nGear, label=f"2026: {current_lap.Driver}",
+    ax.plot(current_car_data.Distance, current_car_data.nGear, label=f"{current.event.year}: {current_lap.Driver}",
             linestyle="solid",
-            color=constants.team_color[2026].get(int(current_lap.DriverNumber), '#808080'))
+            color=constants.team_color[current.event.year].get(int(current_lap.DriverNumber), '#808080'))
     previous_lap = previous.laps.pick_fastest()
     if previous_lap is None:
         return
     previous_car_data = previous_lap.get_car_data().add_distance()
-    ax.plot(previous_car_data.Distance, previous_car_data.nGear, label=f"2025: {previous_lap.Driver}",
-            linestyle="dashed", color=constants.team_color[2025].get(int(previous_lap.DriverNumber), '#808080'))
+    ax.plot(previous_car_data.Distance, previous_car_data.nGear, label=f"{previous.event.year}: {previous_lap.Driver}",
+            linestyle="dashed",
+            color=constants.team_color[previous.event.year].get(int(previous_lap.DriverNumber), '#808080'))
 
     v_min = min(previous_car_data.nGear.min(), current_car_data.nGear.min())
     v_max = max(previous_car_data.nGear.max(), current_car_data.nGear.max())
@@ -105,8 +108,8 @@ def plot_n_gear_distance(log: Logger, current: Session, previous: Session, gp: s
 def plot_rpm_distance(log: Logger, current: Session, previous: Session, gp: str, session: str):
     """RPMを比較
     Args:
-        current: 2026 Session
-        previous: 2025 Session
+        current: current Session
+        previous: previous Session
         session: session
         gp: Grand Prix name
         log: ロガー
@@ -117,15 +120,16 @@ def plot_rpm_distance(log: Logger, current: Session, previous: Session, gp: str,
     if current_lap is None:
         return
     current_car_data = current_lap.get_car_data().add_distance()
-    ax.plot(current_car_data.Distance, current_car_data.RPM, label=f"2026: {current_lap.Driver}",
+    ax.plot(current_car_data.Distance, current_car_data.RPM, label=f"{current.event.year}: {current_lap.Driver}",
             linestyle="solid",
-            color=constants.team_color[2026].get(int(current_lap.DriverNumber), '#808080'))
+            color=constants.team_color[current.event.year].get(int(current_lap.DriverNumber), '#808080'))
     previous_lap = previous.laps.pick_fastest()
     if previous_lap is None:
         return
     previous_car_data = previous_lap.get_car_data().add_distance()
-    ax.plot(previous_car_data.Distance, previous_car_data.RPM, label=f"2025: {previous_lap.Driver}",
-            linestyle="dashed", color=constants.team_color[2025].get(int(previous_lap.DriverNumber), '#808080'))
+    ax.plot(previous_car_data.Distance, previous_car_data.RPM, label=f"{previous.event.year}: {previous_lap.Driver}",
+            linestyle="dashed",
+            color=constants.team_color[previous.event.year].get(int(previous_lap.DriverNumber), '#808080'))
 
     v_min = min(previous_car_data.RPM.min(), current_car_data.RPM.min())
     v_max = max(previous_car_data.RPM.max(), current_car_data.RPM.max())
@@ -149,8 +153,8 @@ def plot_rpm_distance(log: Logger, current: Session, previous: Session, gp: str,
 def plot_speed_distance(log: Logger, current: Session, previous: Session, gp: str, session: str):
     """スピードを比較
     Args:
-        current: 2026 Session
-        previous: 2025 Session
+        current: current Session
+        previous: previous Session
         session: session
         gp: Grand Prix name
         log: ロガー
@@ -161,14 +165,16 @@ def plot_speed_distance(log: Logger, current: Session, previous: Session, gp: st
     if current_lap is None:
         return
     current_car_data = current_lap.get_car_data().add_distance()
-    ax.plot(current_car_data.Distance, current_car_data.Speed, label=f"2026: {current_lap.Driver}", linestyle="solid",
-            color=constants.team_color[2026].get(int(current_lap.DriverNumber), '#808080'))
+    ax.plot(current_car_data.Distance, current_car_data.Speed, label=f"{current.event.year}: {current_lap.Driver}",
+            linestyle="solid",
+            color=constants.team_color[current.event.year].get(int(current_lap.DriverNumber), '#808080'))
     previous_lap = previous.laps.pick_fastest()
     if previous_lap is None:
         return
     previous_car_data = previous_lap.get_car_data().add_distance()
-    ax.plot(previous_car_data.Distance, previous_car_data.Speed, label=f"2025: {previous_lap.Driver}",
-            linestyle="dashed", color=constants.team_color[2025].get(int(previous_lap.DriverNumber), '#808080'))
+    ax.plot(previous_car_data.Distance, previous_car_data.Speed, label=f"{previous.event.year}: {previous_lap.Driver}",
+            linestyle="dashed",
+            color=constants.team_color[previous.event.year].get(int(previous_lap.DriverNumber), '#808080'))
 
     v_min = min(previous_car_data.Speed.min(), current_car_data.Speed.min())
     v_max = max(previous_car_data.Speed.max(), current_car_data.Speed.max())
@@ -193,8 +199,8 @@ def plot_speed_distance(log: Logger, current: Session, previous: Session, gp: st
 def plot_throttle_distance(log: Logger, current: Session, previous: Session, gp: str, session: str):
     """throttleを比較
     Args:
-        current: 2026 Session
-        previous: 2025 Session
+        current: current Session
+        previous: previous Session
         session: session
         gp: Grand Prix name
         log: ロガー
@@ -205,15 +211,17 @@ def plot_throttle_distance(log: Logger, current: Session, previous: Session, gp:
     if current_lap is None:
         return
     current_car_data = current_lap.get_car_data().add_distance()
-    ax.plot(current_car_data.Distance, current_car_data.Throttle, label=f"2026: {current_lap.Driver}",
+    ax.plot(current_car_data.Distance, current_car_data.Throttle, label=f"{current.event.year}: {current_lap.Driver}",
             linestyle="solid",
-            color=constants.team_color[2026].get(int(current_lap.DriverNumber), '#808080'))
+            color=constants.team_color[current.event.year].get(int(current_lap.DriverNumber), '#808080'))
     previous_lap = previous.laps.pick_fastest()
     if previous_lap is None:
         return
     previous_car_data = previous_lap.get_car_data().add_distance()
-    ax.plot(previous_car_data.Distance, previous_car_data.Throttle, label=f"2025: {previous_lap.Driver}",
-            linestyle="dashed", color=constants.team_color[2025].get(int(previous_lap.DriverNumber), '#808080'))
+    ax.plot(previous_car_data.Distance, previous_car_data.Throttle,
+            label=f"{previous.event.year}: {previous_lap.Driver}",
+            linestyle="dashed",
+            color=constants.team_color[previous.event.year].get(int(previous_lap.DriverNumber), '#808080'))
 
     v_min = min(previous_car_data.Throttle.min(), current_car_data.Throttle.min())
     v_max = max(previous_car_data.Throttle.max(), current_car_data.Throttle.max())
@@ -238,13 +246,12 @@ def plot_throttle_distance(log: Logger, current: Session, previous: Session, gp:
 def summary(log: Logger, current: Session, previous: Session, gp: str, session: str, year: int):
     fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
     current_lap = current.laps.pick_fastest()
-    circuit_info = current.get_circuit_info()
     if current_lap is None:
         return
     current_car_data = current_lap.get_car_data().add_distance()
-    ax.plot(current_car_data.Distance, current_car_data.Throttle, label=f"2026: {current_lap.Driver}",
+    ax.plot(current_car_data.Distance, current_car_data.Throttle, label=f"{current.event.year}: {current_lap.Driver}",
             linestyle="solid",
-            color=constants.team_color[2026].get(int(current_lap.DriverNumber), '#808080'))
+            color=constants.team_color[current.event.year].get(int(current_lap.DriverNumber), '#808080'))
     previous_lap = previous.laps.pick_fastest()
     if previous_lap is None:
         return
