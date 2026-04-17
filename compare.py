@@ -67,10 +67,8 @@ def plot_brake_distance(log: Logger, comparison: Comparison):
                                                          '#808080'))
     previous_car_data = comparison.get_current().get_lap().get_car_data().add_distance()
     previous_year = comparison.get_previous().get_year()
-    ax.plot(previous_car_data.Distance, previous_car_data.Brake,
-            label=f"{previous_year}: {comparison.get_previous().get_lap().Driver}", linestyle="dashed",
-            color=constants.team_color[previous_year].get(int(comparison.get_previous().get_lap().DriverNumber),
-                                                          '#808080'))
+    ax.plot(previous_car_data.Distance, previous_car_data.Brake, color='black',
+            label=f"{previous_year}: {comparison.get_previous().get_lap().Driver}", linestyle="dashed")
 
     v_min = min(previous_car_data.Brake.min(), current_car_data.Brake.min())
     v_max = max(previous_car_data.Brake.max(), current_car_data.Brake.max())
@@ -106,10 +104,8 @@ def plot_n_gear_distance(log: Logger, comparison: Comparison):
                                                          '#808080'))
     previous_car_data = comparison.get_current().get_lap().get_car_data().add_distance()
     previous_year = comparison.get_previous().get_year()
-    ax.plot(previous_car_data.Distance, previous_car_data.nGear,
-            label=f"{previous_year}: {comparison.get_previous().get_lap().Driver}", linestyle="dashed",
-            color=constants.team_color[previous_year].get(int(comparison.get_previous().get_lap().DriverNumber),
-                                                          '#808080'))
+    ax.plot(previous_car_data.Distance, previous_car_data.nGear, color='black',
+            label=f"{previous_year}: {comparison.get_previous().get_lap().Driver}", linestyle="dashed")
 
     v_min = min(previous_car_data.nGear.min(), current_car_data.nGear.min())
     v_max = max(previous_car_data.nGear.max(), current_car_data.nGear.max())
@@ -145,10 +141,8 @@ def plot_rpm_distance(log: Logger, comparison: Comparison):
                                                          '#808080'))
     previous_car_data = comparison.get_current().get_lap().get_car_data().add_distance()
     previous_year = comparison.get_previous().get_year()
-    ax.plot(previous_car_data.Distance, previous_car_data.RPM,
-            label=f"{previous_year}: {comparison.get_previous().get_lap().Driver}", linestyle="dashed",
-            color=constants.team_color[previous_year].get(int(comparison.get_previous().get_lap().DriverNumber),
-                                                          '#808080'))
+    ax.plot(previous_car_data.Distance, previous_car_data.RPM, color='black',
+            label=f"{previous_year}: {comparison.get_previous().get_lap().Driver}", linestyle="dashed")
 
     v_min = min(previous_car_data.RPM.min(), current_car_data.RPM.min())
     v_max = max(previous_car_data.RPM.max(), current_car_data.RPM.max())
@@ -185,11 +179,8 @@ def plot_speed_distance(log: Logger, comparison: Comparison):
                                                          '#808080'))
     previous_car_data = comparison.get_current().get_lap().get_car_data().add_distance()
     previous_year = comparison.get_previous().get_year()
-    ax.plot(previous_car_data.Distance, previous_car_data.Speed,
-            label=f"{previous_year}: {comparison.get_previous().get_lap().Driver}",
-            linestyle="dashed",
-            color=constants.team_color[previous_year].get(int(comparison.get_previous().get_lap().DriverNumber),
-                                                          '#808080'))
+    ax.plot(previous_car_data.Distance, previous_car_data.Speed, linestyle="dashed",
+            label=f"{previous_year}: {comparison.get_previous().get_lap().Driver}", color='black')
 
     v_min = min(previous_car_data.Speed.min(), current_car_data.Speed.min())
     v_max = max(previous_car_data.Speed.max(), current_car_data.Speed.max())
@@ -227,11 +218,8 @@ def plot_throttle_distance(log: Logger, comparison: Comparison):
                                                          '#808080'))
     previous_car_data = comparison.get_current().get_lap().get_car_data().add_distance()
     previous_year = comparison.get_previous().get_year()
-    ax.plot(previous_car_data.Distance, previous_car_data.Throttle,
-            label=f"{previous_year}: {comparison.get_previous().get_lap().Driver}",
-            linestyle="dashed",
-            color=constants.team_color[previous_year].get(int(comparison.get_previous().get_lap().DriverNumber),
-                                                          '#808080'))
+    ax.plot(previous_car_data.Distance, previous_car_data.Throttle, linestyle="dashed",
+            label=f"{previous_year}: {comparison.get_previous().get_lap().Driver}", color='black')
 
     v_min = min(previous_car_data.Throttle.min(), current_car_data.Throttle.min())
     v_max = max(previous_car_data.Throttle.max(), current_car_data.Throttle.max())
