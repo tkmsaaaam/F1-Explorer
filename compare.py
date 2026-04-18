@@ -60,20 +60,16 @@ def plot_brake_distance(log: Logger, comparison: Comparison):
     """
     fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
     current_car_data = comparison.get_current().get_lap().get_car_data().add_distance()
-    current_year = comparison.get_current().get_year()
-    ax.plot(current_car_data.Distance, current_car_data.Brake,
-            label=f"{current_year}: {comparison.get_current().get_lap().Driver}", linestyle="solid",
-            color=constants.team_color[current_year].get(int(comparison.get_current().get_lap().DriverNumber),
-                                                         '#808080'))
-    previous_car_data = comparison.get_current().get_lap().get_car_data().add_distance()
-    previous_year = comparison.get_previous().get_year()
-    ax.plot(previous_car_data.Distance, previous_car_data.Brake, color='black',
-            label=f"{previous_year}: {comparison.get_previous().get_lap().Driver}", linestyle="dashed")
-
+    ax.plot(current_car_data.Distance, current_car_data.Brake, linestyle='solid',
+            label=f"{comparison.get_current().get_year()}: {comparison.get_current().get_lap().Driver}",
+            color=constants.team_color[comparison.get_current().get_year()].get(
+                int(comparison.get_current().get_lap().DriverNumber), '#808080'))
+    previous_car_data = comparison.get_previous().get_lap().get_car_data().add_distance()
+    ax.plot(previous_car_data.Distance, previous_car_data.Brake, color='black', linestyle='dashed',
+            label=f"{comparison.get_previous().get_year()}: {comparison.get_previous().get_lap().Driver}")
     v_min = min(previous_car_data.Brake.min(), current_car_data.Brake.min())
     v_max = max(previous_car_data.Brake.max(), current_car_data.Brake.max())
     ax.vlines(x=comparison.get_corners().Distance, ymin=v_min, ymax=v_max, linestyles='dotted', colors='grey')
-
     for _, corner in comparison.get_corners().iterrows():
         txt = f"{corner.Number}{corner.Letter}"
         ax.text(corner.Distance, v_min - 0.05, txt, va='center_baseline', ha='center', size='small')
@@ -97,20 +93,16 @@ def plot_n_gear_distance(log: Logger, comparison: Comparison):
     """
     fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
     current_car_data = comparison.get_current().get_lap().get_car_data().add_distance()
-    current_year = comparison.get_current().get_year()
-    ax.plot(current_car_data.Distance, current_car_data.nGear,
-            label=f"{current_year}: {comparison.get_current().get_lap().Driver}", linestyle="solid",
-            color=constants.team_color[current_year].get(int(comparison.get_current().get_lap().DriverNumber),
-                                                         '#808080'))
+    ax.plot(current_car_data.Distance, current_car_data.nGear, linestyle='solid',
+            label=f"{comparison.get_current().get_year()}: {comparison.get_current().get_lap().Driver}",
+            color=constants.team_color[comparison.get_current().get_year()].get(
+                int(comparison.get_current().get_lap().DriverNumber), '#808080'))
     previous_car_data = comparison.get_current().get_lap().get_car_data().add_distance()
-    previous_year = comparison.get_previous().get_year()
-    ax.plot(previous_car_data.Distance, previous_car_data.nGear, color='black',
-            label=f"{previous_year}: {comparison.get_previous().get_lap().Driver}", linestyle="dashed")
-
+    ax.plot(previous_car_data.Distance, previous_car_data.nGear, color='black', linestyle='dashed',
+            label=f"{comparison.get_previous().get_year()}: {comparison.get_previous().get_lap().Driver}")
     v_min = min(previous_car_data.nGear.min(), current_car_data.nGear.min())
     v_max = max(previous_car_data.nGear.max(), current_car_data.nGear.max())
     ax.vlines(x=comparison.get_corners().Distance, ymin=v_min, ymax=v_max, linestyles='dotted', colors='grey')
-
     for _, corner in comparison.get_corners().iterrows():
         txt = f"{corner.Number}{corner.Letter}"
         ax.text(corner.Distance, v_min - 0.25, txt, va='center_baseline', ha='center', size='small')
@@ -134,16 +126,13 @@ def plot_rpm_distance(log: Logger, comparison: Comparison):
     """
     fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
     current_car_data = comparison.get_current().get_lap().get_car_data().add_distance()
-    current_year = comparison.get_current().get_year()
-    ax.plot(current_car_data.Distance, current_car_data.RPM,
-            label=f"{current_year}: {comparison.get_current().get_lap().Driver}", linestyle="solid",
-            color=constants.team_color[current_year].get(int(comparison.get_current().get_lap().DriverNumber),
-                                                         '#808080'))
-    previous_car_data = comparison.get_current().get_lap().get_car_data().add_distance()
-    previous_year = comparison.get_previous().get_year()
-    ax.plot(previous_car_data.Distance, previous_car_data.RPM, color='black',
-            label=f"{previous_year}: {comparison.get_previous().get_lap().Driver}", linestyle="dashed")
-
+    ax.plot(current_car_data.Distance, current_car_data.RPM, linestyle='solid',
+            label=f"{comparison.get_current().get_year()}: {comparison.get_current().get_lap().Driver}",
+            color=constants.team_color[comparison.get_current().get_year()].get(
+                int(comparison.get_current().get_lap().DriverNumber), '#808080'))
+    previous_car_data = comparison.get_previous().get_lap().get_car_data().add_distance()
+    ax.plot(previous_car_data.Distance, previous_car_data.RPM, color='black', linestyle='dashed',
+            label=f"{comparison.get_previous().get_year()}: {comparison.get_previous().get_lap().Driver}")
     v_min = min(previous_car_data.RPM.min(), current_car_data.RPM.min())
     v_max = max(previous_car_data.RPM.max(), current_car_data.RPM.max())
     ax.vlines(x=comparison.get_corners().Distance, ymin=v_min, ymax=v_max, linestyles='dotted', colors='grey')
@@ -171,26 +160,20 @@ def plot_speed_distance(log: Logger, comparison: Comparison):
     """
     fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
     current_car_data = comparison.get_current().get_lap().get_car_data().add_distance()
-    current_year = comparison.get_current().get_year()
-    ax.plot(current_car_data.Distance, current_car_data.Speed,
-            label=f"{current_year}: {comparison.get_current().get_lap().Driver}",
-            linestyle="solid",
-            color=constants.team_color[current_year].get(int(comparison.get_current().get_lap().DriverNumber),
-                                                         '#808080'))
-    previous_car_data = comparison.get_current().get_lap().get_car_data().add_distance()
-    previous_year = comparison.get_previous().get_year()
-    ax.plot(previous_car_data.Distance, previous_car_data.Speed, linestyle="dashed",
-            label=f"{previous_year}: {comparison.get_previous().get_lap().Driver}", color='black')
-
+    ax.plot(current_car_data.Distance, current_car_data.Speed, linestyle='solid',
+            label=f"{comparison.get_current().get_year()}: {comparison.get_current().get_lap().Driver}",
+            color=constants.team_color[comparison.get_current().get_year()].get(
+                int(comparison.get_current().get_lap().DriverNumber), '#808080'))
+    previous_car_data = comparison.get_previous().get_lap().get_car_data().add_distance()
+    ax.plot(previous_car_data.Distance, previous_car_data.Speed, linestyle='dashed', color='black',
+            label=f"{comparison.get_previous().get_year()}: {comparison.get_previous().get_lap().Driver}")
     v_min = min(previous_car_data.Speed.min(), current_car_data.Speed.min())
     v_max = max(previous_car_data.Speed.max(), current_car_data.Speed.max())
     ax.vlines(x=comparison.get_corners().Distance, ymin=v_min, ymax=v_max, linestyles='dotted', colors='grey')
     ax.hlines(y=list(range(0, int(v_max), 25)), xmin=0, xmax=previous_car_data.Distance.max(), colors='lightgrey')
-
     for _, corner in comparison.get_corners().iterrows():
         txt = f"{corner.Number}{corner.Letter}"
         ax.text(corner.Distance, v_min - 5, txt, va='center_baseline', ha='center', size='small')
-
     ax.set_ylim(v_min - 10, v_max + 10)
     ax.legend(fontsize='small')
     ax.grid(True)
@@ -210,26 +193,20 @@ def plot_throttle_distance(log: Logger, comparison: Comparison):
     """
     fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
     current_car_data = comparison.get_current().get_lap().get_car_data().add_distance()
-    current_year = comparison.get_current().get_year()
-    ax.plot(current_car_data.Distance, current_car_data.Throttle,
-            label=f"{current_year}: {comparison.get_current().get_lap().Driver}",
-            linestyle="solid",
-            color=constants.team_color[current_year].get(int(comparison.get_current().get_lap().DriverNumber),
-                                                         '#808080'))
-    previous_car_data = comparison.get_current().get_lap().get_car_data().add_distance()
-    previous_year = comparison.get_previous().get_year()
-    ax.plot(previous_car_data.Distance, previous_car_data.Throttle, linestyle="dashed",
-            label=f"{previous_year}: {comparison.get_previous().get_lap().Driver}", color='black')
-
+    ax.plot(current_car_data.Distance, current_car_data.Throttle, linestyle='solid',
+            label=f"{comparison.get_current().get_year()}: {comparison.get_current().get_lap().Driver}",
+            color=constants.team_color[comparison.get_current().get_year()].get(
+                int(comparison.get_current().get_lap().DriverNumber), '#808080'))
+    previous_car_data = comparison.get_previous().get_lap().get_car_data().add_distance()
+    ax.plot(previous_car_data.Distance, previous_car_data.Throttle, linestyle='dashed', color='black',
+            label=f"{comparison.get_previous().get_year()}: {comparison.get_previous().get_lap().Driver}")
     v_min = min(previous_car_data.Throttle.min(), current_car_data.Throttle.min())
     v_max = max(previous_car_data.Throttle.max(), current_car_data.Throttle.max())
     ax.vlines(x=comparison.get_corners().Distance, ymin=v_min, ymax=v_max, linestyles='dotted', colors='grey')
     ax.hlines(y=[10, 20, 30, 40, 50, 60, 70, 80, 90], xmin=0, xmax=previous_car_data.Distance.max(), colors='lightgrey')
-
     for _, corner in comparison.get_corners().iterrows():
         txt = f"{corner.Number}{corner.Letter}"
         ax.text(corner.Distance, v_min - 2.5, txt, va='center_baseline', ha='center', size='small')
-
     ax.set_ylim(v_min - 5, v_max + 5)
     ax.legend(fontsize='small')
     ax.grid(True)
@@ -248,7 +225,7 @@ def summary(log: Logger, current: Session, previous: Session, gp: str, session: 
         return
     current_car_data = current_lap.get_car_data().add_distance()
     ax.plot(current_car_data.Distance, current_car_data.Throttle, label=f"{current.event.year}: {current_lap.Driver}",
-            linestyle="solid",
+            linestyle='solid',
             color=constants.team_color[current.event.year].get(int(current_lap.DriverNumber), '#808080'))
     previous_lap = previous.laps.pick_fastest()
     if previous_lap is None:
