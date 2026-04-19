@@ -1,9 +1,10 @@
 import json
 import os
 from logging import Logger
+from typing import Any
 
 import fastf1
-from fastf1.core import Session, Lap
+from fastf1.core import Lap
 from matplotlib import pyplot as plt
 from opentelemetry import trace
 from pandas.core.interchange.dataframe_protocol import DataFrame
@@ -15,20 +16,24 @@ import setup
 tracer = trace.get_tracer(__name__)
 
 
-class LapAndYear:
-    def __init__(self, lap: Lap, year: int):
+class SessionSummary:
+    def __init__(self, lap: Lap, weather: Any, year: int):
         self.lap = lap
+        self.weather = weather
         self.year = year
 
     def get_lap(self) -> Lap:
         return self.lap
+
+    def get_weather(self) -> Any:
+        return self.weather
 
     def get_year(self) -> int:
         return self.year
 
 
 class Comparison:
-    def __init__(self, gp: str, session: str, current: LapAndYear, previous: LapAndYear, corners: DataFrame):
+    def __init__(self, gp: str, session: str, current: SessionSummary, previous: SessionSummary, corners: DataFrame):
         self.gp = gp
         self.session = session
         self.current = current
@@ -41,10 +46,10 @@ class Comparison:
     def get_session(self) -> str:
         return self.session
 
-    def get_current(self) -> LapAndYear:
+    def get_current(self) -> SessionSummary:
         return self.current
 
-    def get_previous(self) -> LapAndYear:
+    def get_previous(self) -> SessionSummary:
         return self.previous
 
     def get_corners(self) -> DataFrame:
@@ -218,19 +223,13 @@ def plot_throttle_distance(log: Logger, comparison: Comparison):
 
 
 @tracer.start_as_current_span("summary")
-def summary(log: Logger, current: Session, previous: Session, gp: str, session: str, year: int):
+def summary(log: Logger, comparison: Comparison):
     fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
-    current_lap = current.laps.pick_fastest()
-    if current_lap is None:
-        return
-    current_car_data = current_lap.get_car_data().add_distance()
-    ax.plot(current_car_data.Distance, current_car_data.Throttle, label=f"{current.event.year}: {current_lap.Driver}",
-            linestyle='solid',
-            color=constants.team_color[current.event.year].get(int(current_lap.DriverNumber), '#808080'))
-    previous_lap = previous.laps.pick_fastest()
-    if previous_lap is None:
-        return
-
+    current_car_data = comparison.get_current().get_lap().get_car_data().add_distance()
+    ax.plot(current_car_data.Distance, current_car_data.Throttle, linestyle='solid',
+            label=f"{comparison.get_current().get_year()}: {comparison.get_current().get_lap().Driver}",
+            color=constants.team_color[comparison.get_current().get_year()].get(
+                int(comparison.get_current().get_lap().DriverNumber), '#808080'))
     titles = []
     title_colors = []
     c = []
@@ -239,149 +238,154 @@ def summary(log: Logger, current: Session, previous: Session, gp: str, session: 
     p_colors = []
 
     titles.append("LapTime(s)")
-    c.append(current_lap.LapTime.total_seconds())
-    p.append(previous_lap.LapTime.total_seconds())
+    c.append(comparison.get_current().get_lap().LapTime.total_seconds())
+    p.append(comparison.get_previous().get_lap().LapTime.total_seconds())
     title_colors.append("lightgray")
-    c_win = current_lap.LapTime > previous_lap.LapTime
+    c_win = comparison.get_current().get_lap().LapTime > comparison.get_previous().get_lap().LapTime
     c_colors.append("white" if c_win else "lightgray")
     p_colors.append("white" if not c_win else "lightgray")
     titles.append("LapTime(%)")
-    c.append("{:.3f}".format(current_lap.LapTime.total_seconds() / previous_lap.LapTime.total_seconds()))
+    c.append("{:.3f}".format(
+        comparison.get_current().get_lap().LapTime.total_seconds() / comparison.get_previous().get_lap().LapTime.total_seconds()))
     p.append(1)
-    c_win = current_lap.LapTime > previous_lap.LapTime
+    c_win = comparison.get_current().get_lap().LapTime > comparison.get_previous().get_lap().LapTime
     c_colors.append("white" if c_win else "lightgray")
     p_colors.append("white" if not c_win else "lightgray")
 
     titles.append("Sector1Time(s)")
-    c.append(current_lap.Sector1Time.total_seconds())
-    p.append(previous_lap.Sector1Time.total_seconds())
+    c.append(comparison.get_current().get_lap().Sector1Time.total_seconds())
+    p.append(comparison.get_previous().get_lap().Sector1Time.total_seconds())
     title_colors.append("lightgray")
-    c_win = current_lap.Sector1Time > previous_lap.Sector1Time
+    c_win = comparison.get_current().get_lap().Sector1Time > comparison.get_previous().get_lap().Sector1Time
     c_colors.append("white" if c_win else "lightgray")
     p_colors.append("white" if not c_win else "lightgray")
     titles.append("Sector1Time(%)")
-    c.append("{:.3f}".format(current_lap.Sector1Time.total_seconds() / previous_lap.Sector1Time.total_seconds()))
+    c.append("{:.3f}".format(
+        comparison.get_current().get_lap().Sector1Time.total_seconds() / comparison.get_previous().get_lap().Sector1Time.total_seconds()))
     p.append(1)
-    c_win = current_lap.Sector1Time > previous_lap.Sector1Time
+    c_win = comparison.get_current().get_lap().Sector1Time > comparison.get_previous().get_lap().Sector1Time
     c_colors.append("white" if c_win else "lightgray")
     p_colors.append("white" if not c_win else "lightgray")
 
     titles.append("Sector2Time(s)")
-    c.append(current_lap.Sector2Time.total_seconds())
-    p.append(previous_lap.Sector2Time.total_seconds())
+    c.append(comparison.get_current().get_lap().Sector2Time.total_seconds())
+    p.append(comparison.get_previous().get_lap().Sector2Time.total_seconds())
     title_colors.append("lightgray")
-    c_win = current_lap.Sector2Time > previous_lap.Sector2Time
+    c_win = comparison.get_current().get_lap().Sector2Time > comparison.get_previous().get_lap().Sector2Time
     c_colors.append("white" if c_win else "lightgray")
     p_colors.append("white" if not c_win else "lightgray")
     titles.append("Sector2Time(%)")
-    c.append("{:.3f}".format(current_lap.Sector2Time.total_seconds() / previous_lap.Sector2Time.total_seconds()))
+    c.append("{:.3f}".format(
+        comparison.get_current().get_lap().Sector2Time.total_seconds() / comparison.get_previous().get_lap().Sector2Time.total_seconds()))
     p.append(1)
-    c_win = current_lap.Sector2Time > previous_lap.Sector2Time
+    c_win = comparison.get_current().get_lap().Sector2Time > comparison.get_previous().get_lap().Sector2Time
     c_colors.append("white" if c_win else "lightgray")
     p_colors.append("white" if not c_win else "lightgray")
 
     titles.append("Sector3Time(s)")
-    c.append(current_lap.Sector3Time.total_seconds())
-    p.append(previous_lap.Sector3Time.total_seconds())
+    c.append(comparison.get_current().get_lap().Sector3Time.total_seconds())
+    p.append(comparison.get_previous().get_lap().Sector3Time.total_seconds())
     title_colors.append("lightgray")
-    c_win = current_lap.Sector3Time > previous_lap.Sector3Time
+    c_win = comparison.get_current().get_lap().Sector3Time > comparison.get_previous().get_lap().Sector3Time
     c_colors.append("white" if c_win else "lightgray")
     p_colors.append("white" if not c_win else "lightgray")
     titles.append("Sector3Time(%)")
-    c.append("{:.3f}".format(current_lap.Sector3Time.total_seconds() / previous_lap.Sector3Time.total_seconds()))
+    c.append("{:.3f}".format(
+        comparison.get_current().get_lap().Sector3Time.total_seconds() / comparison.get_previous().get_lap().Sector3Time.total_seconds()))
     p.append(1)
-    c_win = current_lap.Sector3Time > previous_lap.Sector3Time
+    c_win = comparison.get_current().get_lap().Sector3Time > comparison.get_previous().get_lap().Sector3Time
     c_colors.append("white" if c_win else "lightgray")
     p_colors.append("white" if not c_win else "lightgray")
 
     titles.append("SpeedFL")
-    c.append(current_lap.SpeedFL)
-    p.append(previous_lap.SpeedFL)
+    c.append(comparison.get_current().get_lap().SpeedFL)
+    p.append(comparison.get_previous().get_lap().SpeedFL)
     title_colors.append("lightgray")
-    c_win = current_lap.SpeedFL < previous_lap.SpeedFL
+    c_win = comparison.get_current().get_lap().SpeedFL < comparison.get_previous().get_lap().SpeedFL
     c_colors.append("white" if c_win else "lightgray")
     p_colors.append("white" if not c_win else "lightgray")
 
     titles.append("SpeedI1")
-    c.append(current_lap.SpeedI1)
-    p.append(previous_lap.SpeedI1)
+    c.append(comparison.get_current().get_lap().SpeedI1)
+    p.append(comparison.get_previous().get_lap().SpeedI1)
     title_colors.append("lightgray")
-    c_win = current_lap.SpeedI1 < previous_lap.SpeedI1
+    c_win = comparison.get_current().get_lap().SpeedI1 < comparison.get_previous().get_lap().SpeedI1
     c_colors.append("white" if c_win else "lightgray")
     p_colors.append("white" if not c_win else "lightgray")
 
     titles.append("SpeedI2")
-    c.append(current_lap.SpeedI2)
-    p.append(previous_lap.SpeedI2)
+    c.append(comparison.get_current().get_lap().SpeedI2)
+    p.append(comparison.get_previous().get_lap().SpeedI2)
     title_colors.append("lightgray")
-    c_win = current_lap.SpeedI2 < previous_lap.SpeedI2
+    c_win = comparison.get_current().get_lap().SpeedI2 < comparison.get_previous().get_lap().SpeedI2
     c_colors.append("white" if c_win else "lightgray")
     p_colors.append("white" if not c_win else "lightgray")
 
     titles.append("SpeedST")
-    c.append(current_lap.SpeedST)
-    p.append(previous_lap.SpeedST)
+    c.append(comparison.get_current().get_lap().SpeedST)
+    p.append(comparison.get_previous().get_lap().SpeedST)
     title_colors.append("lightgray")
-    c_win = current_lap.SpeedST < previous_lap.SpeedST
+    c_win = comparison.get_current().get_lap().SpeedST < comparison.get_previous().get_lap().SpeedST
     c_colors.append("white" if c_win else "lightgray")
     p_colors.append("white" if not c_win else "lightgray")
 
     titles.append("Max(Speed)")
-    c.append(current.laps.pick_fastest().telemetry.Speed.max())
-    p.append(previous.laps.pick_fastest().telemetry.Speed.max())
+    c.append(comparison.get_current().get_lap().telemetry.Speed.max())
+    p.append(comparison.get_previous().get_lap().telemetry.Speed.max())
     title_colors.append("lightgray")
-    c_win = current.laps.pick_fastest().telemetry.Speed.max() < previous.laps.pick_fastest().telemetry.Speed.max()
+    c_win = comparison.get_current().get_lap().telemetry.Speed.max() < comparison.get_previous().get_lap().telemetry.Speed.max()
     c_colors.append("white" if c_win else "lightgray")
     p_colors.append("white" if not c_win else "lightgray")
 
     titles.append("Compound")
-    c.append(current_lap.Compound)
-    p.append(previous_lap.Compound)
+    c.append(comparison.get_current().get_lap().Compound)
+    p.append(comparison.get_previous().get_lap().Compound)
     title_colors.append("lightgray")
     c_colors.append("white")
     p_colors.append("white")
 
     titles.append("TyreLife")
-    c.append(current_lap.TyreLife)
-    p.append(previous_lap.TyreLife)
+    c.append(comparison.get_current().get_lap().TyreLife)
+    p.append(comparison.get_previous().get_lap().TyreLife)
     title_colors.append("lightgray")
     c_colors.append("white")
     p_colors.append("white")
 
     titles.append("Max(AirTemp)")
-    c.append(current.weather_data.AirTemp.max())
-    p.append(previous.weather_data.AirTemp.max())
+    c.append(comparison.get_current().get_weather().AirTemp.max())
+    p.append(comparison.get_previous().get_weather().AirTemp.max())
     title_colors.append("lightgray")
     c_colors.append("white")
     p_colors.append("white")
 
     titles.append("Min(AirTemp)")
-    c.append(current.weather_data.AirTemp.min())
-    p.append(previous.weather_data.AirTemp.min())
+    c.append(comparison.get_current().get_weather().AirTemp.min())
+    p.append(comparison.get_previous().get_weather().AirTemp.min())
     title_colors.append("lightgray")
     c_colors.append("white")
     p_colors.append("white")
 
     titles.append("Max(TrackTemp)")
-    c.append(current.weather_data.TrackTemp.max())
-    p.append(previous.weather_data.TrackTemp.max())
+    c.append(comparison.get_current().get_weather().TrackTemp.max())
+    p.append(comparison.get_previous().get_weather().TrackTemp.max())
     title_colors.append("lightgray")
     c_colors.append("white")
     p_colors.append("white")
 
     titles.append("Min(TrackTemp)")
-    c.append(current.weather_data.TrackTemp.min())
-    p.append(previous.weather_data.TrackTemp.min())
+    c.append(comparison.get_current().get_weather().TrackTemp.min())
+    p.append(comparison.get_previous().get_weather().TrackTemp.min())
     title_colors.append("lightgray")
     c_colors.append("white")
     p_colors.append("white")
 
     fig = graph_objects.Figure(data=[graph_objects.Table(
-        header={'values': ["", year - 1, year], 'fill_color': 'lightgrey', 'align': 'center'},
+        header={'values': ["", comparison.get_previous().get_year(), comparison.get_current().get_year()],
+                'fill_color': 'lightgrey', 'align': 'center'},
         cells={'values': [titles, p, c], 'fill_color': [title_colors, c_colors, p_colors], 'align': 'center'}
     )])
 
-    output_path = f"./images/comparison/{gp}/{session}/summary.png"
+    output_path = f"./images/comparison/{comparison.get_gp()}/{comparison.get_session()}/summary.png"
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     fig.write_image(output_path, width=1920, height=1080)
     log.info(f"Saved plot to {output_path}")
@@ -414,7 +418,6 @@ def __main():
         return
     previous.load(messages=False)
     log.info(f"{round} {session}")
-    summary(log, current, previous, round, session, year)
 
     current_lap = current.laps.pick_fastest()
     if current_lap is None:
@@ -423,8 +426,11 @@ def __main():
     if previous_lap is None:
         return
 
-    comparison = Comparison(round, session, LapAndYear(current_lap, current.event.year),
-                            LapAndYear(previous_lap, previous.event.year), current.get_circuit_info().corners)
+    comparison = Comparison(round, session, SessionSummary(current_lap, current.weather_data, current.event.year),
+                            SessionSummary(previous_lap, previous.weather_data, previous.event.year),
+                            current.get_circuit_info().corners)
+    summary(log, comparison)
+
     plot_brake_distance(log, comparison)
     plot_n_gear_distance(log, comparison)
     plot_rpm_distance(log, comparison)
