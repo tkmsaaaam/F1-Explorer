@@ -17,7 +17,7 @@ tracer = trace.get_tracer(__name__)
 
 
 class SessionSummary:
-    def __init__(self, lap: Lap, weather: Any):
+    def __init__(self, lap: Lap, weather: DataFrame):
         self.lap = lap
         self.weather = weather
 
