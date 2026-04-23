@@ -76,8 +76,8 @@ def plot_brake_distance(log: Logger, comparison: Comparison):
     previous_car_data = comparison.get_previous().get_lap().get_car_data().add_distance()
     ax.plot(previous_car_data.Distance, previous_car_data.Brake, color='black', linestyle='dashed',
             label=f"{comparison.get_previous_year()}: {comparison.get_previous().get_lap().Driver}")
-    v_min = min(previous_car_data.Brake.min(), current_car_data.Brake.min())
-    v_max = max(previous_car_data.Brake.max(), current_car_data.Brake.max())
+    v_min = min(int(previous_car_data.Brake.min()), int(current_car_data.Brake.min()))
+    v_max = max(int(previous_car_data.Brake.max()), int(current_car_data.Brake.max()))
     ax.vlines(x=comparison.get_corners().Distance, ymin=v_min, ymax=v_max, linestyles='dotted', colors='grey')
     for _, corner in comparison.get_corners().iterrows():
         txt = f"{corner.Number}{corner.Letter}"
@@ -109,8 +109,8 @@ def plot_n_gear_distance(log: Logger, comparison: Comparison):
     previous_car_data = comparison.get_current().get_lap().get_car_data().add_distance()
     ax.plot(previous_car_data.Distance, previous_car_data.nGear, color='black', linestyle='dashed',
             label=f"{comparison.get_previous_year()}: {comparison.get_previous().get_lap().Driver}")
-    v_min = min(previous_car_data.nGear.min(), current_car_data.nGear.min())
-    v_max = max(previous_car_data.nGear.max(), current_car_data.nGear.max())
+    v_min = min(int(previous_car_data.nGear.min()), int(current_car_data.nGear.min()))
+    v_max = max(int(previous_car_data.nGear.max()), int(current_car_data.nGear.max()))
     ax.vlines(x=comparison.get_corners().Distance, ymin=v_min, ymax=v_max, linestyles='dotted', colors='grey')
     for _, corner in comparison.get_corners().iterrows():
         txt = f"{corner.Number}{corner.Letter}"
@@ -142,8 +142,8 @@ def plot_rpm_distance(log: Logger, comparison: Comparison):
     previous_car_data = comparison.get_previous().get_lap().get_car_data().add_distance()
     ax.plot(previous_car_data.Distance, previous_car_data.RPM, color='black', linestyle='dashed',
             label=f"{comparison.get_previous_year()}: {comparison.get_previous().get_lap().Driver}")
-    v_min = min(previous_car_data.RPM.min(), current_car_data.RPM.min())
-    v_max = max(previous_car_data.RPM.max(), current_car_data.RPM.max())
+    v_min = min(int(previous_car_data.RPM.min()), int(current_car_data.RPM.min()))
+    v_max = max(int(previous_car_data.RPM.max()), int(current_car_data.RPM.max()))
     ax.vlines(x=comparison.get_corners().Distance, ymin=v_min, ymax=v_max, linestyles='dotted', colors='grey')
 
     for _, corner in comparison.get_corners().iterrows():
@@ -176,8 +176,8 @@ def plot_speed_distance(log: Logger, comparison: Comparison):
     previous_car_data = comparison.get_previous().get_lap().get_car_data().add_distance()
     ax.plot(previous_car_data.Distance, previous_car_data.Speed, linestyle='dashed', color='black',
             label=f"{comparison.get_previous_year()}: {comparison.get_previous().get_lap().Driver}")
-    v_min = min(previous_car_data.Speed.min(), current_car_data.Speed.min())
-    v_max = max(previous_car_data.Speed.max(), current_car_data.Speed.max())
+    v_min = min(int(previous_car_data.Speed.min()), int(current_car_data.Speed.min()))
+    v_max = max(int(previous_car_data.Speed.max()), int(current_car_data.Speed.max()))
     ax.vlines(x=comparison.get_corners().Distance, ymin=v_min, ymax=v_max, linestyles='dotted', colors='grey')
     ax.hlines(y=list(range(0, int(v_max), 25)), xmin=0, xmax=previous_car_data.Distance.max(), colors='lightgrey')
     for _, corner in comparison.get_corners().iterrows():
@@ -209,8 +209,8 @@ def plot_throttle_distance(log: Logger, comparison: Comparison):
     previous_car_data = comparison.get_previous().get_lap().get_car_data().add_distance()
     ax.plot(previous_car_data.Distance, previous_car_data.Throttle, linestyle='dashed', color='black',
             label=f"{comparison.get_previous_year()}: {comparison.get_previous().get_lap().Driver}")
-    v_min = min(previous_car_data.Throttle.min(), current_car_data.Throttle.min())
-    v_max = max(previous_car_data.Throttle.max(), current_car_data.Throttle.max())
+    v_min = min(int(previous_car_data.Throttle.min()), int(current_car_data.Throttle.min()))
+    v_max = max(int(previous_car_data.Throttle.max()), int(current_car_data.Throttle.max()))
     ax.vlines(x=comparison.get_corners().Distance, ymin=v_min, ymax=v_max, linestyles='dotted', colors='grey')
     ax.hlines(y=[10, 20, 30, 40, 50, 60, 70, 80, 90], xmin=0, xmax=previous_car_data.Distance.max(), colors='lightgrey')
     for _, corner in comparison.get_corners().iterrows():
