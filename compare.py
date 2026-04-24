@@ -246,100 +246,100 @@ def summary(log: Logger, comparison: Comparison):
     p.append(comparison.get_previous().get_lap().LapTime.total_seconds())
     title_colors.append("lightgray")
     c_win = comparison.get_current().get_lap().LapTime > comparison.get_previous().get_lap().LapTime
-    c_colors.append("white" if c_win else "lightgray")
-    p_colors.append("white" if not c_win else "lightgray")
+    c_colors.append("#d4edda" if c_win else "white")
+    p_colors.append("#d4edda" if not c_win else "white")
     titles.append("LapTime(%)")
     c.append("{:.3f}".format(
         comparison.get_current().get_lap().LapTime.total_seconds() / comparison.get_previous().get_lap().LapTime.total_seconds()))
     p.append(1)
     c_win = comparison.get_current().get_lap().LapTime > comparison.get_previous().get_lap().LapTime
-    c_colors.append("white" if c_win else "lightgray")
-    p_colors.append("white" if not c_win else "lightgray")
+    c_colors.append("#d4edda" if c_win else "white")
+    p_colors.append("#d4edda" if not c_win else "white")
 
     titles.append("Sector1Time(s)")
     c.append(comparison.get_current().get_lap().Sector1Time.total_seconds())
     p.append(comparison.get_previous().get_lap().Sector1Time.total_seconds())
     title_colors.append("lightgray")
     c_win = comparison.get_current().get_lap().Sector1Time > comparison.get_previous().get_lap().Sector1Time
-    c_colors.append("white" if c_win else "lightgray")
-    p_colors.append("white" if not c_win else "lightgray")
+    c_colors.append("#d4edda" if c_win else "white")
+    p_colors.append("#d4edda" if not c_win else "white")
     titles.append("Sector1Time(%)")
     c.append("{:.3f}".format(
         comparison.get_current().get_lap().Sector1Time.total_seconds() / comparison.get_previous().get_lap().Sector1Time.total_seconds()))
     p.append(1)
     c_win = comparison.get_current().get_lap().Sector1Time > comparison.get_previous().get_lap().Sector1Time
-    c_colors.append("white" if c_win else "lightgray")
-    p_colors.append("white" if not c_win else "lightgray")
+    c_colors.append("#d4edda" if c_win else "white")
+    p_colors.append("#d4edda" if not c_win else "white")
 
     titles.append("Sector2Time(s)")
     c.append(comparison.get_current().get_lap().Sector2Time.total_seconds())
     p.append(comparison.get_previous().get_lap().Sector2Time.total_seconds())
     title_colors.append("lightgray")
     c_win = comparison.get_current().get_lap().Sector2Time > comparison.get_previous().get_lap().Sector2Time
-    c_colors.append("white" if c_win else "lightgray")
-    p_colors.append("white" if not c_win else "lightgray")
+    c_colors.append("#d4edda" if c_win else "white")
+    p_colors.append("#d4edda" if not c_win else "white")
     titles.append("Sector2Time(%)")
     c.append("{:.3f}".format(
         comparison.get_current().get_lap().Sector2Time.total_seconds() / comparison.get_previous().get_lap().Sector2Time.total_seconds()))
     p.append(1)
     c_win = comparison.get_current().get_lap().Sector2Time > comparison.get_previous().get_lap().Sector2Time
-    c_colors.append("white" if c_win else "lightgray")
-    p_colors.append("white" if not c_win else "lightgray")
+    c_colors.append("#d4edda" if c_win else "white")
+    p_colors.append("#d4edda" if not c_win else "white")
 
     titles.append("Sector3Time(s)")
     c.append(comparison.get_current().get_lap().Sector3Time.total_seconds())
     p.append(comparison.get_previous().get_lap().Sector3Time.total_seconds())
     title_colors.append("lightgray")
     c_win = comparison.get_current().get_lap().Sector3Time > comparison.get_previous().get_lap().Sector3Time
-    c_colors.append("white" if c_win else "lightgray")
-    p_colors.append("white" if not c_win else "lightgray")
+    c_colors.append("#d4edda" if c_win else "white")
+    p_colors.append("#d4edda" if not c_win else "white")
     titles.append("Sector3Time(%)")
     c.append("{:.3f}".format(
         comparison.get_current().get_lap().Sector3Time.total_seconds() / comparison.get_previous().get_lap().Sector3Time.total_seconds()))
     p.append(1)
     c_win = comparison.get_current().get_lap().Sector3Time > comparison.get_previous().get_lap().Sector3Time
-    c_colors.append("white" if c_win else "lightgray")
-    p_colors.append("white" if not c_win else "lightgray")
+    c_colors.append("#d4edda" if c_win else "white")
+    p_colors.append("#d4edda" if not c_win else "white")
 
     titles.append("SpeedFL")
     c.append(comparison.get_current().get_lap().SpeedFL)
     p.append(comparison.get_previous().get_lap().SpeedFL)
     title_colors.append("lightgray")
     c_win = comparison.get_current().get_lap().SpeedFL < comparison.get_previous().get_lap().SpeedFL
-    c_colors.append("white" if c_win else "lightgray")
-    p_colors.append("white" if not c_win else "lightgray")
+    c_colors.append("#d4edda" if c_win else "white")
+    p_colors.append("#d4edda" if not c_win else "white")
 
     titles.append("SpeedI1")
     c.append(comparison.get_current().get_lap().SpeedI1)
     p.append(comparison.get_previous().get_lap().SpeedI1)
     title_colors.append("lightgray")
     c_win = comparison.get_current().get_lap().SpeedI1 < comparison.get_previous().get_lap().SpeedI1
-    c_colors.append("white" if c_win else "lightgray")
-    p_colors.append("white" if not c_win else "lightgray")
+    c_colors.append("#d4edda" if c_win else "white")
+    p_colors.append("#d4edda" if not c_win else "white")
 
     titles.append("SpeedI2")
     c.append(comparison.get_current().get_lap().SpeedI2)
     p.append(comparison.get_previous().get_lap().SpeedI2)
     title_colors.append("lightgray")
     c_win = comparison.get_current().get_lap().SpeedI2 < comparison.get_previous().get_lap().SpeedI2
-    c_colors.append("white" if c_win else "lightgray")
-    p_colors.append("white" if not c_win else "lightgray")
+    c_colors.append("#d4edda" if c_win else "white")
+    p_colors.append("#d4edda" if not c_win else "white")
 
     titles.append("SpeedST")
     c.append(comparison.get_current().get_lap().SpeedST)
     p.append(comparison.get_previous().get_lap().SpeedST)
     title_colors.append("lightgray")
     c_win = comparison.get_current().get_lap().SpeedST < comparison.get_previous().get_lap().SpeedST
-    c_colors.append("white" if c_win else "lightgray")
-    p_colors.append("white" if not c_win else "lightgray")
+    c_colors.append("#d4edda" if c_win else "white")
+    p_colors.append("#d4edda" if not c_win else "white")
 
     titles.append("Max(Speed)")
     c.append(comparison.get_current().get_lap().telemetry.Speed.max())
     p.append(comparison.get_previous().get_lap().telemetry.Speed.max())
     title_colors.append("lightgray")
     c_win = comparison.get_current().get_lap().telemetry.Speed.max() < comparison.get_previous().get_lap().telemetry.Speed.max()
-    c_colors.append("white" if c_win else "lightgray")
-    p_colors.append("white" if not c_win else "lightgray")
+    c_colors.append("#d4edda" if c_win else "white")
+    p_colors.append("#d4edda" if not c_win else "white")
 
     titles.append("Compound")
     c.append(comparison.get_current().get_lap().Compound)
