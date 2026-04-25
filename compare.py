@@ -4,7 +4,7 @@ from logging import Logger
 from typing import Any
 
 import fastf1
-from fastf1.core import Lap
+from fastf1.core import Lap, Session
 from matplotlib import pyplot as plt
 from opentelemetry import trace
 from pandas.core.interchange.dataframe_protocol import DataFrame
@@ -14,6 +14,14 @@ import constants
 import setup
 
 tracer = trace.get_tracer(__name__)
+
+
+def new(session: Session) -> SessionSummary:
+    lap = session.laps.pick_fastest()
+    if lap is None:
+        raise Exception("Session is invalid")
+
+    return SessionSummary(lap, session.weather_data)
 
 
 class SessionSummary:
@@ -423,15 +431,18 @@ def __main():
     previous.load(messages=False)
     log.info(f"{round} {session}")
 
-    current_lap = current.laps.pick_fastest()
-    if current_lap is None:
+    try:
+        current_summary = new(current)
+    except Exception as exception:
+        log.warning(exception.args)
         return
-    previous_lap = previous.laps.pick_fastest()
-    if previous_lap is None:
+    try:
+        previous_summary = new(previous)
+    except Exception as exception:
+        log.warning(exception.args)
         return
 
-    comparison = Comparison(year, round, session, SessionSummary(current_lap, current.weather_data),
-                            SessionSummary(previous_lap, previous.weather_data), current.get_circuit_info().corners)
+    comparison = Comparison(year, round, session, current_summary, previous_summary, current.get_circuit_info().corners)
     summary(log, comparison)
 
     plot_brake_distance(log, comparison)
