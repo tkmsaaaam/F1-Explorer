@@ -259,7 +259,7 @@ def summary(log: Logger, comparison: Comparison):
     titles.append("LapTime(%)")
     c.append("{:.3f}".format(
         comparison.get_current().get_lap().LapTime.total_seconds() / comparison.get_previous().get_lap().LapTime.total_seconds()))
-    p.append(1)
+    p.append('-')
     c_win = comparison.get_current().get_lap().LapTime > comparison.get_previous().get_lap().LapTime
     c_colors.append("#d4edda" if c_win else "white")
     p_colors.append("#d4edda" if not c_win else "white")
@@ -274,7 +274,7 @@ def summary(log: Logger, comparison: Comparison):
     titles.append("Sector1Time(%)")
     c.append("{:.3f}".format(
         comparison.get_current().get_lap().Sector1Time.total_seconds() / comparison.get_previous().get_lap().Sector1Time.total_seconds()))
-    p.append(1)
+    p.append('-')
     c_win = comparison.get_current().get_lap().Sector1Time > comparison.get_previous().get_lap().Sector1Time
     c_colors.append("#d4edda" if c_win else "white")
     p_colors.append("#d4edda" if not c_win else "white")
@@ -289,7 +289,7 @@ def summary(log: Logger, comparison: Comparison):
     titles.append("Sector2Time(%)")
     c.append("{:.3f}".format(
         comparison.get_current().get_lap().Sector2Time.total_seconds() / comparison.get_previous().get_lap().Sector2Time.total_seconds()))
-    p.append(1)
+    p.append('-')
     c_win = comparison.get_current().get_lap().Sector2Time > comparison.get_previous().get_lap().Sector2Time
     c_colors.append("#d4edda" if c_win else "white")
     p_colors.append("#d4edda" if not c_win else "white")
@@ -304,7 +304,7 @@ def summary(log: Logger, comparison: Comparison):
     titles.append("Sector3Time(%)")
     c.append("{:.3f}".format(
         comparison.get_current().get_lap().Sector3Time.total_seconds() / comparison.get_previous().get_lap().Sector3Time.total_seconds()))
-    p.append(1)
+    p.append('-')
     c_win = comparison.get_current().get_lap().Sector3Time > comparison.get_previous().get_lap().Sector3Time
     c_colors.append("#d4edda" if c_win else "white")
     p_colors.append("#d4edda" if not c_win else "white")
