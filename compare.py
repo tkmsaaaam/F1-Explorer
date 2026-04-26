@@ -424,23 +424,24 @@ def __main():
         return
     current.load(messages=False)
     try:
+        current_summary = new(current)
+    except Exception as exception:
+        log.warning(exception.args)
+        return
+
+    try:
         previous = fastf1.get_session(year - 1, round, session)
     except Exception as exception:
         log.warning(exception.args)
         return
     previous.load(messages=False)
-    log.info(f"{round} {session}")
-
-    try:
-        current_summary = new(current)
-    except Exception as exception:
-        log.warning(exception.args)
-        return
     try:
         previous_summary = new(previous)
     except Exception as exception:
         log.warning(exception.args)
         return
+
+    log.info(f"{round} {session}")
 
     comparison = Comparison(year, round, session, current_summary, previous_summary, current.get_circuit_info().corners)
     summary(log, comparison)
