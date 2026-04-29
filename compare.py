@@ -45,7 +45,7 @@ class Comparison:
         self.session = session
         self.current = current
         self.previous = previous
-        self.corners: dict[int, int] = {row.Number: row.Distance for _, row in circuit.corners.iterrows()}
+        self.corners: dict[int, float] = {row.Number: row.Distance for _, row in circuit.corners.iterrows()}
 
     def get_year(self) -> int:
         return self.year
@@ -65,7 +65,7 @@ class Comparison:
     def get_previous(self) -> SessionSummary:
         return self.previous
 
-    def get_corners(self) -> dict[int, int]:
+    def get_corners(self) -> dict[int, float]:
         return self.corners
 
 
@@ -87,9 +87,9 @@ def plot_brake_distance(log: Logger, comparison: Comparison):
             label=f"{comparison.get_previous_year()}: {comparison.get_previous().get_lap().Driver}")
     v_min = min(int(previous_car_data.Brake.min()), int(current_car_data.Brake.min()))
     v_max = max(int(previous_car_data.Brake.max()), int(current_car_data.Brake.max()))
-    ax.vlines(x=list(comparison.get_corners().values()), ymin=v_min, ymax=v_max, linestyles='dotted', colors='grey')
+    ax.vlines(x=comparison.get_corners().values(), ymin=v_min, ymax=v_max, linestyles='dotted', colors='grey')
     for number, distance in comparison.get_corners().items():
-        ax.text(distance, v_min - 0.05, str(number), va='center_baseline', ha='center', size='small')
+        ax.text(distance, v_min - 0.05, number, va='center_baseline', ha='center', size='small')
 
     ax.set_ylim(v_min - 0.1, v_max + 0.1)
     ax.legend(fontsize='small')
@@ -119,9 +119,9 @@ def plot_n_gear_distance(log: Logger, comparison: Comparison):
             label=f"{comparison.get_previous_year()}: {comparison.get_previous().get_lap().Driver}")
     v_min = min(int(previous_car_data.nGear.min()), int(current_car_data.nGear.min()))
     v_max = max(int(previous_car_data.nGear.max()), int(current_car_data.nGear.max()))
-    ax.vlines(x=list(comparison.get_corners().values()), ymin=v_min, ymax=v_max, linestyles='dotted', colors='grey')
+    ax.vlines(x=comparison.get_corners().values(), ymin=v_min, ymax=v_max, linestyles='dotted', colors='grey')
     for number, distance in comparison.get_corners().items():
-        ax.text(distance, v_min - 0.25, str(number), va='center_baseline', ha='center', size='small')
+        ax.text(distance, v_min - 0.25, number, va='center_baseline', ha='center', size='small')
 
     ax.set_ylim(v_min - 0.5, v_max + 0.5)
     ax.legend(fontsize='small')
@@ -151,9 +151,9 @@ def plot_rpm_distance(log: Logger, comparison: Comparison):
             label=f"{comparison.get_previous_year()}: {comparison.get_previous().get_lap().Driver}")
     v_min = min(int(previous_car_data.RPM.min()), int(current_car_data.RPM.min()))
     v_max = max(int(previous_car_data.RPM.max()), int(current_car_data.RPM.max()))
-    ax.vlines(x=list(comparison.get_corners().values()), ymin=v_min, ymax=v_max, linestyles='dotted', colors='grey')
+    ax.vlines(x=comparison.get_corners().values(), ymin=v_min, ymax=v_max, linestyles='dotted', colors='grey')
     for number, distance in comparison.get_corners().items():
-        ax.text(distance, v_min - 250, str(number), va='center_baseline', ha='center', size='small')
+        ax.text(distance, v_min - 250, number, va='center_baseline', ha='center', size='small')
 
     ax.set_ylim(v_min - 500, v_max + 500)
     ax.legend(fontsize='small')
@@ -183,10 +183,10 @@ def plot_speed_distance(log: Logger, comparison: Comparison):
             label=f"{comparison.get_previous_year()}: {comparison.get_previous().get_lap().Driver}")
     v_min = min(int(previous_car_data.Speed.min()), int(current_car_data.Speed.min()))
     v_max = max(int(previous_car_data.Speed.max()), int(current_car_data.Speed.max()))
-    ax.vlines(x=list(comparison.get_corners().values()), ymin=v_min, ymax=v_max, linestyles='dotted', colors='grey')
+    ax.vlines(x=comparison.get_corners().values(), ymin=v_min, ymax=v_max, linestyles='dotted', colors='grey')
     ax.hlines(y=list(range(0, int(v_max), 25)), xmin=0, xmax=previous_car_data.Distance.max(), colors='lightgrey')
     for number, distance in comparison.get_corners().items():
-        ax.text(distance, v_min - 5, str(number), va='center_baseline', ha='center', size='small')
+        ax.text(distance, v_min - 5, number, va='center_baseline', ha='center', size='small')
     ax.set_ylim(v_min - 10, v_max + 10)
     ax.legend(fontsize='small')
     ax.grid(True)
@@ -215,10 +215,10 @@ def plot_throttle_distance(log: Logger, comparison: Comparison):
             label=f"{comparison.get_previous_year()}: {comparison.get_previous().get_lap().Driver}")
     v_min = min(int(previous_car_data.Throttle.min()), int(current_car_data.Throttle.min()))
     v_max = max(int(previous_car_data.Throttle.max()), int(current_car_data.Throttle.max()))
-    ax.vlines(x=list(comparison.get_corners().values()), ymin=v_min, ymax=v_max, linestyles='dotted', colors='grey')
+    ax.vlines(x=comparison.get_corners().values(), ymin=v_min, ymax=v_max, linestyles='dotted', colors='grey')
     ax.hlines(y=[10, 20, 30, 40, 50, 60, 70, 80, 90], xmin=0, xmax=previous_car_data.Distance.max(), colors='lightgrey')
     for number, distance in comparison.get_corners().items():
-        ax.text(distance, v_min - 2.5, str(number), va='center_baseline', ha='center', size='small')
+        ax.text(distance, v_min - 2.5, number, va='center_baseline', ha='center', size='small')
     ax.set_ylim(v_min - 5, v_max + 5)
     ax.legend(fontsize='small')
     ax.grid(True)
