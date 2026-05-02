@@ -30,8 +30,6 @@ def __main():
 
     log.info(f"{config.get_year()} Race {config.get_round()} {session.event.EventName} {config.get_session()}")
 
-    weekend.plot_tyre(config.get_year(), config.get_round(), log)
-
     run_volume.plot_lap_number_by_timing(session, log)
     run_volume.plot_laptime(session, log)
     run_volume.plot_laptime_by_timing(session, log)
@@ -93,6 +91,7 @@ def __main():
                               )
 
     weather.execute(session, log, base_path)
+    weekend.plot_tyre(config.get_year(), config.get_round(), log)
 
 
 if __name__ == "__main__":
