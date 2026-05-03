@@ -1,3 +1,4 @@
+import datetime
 import os
 from logging import Logger
 from typing import Final
@@ -21,6 +22,8 @@ def plot_tyre(year: int, race_number: int, log: Logger):
         except ValueError:
             continue
         session.load(weather=False, messages=False, telemetry=False)
+        if datetime.datetime.now() < session.date:
+            continue
         laps = session.laps
         for driver in session.drivers:
             driver_laps = laps[laps['DriverNumber'] == driver]
