@@ -42,7 +42,7 @@ def plot_by_tyre_age_and_tyre(session: Session, log: Logger):
 
     """
     for compound in session.laps.Compound.unique():
-        fastf1.plotting.setup_mpl(mpl_timedelta_support=True, misc_mpl_mods=False, color_scheme='light')
+        fastf1.plotting.setup_mpl(mpl_timedelta_support=True, color_scheme='light')
         fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
         # ロングランとみなす連続ラップ数のしきい値は2
         stint_set = make_stint_set(2, session.laps, compound)

@@ -805,6 +805,8 @@ def _plot_driver_telemetry(session: Session, log: Logger,
 
         if v_min == float('inf') or v_max == float('-inf'):
             continue
+        if v_min == 0.0 and v_max == 0.0:
+            continue
 
         # コーナー線と番号
         for _, corner in session.get_circuit_info().corners.iterrows():
@@ -1002,6 +1004,9 @@ def plot_telemetry(session: Session, log: Logger,
         ax.text(corner.Distance, v_min - (v_max - v_min) * 0.05,
                 f"{corner.Number}{corner.Letter}",
                 va='center_baseline', ha='center', size='small')
+
+    if v_min == 0.0 and v_max == 0.0:
+        return
 
     ax.set_ylim(v_min - 0.1 * (v_max - v_min), v_max + 0.1 * (v_max - v_min))
     ax.set_ylabel(label)
