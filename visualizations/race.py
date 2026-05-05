@@ -25,10 +25,12 @@ def execute(session: Session, log: Logger, images_path: str, logs_path: str, lap
             gap_ahead_range: int | None):
     driver_laps_set = make_driver_laps_set(session.laps)
     start_by_position_by_number = make_lap_start_by_position_by_number(session.laps)
-    laptime(log, images_path, "laptime", session, lap_time_range, driver_laps_set)
-    gap(log, f"{images_path}/gap.png", driver_laps_set, start_by_position_by_number)
-    gap_to_ahead(log, images_path, "gap_ahead", session, gap_ahead_range, driver_laps_set, start_by_position_by_number)
-    gap_to_top(log, images_path, "gap_top", session, gap_top_range, driver_laps_set)
+    laptime(log, images_path, "laptime_graph", session, lap_time_range, driver_laps_set)
+    gap_to_ahead_table(log, f"{images_path}/gap_ahead_table.png", driver_laps_set, start_by_position_by_number)
+    gap_to_top_table(log, f"{images_path}/gap_top_table.png", driver_laps_set, session)
+    gap_to_ahead_graph(log, images_path, "gap_ahead_graph", session, gap_ahead_range, driver_laps_set,
+                       start_by_position_by_number)
+    gap_to_top_graph(log, images_path, "gap_top_graph", session, gap_top_range, driver_laps_set)
     positions(log, f"{images_path}/position.png", session, driver_laps_set)
     speed_first_10s(log, f"{images_path}/speed_first_10s.png", session)
     speed_until_turn1(log, f"{images_path}/speed_until_turn1.png", session)
@@ -130,9 +132,9 @@ def make_top_time_map(all_laps: Laps) -> dict[int, datetime.datetime]:
     return fastest
 
 
-@tracer.start_as_current_span("gap")
-def gap(log: Logger, filepath: str, lap_logs: set[DriverLaps],
-        position_logs: dict[int, dict[int, datetime.datetime]]):
+@tracer.start_as_current_span("gap_to_ahead_table")
+def gap_to_ahead_table(log: Logger, filepath: str, lap_logs: set[DriverLaps],
+                       position_logs: dict[int, dict[int, datetime.datetime]]):
     """ラップごとのギャップの一覧を作成する
     Args:
         log: ロガー
@@ -144,7 +146,11 @@ def gap(log: Logger, filepath: str, lap_logs: set[DriverLaps],
     all_gaps = []
     fill_colors = []
     max_laps = 0
-    for driver_laps in lap_logs:
+    sorted_lap_logs = sorted(
+        lap_logs,
+        key=lambda dl: dl.get_laps()[max(dl.get_laps().keys())].get_position()
+    )
+    for driver_laps in sorted_lap_logs:
         gaps = []
         colors = []
         # ensure we iterate over integer lap numbers; keys may be numpy types
@@ -183,9 +189,66 @@ def gap(log: Logger, filepath: str, lap_logs: set[DriverLaps],
     log.info(f"Saved plot to {filepath}")
 
 
+@tracer.start_as_current_span("gap_to_top_table")
+def gap_to_top_table(log: Logger, filepath: str, lap_logs: set[DriverLaps], session: Session):
+    """ラップごとのTopへのギャップの一覧を作成する
+    Args:
+        log: ロガー
+        filepath: 画像を保存する先のpathとファイル名
+        lap_logs: ドライバーごとのラップ
+        session: Session
+    """
+    header = ["Lap"]
+    all_gaps = []
+    fill_colors = []
+    max_laps = 0
+    top_time_map = make_top_time_map(session.laps)
+    sorted_lap_logs = sorted(
+        lap_logs,
+        key=lambda dl: dl.get_laps()[max(dl.get_laps().keys())].get_position()
+    )
+    for driver_laps in sorted_lap_logs:
+        gaps = []
+        colors = []
+        # ensure we iterate over integer lap numbers; keys may be numpy types
+        lap_keys = driver_laps.get_laps().keys()
+        start = int(min(lap_keys))
+        end = int(max(lap_keys))
+        for i in range(start, end):
+            lap = driver_laps.get_laps().get(i)
+            if lap.get_position() == 1:
+                gaps.append("{:.3f}".format(0))
+                colors.append('gold')
+                continue
+            diff = (lap.get_at() - top_time_map.get(i)).total_seconds()
+            gaps.append(diff)
+            if diff < 5:
+                colors.append('#9966ff')
+            elif diff < 30:
+                colors.append('#e95464')
+            else:
+                colors.append('#ffffff')
+        if len(gaps) > max_laps:
+            max_laps = len(gaps)
+        header.append(driver_laps.get_driver().get_name())
+        all_gaps.append(gaps)
+        fill_colors.append(colors)
+
+    fig = graph_objects.Figure(data=[graph_objects.Table(
+        header={'values': header, 'fill_color': 'lightgrey', 'align': 'center'},
+        cells={'values': [list(range(1, max_laps + 1))] + all_gaps,
+               'fill_color': [["#f0f0f0"] * max_laps] + fill_colors,
+               'align': 'center'}
+    )], layout={'autosize': True, 'margin': {'autoexpand': True}})
+
+    os.makedirs(os.path.dirname(filepath), exist_ok=True)
+    fig.write_image(filepath, width=1920, height=1620)
+    log.info(f"Saved plot to {filepath}")
+
+
 @tracer.start_as_current_span("gap_to_ahead")
-def gap_to_ahead(log: Logger, filepath: str, filename: str, session: Session, r: int, lap_logs: set[DriverLaps],
-                 position_logs: dict[int, dict[int, datetime.datetime]]):
+def gap_to_ahead_graph(log: Logger, filepath: str, filename: str, session: Session, r: int, lap_logs: set[DriverLaps],
+                       position_logs: dict[int, dict[int, datetime.datetime]]):
     """x = ラップ番号, y = 前走とのギャップのドライバーごとの推移
     Args:
         log: ロガー
@@ -224,7 +287,7 @@ def gap_to_ahead(log: Logger, filepath: str, filename: str, session: Session, r:
 
 
 @tracer.start_as_current_span("gap_to_top")
-def gap_to_top(log: Logger, filepath: str, filename: str, session: Session, r: int, lap_logs: set[DriverLaps]):
+def gap_to_top_graph(log: Logger, filepath: str, filename: str, session: Session, r: int, lap_logs: set[DriverLaps]):
     """x = ラップ番号, y = トップとのギャップのドライバーごとの推移
     Args:
         log: ロガー
