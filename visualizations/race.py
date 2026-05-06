@@ -101,12 +101,18 @@ def laptime(log: Logger, filepath: str, filename: str, session: Session, r: int,
         lap_numbers = sorted(lap_log.get_laps().keys())
         lap_times = [lap_log.get_laps().get(i).get_time() for i in lap_numbers]
         color = fastf1.plotting.get_team_color(lap_log.get_driver().get_team_name(), session)
-        ax.plot(lap_numbers, lap_times, color=color, label=lap_log.get_driver().get_name(),
+        ax.plot(lap_numbers, lap_times, color=color, label=lap_log.get_driver().get_name(), linewidth=0.5,
                 linestyle="solid" if constants.camera[session.event.year].get(lap_log.get_driver().get_number(),
                                                                               'black') == "black" else "dashed")
-    minimum = session.laps.sort_values(by='LapTime').iloc[0].LapTime.total_seconds()
+    minimum = \
+        session.laps[(session.laps['IsAccurate']) & (session.laps['Deleted'] == False) & (
+                session.laps['TrackStatus'] == '1')].sort_values(by='LapTime').iloc[
+            0].LapTime.total_seconds()
+    maximum = session.laps[(session.laps['IsAccurate']) & (session.laps['Deleted'] == False) & (
+            session.laps['TrackStatus'] == '1')].sort_values(by='LapTime', ascending=False).iloc[
+        0].LapTime.total_seconds()
     ax.legend(fontsize='small')
-    ax.set_ylim(top=minimum, bottom=minimum + 15)
+    ax.set_ylim(top=minimum - 0.1, bottom=maximum + 0.1)
     ax.grid(True)
     output_path = f"{filepath}/{filename}.png"
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
@@ -268,7 +274,7 @@ def gap_to_ahead_graph(log: Logger, filepath: str, filename: str, session: Sessi
                                                                          'black') == "black" else "dashed"
         ax.plot(x, y, color=fastf1.plotting.get_team_color(driver_laps.get_driver().get_team_name(), session),
                 label=driver_laps.get_driver().get_name(),
-                linestyle=line_style, linewidth=1)
+                linestyle=line_style, linewidth=0.5)
     ax.legend(fontsize='small')
     ax.set_ylim(top=0, bottom=30)
     ax.grid(True)
@@ -305,7 +311,7 @@ def gap_to_top_graph(log: Logger, filepath: str, filename: str, session: Session
         y = [(lap_log.get_laps().get(i).get_at() - top_time_map.get(i)).total_seconds() for i in x]
         line_style = "solid" if constants.camera[session.event.year].get(lap_log.get_driver().get_number(),
                                                                          'black') == "black" else "dashed"
-        ax.plot(x, y, linewidth=1, color=color, label=lap_log.get_driver().get_name(), linestyle=line_style)
+        ax.plot(x, y, linewidth=0.5, color=color, label=lap_log.get_driver().get_name(), linestyle=line_style)
     ax.legend(fontsize='small')
     ax.invert_yaxis()
     ax.set_ylim(top=0, bottom=60)
