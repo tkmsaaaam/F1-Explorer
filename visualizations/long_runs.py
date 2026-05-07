@@ -54,9 +54,9 @@ def plot_by_tyre_age_and_tyre(session: Session, log: Logger):
             line_style = "solid" if constants.camera[session.event.year].get(stint.get_driver().get_number(),
                                                                              'black') == "black" else "dashed"
             if stint.get_driver().get_number() in legends:
-                ax.plot(x, y, linewidth=1, color=color, linestyle=line_style)
+                ax.plot(x, y, linewidth=0.5, color=color, linestyle=line_style)
             else:
-                ax.plot(x, y, linewidth=1, color=color, linestyle=line_style, label=stint.get_driver().get_number())
+                ax.plot(x, y, linewidth=0.5, color=color, linestyle=line_style, label=stint.get_driver().get_number())
                 legends.add(stint.get_driver().get_number())
         ax.legend(fontsize='small')
         ax.invert_yaxis()

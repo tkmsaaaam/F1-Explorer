@@ -563,7 +563,7 @@ def plot_speed_distance_comparison(session: Session, log: Logger):
             style = "solid" if constants.camera[session.event.year].get(int(driver_number),
                                                                         'black') == "black" else "dashed"
             ax.plot(car_data.Distance, car_data.Speed,
-                    color=team_color, label=laps.Driver, linestyle=style)
+                    color=team_color, label=laps.Driver, linestyle=style, linewidth=1, alpha=0.5)
         v_min, v_max = float('inf'), float('-inf')
         for driver_number in driver_group:
             laps = session.laps.pick_drivers(driver_number).pick_fastest()
@@ -799,8 +799,8 @@ def _plot_driver_telemetry(session: Session, log: Logger,
             line_style = 'solid' if camera_color == 'black' else 'dashed'
 
             y_data = value_func(car_data)
-            ax.plot(car_data.Distance, y_data, label=driver_name,
-                    color=team_color, linestyle=line_style)
+            ax.plot(car_data.Distance, y_data, label=driver_name, linewidth=1,
+                    color=team_color, linestyle=line_style, alpha=0.5)
             v_min, v_max = min(v_min, y_data.min()), max(v_max, y_data.max())
 
         if v_min == float('inf') or v_max == float('-inf'):

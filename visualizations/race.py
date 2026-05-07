@@ -375,7 +375,7 @@ def speed_first_10s(log: Logger, filepath: str, session: Session) -> None:
         ax.plot(
             car_data.TimeSeconds,
             car_data.Speed,
-            label=lap.Driver,
+            label=lap.Driver, linewidth=0.5,
             color=constants.team_color[session.event.EventDate.year][driver_number],
             linestyle="solid" if constants.camera[session.event.year].get(driver_number,
                                                                           'black') == "black" else "dashed"
@@ -411,7 +411,7 @@ def speed_until_turn1(log: Logger, filepath: str, session: Session) -> None:
         ax.plot(
             car_data.Distance,
             car_data.Speed,
-            label=lap.Driver,
+            label=lap.Driver, linewidth=0.5,
             color=constants.team_color[session.event.EventDate.year][driver_number],
             linestyle="solid" if constants.camera[session.event.year].get(driver_number,
                                                                           'black') == "black" else "dashed"
