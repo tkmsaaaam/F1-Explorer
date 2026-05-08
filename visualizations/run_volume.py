@@ -6,6 +6,7 @@ import pandas
 from fastf1.core import Session
 from matplotlib import pyplot as plt
 from numpy import datetime64
+# noinspection PyPackageRequirements
 from opentelemetry import trace
 from plotly import graph_objects
 
@@ -33,11 +34,13 @@ def plot_lap_number_by_timing(session: Session, log: Logger):
         lap_numbers = stint_laps['LapNumber']
         lap_starts = stint_laps['LapStartDate']
         if stint_num == 1:
+            # noinspection PyTypeChecker
             ax.plot(lap_starts, lap_numbers, color=color,
                     linestyle="solid" if constants.camera[session.event.year].get(int(driver_number),
                                                                                   'black') == "black" else "dashed",
                     label=driver_name)
         else:
+            # noinspection PyTypeChecker
             ax.plot(lap_starts, lap_numbers, color=color,
                     linestyle="solid" if constants.camera[session.event.year].get(int(driver_number),
                                                                                   'black') == "black" else "dashed")
@@ -83,7 +86,7 @@ def plot_laptime(session: Session, log: Logger):
         data_rows.append(lap_times)
         fill_colors.append(bg_colors)
 
-    # テーブル描画
+    # noinspection SpellCheckingInspection
     fig = graph_objects.Figure(data=[graph_objects.Table(
         header={'values': header, 'fill_color': 'lightgrey', 'align': 'center'},
         cells={'values': data_rows, 'fill_color': fill_colors, 'align': 'center'}
@@ -118,6 +121,7 @@ def plot_laptime_by_lap_number(session: Session, log: Logger):
                 linestyle="solid" if constants.camera[session.event.year].get(int(stint_laps.DriverNumber.iloc[0]),
                                                                               'black') == "black" else "dashed",
                 label=driver_name)
+    # noinspection PyUnresolvedReferences
     minimum = session.laps.LapTime.min().total_seconds()
     ax.set_ylim(top=minimum, bottom=minimum * 1.25)
     ax.legend(fontsize='small')
@@ -160,6 +164,7 @@ def plot_laptime_by_timing(session: Session, log: Logger):
                 linestyle="solid" if constants.camera[session.event.year].get(stint_laps.DriverNumber.iloc[0],
                                                                               'black') == "black" else "dashed",
                 label=driver_name)
+    # noinspection PyUnresolvedReferences
     minimum = session.laps.LapTime.min().seconds
     ax.set_ylim(top=minimum, bottom=minimum * 1.25)
     output_path = f"./images/{session.event.year}/{session.event.RoundNumber}_{session.event.Location}/{session.name.replace(' ', '')}/laptime_by_timing.png"

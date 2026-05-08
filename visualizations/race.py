@@ -7,6 +7,7 @@ import pandas
 from fastf1.core import Session, Laps
 from matplotlib import pyplot as plt
 from matplotlib.patches import Patch
+# noinspection PyPackageRequirements
 from opentelemetry import trace
 from plotly import graph_objects
 
@@ -41,7 +42,7 @@ def execute(session: Session, log: Logger, images_path: str, logs_path: str, lap
         os.remove(f"{logs_path}/timestamp.txt")
     except FileNotFoundError:
         pass
-    util.write_to_file_top(f"{logs_path}/timestamp.txt", str(datetime.datetime.now()))
+    util.write_to_file_top(f"{logs_path}/timestamp.txt", datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
 
 
 class DriverLaps:
@@ -64,6 +65,7 @@ def make_driver_laps_set(laps: Laps) -> set[DriverLaps]:
                                 stint_laps.Team.iloc[0])
         laps: dict[int, Lap] = {}
         for i in range(0, len(stint_laps)):
+            # noinspection PyTypeChecker
             lap: Lap = Lap(stint_laps.LapTime.iloc[i].total_seconds(), stint_laps.Time.iloc[i],
                            stint_laps.Position.iloc[i], pandas.isna(stint_laps.PitOutTime.iloc[i]),
                            Tyre(stint_laps.Compound.iloc[i], stint_laps.FreshTyre.iloc[i]))
@@ -86,7 +88,7 @@ def make_lap_start_by_position_by_number(laps: Laps) -> dict[int, dict[int, date
 
 
 @tracer.start_as_current_span("laptime")
-def laptime(log: Logger, filepath: str, filename: str, session: Session, r: int, lap_logs: set[DriverLaps]):
+def laptime(log: Logger, filepath: str, filename: str, session: Session, r: int | None, lap_logs: set[DriverLaps]):
     """x = ラップ番号, y = ラップタイムのドライバーごとの推移
     Args:
         log: ロガー
@@ -99,7 +101,10 @@ def laptime(log: Logger, filepath: str, filename: str, session: Session, r: int,
     fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
     for lap_log in lap_logs:
         lap_numbers = sorted(lap_log.get_laps().keys())
-        lap_times = [lap_log.get_laps().get(i).get_time() for i in lap_numbers]
+        lap_times = [
+            l.get_time() if (l := lap_log.get_laps().get(i)) is not None else None
+            for i in lap_numbers
+        ]
         color = fastf1.plotting.get_team_color(lap_log.get_driver().get_team_name(), session)
         ax.plot(lap_numbers, lap_times, color=color, label=lap_log.get_driver().get_name(), linewidth=0.5,
                 linestyle="solid" if constants.camera[session.event.year].get(lap_log.get_driver().get_number(),
@@ -165,11 +170,25 @@ def gap_to_ahead_table(log: Logger, filepath: str, lap_logs: set[DriverLaps],
         end = int(max(lap_keys))
         for i in range(start, end):
             lap = driver_laps.get_laps().get(i)
+            if lap is None:
+                gaps.append('---')
+                colors.append('#ffffff')
+                continue
             if lap.get_position() == 1:
                 gaps.append("{:.3f}".format(0))
                 colors.append('#ffffff')
                 continue
-            diff = (lap.get_at() - position_logs.get(i).get(lap.get_position() - 1)).total_seconds()
+            positions_by_lap = position_logs.get(i)
+            if positions_by_lap is None:
+                gaps.append('---')
+                colors.append('#ffffff')
+                continue
+            ahead = positions_by_lap.get(lap.get_position() - 1)
+            if ahead is None:
+                gaps.append('---')
+                colors.append('#ffffff')
+                continue
+            diff = (lap.get_at() - ahead).total_seconds()
             gaps.append(diff)
             if diff < 3:
                 colors.append('#9966ff')
@@ -182,7 +201,7 @@ def gap_to_ahead_table(log: Logger, filepath: str, lap_logs: set[DriverLaps],
         header.append(driver_laps.get_driver().get_name())
         all_gaps.append(gaps)
         fill_colors.append(colors)
-
+    # noinspection SpellCheckingInspection
     fig = graph_objects.Figure(data=[graph_objects.Table(
         header={'values': header, 'fill_color': 'lightgrey', 'align': 'center'},
         cells={'values': [list(range(1, max_laps + 1))] + all_gaps,
@@ -222,11 +241,20 @@ def gap_to_top_table(log: Logger, filepath: str, lap_logs: set[DriverLaps], sess
         end = int(max(lap_keys))
         for i in range(start, end):
             lap = driver_laps.get_laps().get(i)
+            if lap is None:
+                gaps.append('---')
+                colors.append('#ffffff')
+                continue
             if lap.get_position() == 1:
                 gaps.append("{:.3f}".format(0))
                 colors.append('gold')
                 continue
-            diff = (lap.get_at() - top_time_map.get(i)).total_seconds()
+            top = top_time_map.get(i)
+            if top is None:
+                gaps.append('---')
+                colors.append('#ffffff')
+                continue
+            diff = (lap.get_at() - top).total_seconds()
             gaps.append(diff)
             if diff < 5:
                 colors.append('#9966ff')
@@ -239,7 +267,7 @@ def gap_to_top_table(log: Logger, filepath: str, lap_logs: set[DriverLaps], sess
         header.append(driver_laps.get_driver().get_name())
         all_gaps.append(gaps)
         fill_colors.append(colors)
-
+    # noinspection SpellCheckingInspection
     fig = graph_objects.Figure(data=[graph_objects.Table(
         header={'values': header, 'fill_color': 'lightgrey', 'align': 'center'},
         cells={'values': [list(range(1, max_laps + 1))] + all_gaps,
@@ -253,7 +281,8 @@ def gap_to_top_table(log: Logger, filepath: str, lap_logs: set[DriverLaps], sess
 
 
 @tracer.start_as_current_span("gap_to_ahead")
-def gap_to_ahead_graph(log: Logger, filepath: str, filename: str, session: Session, r: int, lap_logs: set[DriverLaps],
+def gap_to_ahead_graph(log: Logger, filepath: str, filename: str, session: Session, r: int | None,
+                       lap_logs: set[DriverLaps],
                        position_logs: dict[int, dict[int, datetime.datetime]]):
     """x = ラップ番号, y = 前走とのギャップのドライバーごとの推移
     Args:
@@ -268,8 +297,13 @@ def gap_to_ahead_graph(log: Logger, filepath: str, filename: str, session: Sessi
     fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
     for driver_laps in lap_logs:
         x = sorted(driver_laps.get_laps().keys())
-        y = [(driver_laps.get_laps().get(i).get_at() - position_logs.get(i).get(
-            driver_laps.get_laps().get(i).get_position() - 1)).total_seconds() for i in x]
+        y = [
+            ((l := driver_laps.get_laps().get(i)) is not None and
+             (p_log := position_logs.get(i)) is not None and
+             (p_target := p_log.get(l.get_position() - 1)) is not None
+             ) and (l.get_at() - p_target).total_seconds() or 0
+            for i in x
+        ]
         line_style = "solid" if constants.camera[session.event.year].get(driver_laps.get_driver().get_number(),
                                                                          'black') == "black" else "dashed"
         ax.plot(x, y, color=fastf1.plotting.get_team_color(driver_laps.get_driver().get_team_name(), session),
@@ -293,7 +327,8 @@ def gap_to_ahead_graph(log: Logger, filepath: str, filename: str, session: Sessi
 
 
 @tracer.start_as_current_span("gap_to_top")
-def gap_to_top_graph(log: Logger, filepath: str, filename: str, session: Session, r: int, lap_logs: set[DriverLaps]):
+def gap_to_top_graph(log: Logger, filepath: str, filename: str, session: Session, r: int | None,
+                     lap_logs: set[DriverLaps]):
     """x = ラップ番号, y = トップとのギャップのドライバーごとの推移
     Args:
         log: ロガー
@@ -308,7 +343,12 @@ def gap_to_top_graph(log: Logger, filepath: str, filename: str, session: Session
     for lap_log in lap_logs:
         color = fastf1.plotting.get_team_color(lap_log.get_driver().get_team_name(), session)
         x = sorted(lap_log.get_laps().keys())
-        y = [(lap_log.get_laps().get(i).get_at() - top_time_map.get(i)).total_seconds() for i in x]
+        y = [
+            (l.get_at() - t).total_seconds()
+            if (l := lap_log.get_laps().get(i)) is not None and (t := top_time_map.get(i)) is not None
+            else 0
+            for i in x
+        ]
         line_style = "solid" if constants.camera[session.event.year].get(lap_log.get_driver().get_number(),
                                                                          'black') == "black" else "dashed"
         ax.plot(x, y, linewidth=0.5, color=color, label=lap_log.get_driver().get_name(), linestyle=line_style)
@@ -344,7 +384,10 @@ def positions(log: Logger, filepath: str, session: Session, lap_logs: set[Driver
     for lap_log in lap_logs:
         color = fastf1.plotting.get_team_color(lap_log.get_driver().get_team_name(), session)
         x = sorted(lap_log.get_laps().keys())
-        y = [lap_log.get_laps().get(i).get_position() for i in x]
+        y = [
+            l.get_position() if (l := lap_log.get_laps().get(i)) is not None else 0
+            for i in x
+        ]
         line_style = "solid" if constants.camera[session.event.year].get(lap_log.get_driver().get_number(),
                                                                          'black') == "black" else "dashed"
         ax.plot(x, y, linewidth=1, color=color, label=lap_log.get_driver().get_name(), linestyle=line_style)
@@ -397,7 +440,10 @@ def speed_first_10s(log: Logger, filepath: str, session: Session) -> None:
 @tracer.start_as_current_span("speed_until_turn1")
 def speed_until_turn1(log: Logger, filepath: str, session: Session) -> None:
     fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
-    first_corner_distance = session.get_circuit_info().corners.iloc[0].Distance
+    circuit_info = session.get_circuit_info()
+    if circuit_info is None:
+        return
+    first_corner_distance = circuit_info.corners.iloc[0].Distance
     v_min = float('inf')
     v_max = float('-inf')
     for driver in session.drivers:
@@ -416,7 +462,9 @@ def speed_until_turn1(log: Logger, filepath: str, session: Session) -> None:
             linestyle="solid" if constants.camera[session.event.year].get(driver_number,
                                                                           'black') == "black" else "dashed"
         )
+        # noinspection PyCallingNonCallable
         v_min = min(v_min, int(car_data.Speed.min()) + 50)
+        # noinspection PyCallingNonCallable
         v_max = max(v_max, int(car_data.Speed.max()) + 10)
     ax.set_xlabel("Distance (m)")
     ax.set_ylabel("Speed (km/h)")
@@ -445,16 +493,22 @@ def tyres(log: Logger, filepath: str, lap_logs: set[DriverLaps]):
         x = sorted(lap_log.get_laps().keys())
         start = 0
         for i in x:
-            if not lap_log.get_laps().get(i).get_pit_out() and i != max(x):
+            lap = lap_log.get_laps().get(i)
+            if lap is None:
+                continue
+            if not lap.get_pit_out() and i != max(x):
                 continue
             j = i - 1
             if j < 1:
                 continue
+            previous = lap_log.get_laps().get(j)
+            if previous is None:
+                continue
             ax.barh(y=y,
                     width=j - start,
                     left=start,
-                    color=constants.compound_color.get(lap_log.get_laps().get(j).get_tyre().get_compound(), 'gray'),
-                    edgecolor='black' if lap_log.get_laps().get(j).get_tyre().get_new() else 'gray'
+                    color=constants.compound_color.get(previous.get_tyre().get_compound(), 'gray'),
+                    edgecolor='black' if previous.get_tyre().get_new() else 'gray'
                     )
             start = j
         y += 1

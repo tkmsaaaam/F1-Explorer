@@ -1,4 +1,5 @@
 import fastf1
+# noinspection PyPackageRequirements
 from opentelemetry import trace
 
 import setup
@@ -44,7 +45,9 @@ def __main():
     short_runs.plot_best_laptime(session, log, 'LapTime')
 
     short_runs.plot_best_speed(session, log, 'SpeedFL')
+    # noinspection SpellCheckingInspection
     short_runs.plot_best_speed(session, log, 'SpeedI1')
+    # noinspection SpellCheckingInspection
     short_runs.plot_best_speed(session, log, 'SpeedI2')
     short_runs.plot_best_speed(session, log, 'SpeedST')
 

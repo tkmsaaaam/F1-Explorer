@@ -4,6 +4,7 @@ from logging import Logger
 from typing import Final
 
 import fastf1
+# noinspection PyPackageRequirements
 from opentelemetry import trace
 from plotly import graph_objects
 

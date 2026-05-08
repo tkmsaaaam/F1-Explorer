@@ -3,6 +3,7 @@ from logging import Logger
 
 from fastf1.core import Session
 from matplotlib import pyplot as plt
+# noinspection PyPackageRequirements
 from opentelemetry import trace
 
 tracer = trace.get_tracer(__name__)

@@ -10,6 +10,7 @@ import numpy
 from fastf1.core import DriverResult
 from fastf1.events import EventSchedule
 from matplotlib import pyplot as plt
+# noinspection PyPackageRequirements
 from opentelemetry import trace
 from plotly import graph_objects
 
@@ -73,6 +74,7 @@ def __save_events(base_dir: str, log: Logger, schedule: EventSchedule):
     output_path = f"{base_dir}/events.png"
     if os.path.exists(output_path):
         return
+    # noinspection SpellCheckingInspection
     fig = graph_objects.Figure(data=[graph_objects.Table(
         header={'values': ["number", "name", "sprint", "datetime"], 'fill_color': 'lightgrey', 'align': 'center'},
         cells={'values': [[event.RoundNumber for _, event in schedule.iterrows()],
@@ -293,7 +295,7 @@ def __main():
     ]
 
     topic_colors = [['lightgrey'] * (len(schedule) + 1)]
-
+    # noinspection SpellCheckingInspection
     fig = graph_objects.Figure(data=[graph_objects.Table(
         header={'values': headers, 'fill_color': header_colors, 'align': 'center'},
         cells={'values': round_numbers + event_names + [values_map[k] for k in drivers_standing],

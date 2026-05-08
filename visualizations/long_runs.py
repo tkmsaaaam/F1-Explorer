@@ -4,6 +4,7 @@ from logging import Logger
 import fastf1
 from fastf1.core import Session, Laps
 from matplotlib import pyplot as plt
+# noinspection PyPackageRequirements
 from opentelemetry import trace
 
 import constants
@@ -18,12 +19,14 @@ def make_stint_set(min_consecutive_laps: int, all_laps: Laps, compound: str) -> 
     laps: Laps = all_laps[all_laps.Compound == compound]
     grouped_by_driver = laps.sort_values(by='TyreLife').groupby(['DriverNumber', 'Stint'])
     for (driver_number_str, _), stint_laps in grouped_by_driver:
+        # noinspection PyTypeChecker
         driver_number = int(driver_number_str)
         if len(stint_laps) < min_consecutive_laps:
             continue
         first_lap = stint_laps.iloc[0]
         lap_map: dict[int, float] = {}
         for i in range(0, len(stint_laps)):
+            # noinspection PyUnresolvedReferences
             if stint_laps.iloc[i].LapTime.total_seconds() > all_laps.LapTime.min().total_seconds() * 1.2:
                 continue
             lap_map[stint_laps.iloc[i].TyreLife] = stint_laps.iloc[i].LapTime.total_seconds()
