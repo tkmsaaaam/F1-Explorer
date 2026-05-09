@@ -113,23 +113,32 @@ def __main():
         if now < event.EventDate:
             break
         if event.RoundNumber not in results:
+            # noinspection PyTypeChecker
             results[event.RoundNumber] = Weekend(event.EventName)
 
+        # noinspection PyTypeChecker
         gp: Weekend = results[event.RoundNumber]
         if event.EventFormat == "sprint_qualifying":
+            # noinspection PyTypeChecker
             sprint = fastf1.get_session(config.get_year(), event.EventName, "S")
             sprint.load(laps=False, telemetry=False, weather=False, messages=False)
             for driver_row in sprint.results.itertuples(index=False):
+                # noinspection PyTypeChecker
                 gp.set_sprint_point(driver_row.Abbreviation, driver_row.Points)
 
+        # noinspection PyTypeChecker
         race = fastf1.get_session(config.get_year(), event.EventName, "R")
         race.load(laps=False, telemetry=False, weather=False, messages=False)
         for driver_row in race.results.itertuples(index=False):
             abbreviation = driver_row.Abbreviation
+            # noinspection PyTypeChecker
             gp.set_grid_position(abbreviation, driver_row.GridPosition)
+            # noinspection PyTypeChecker
             gp.set_position(abbreviation, driver_row.Position)
+            # noinspection PyTypeChecker
             gp.set_point(abbreviation, driver_row.Points)
             if driver_row.DriverNumber not in drivers:
+                # noinspection PyTypeChecker
                 drivers[int(driver_row.DriverNumber)] = race.get_driver(abbreviation)
 
     base_dir: Final = f"./images/{config.get_year()}"
@@ -289,7 +298,7 @@ def __main():
 
     round_numbers = [sorted(results.keys()) + summaries + [f"{i}" for i in one_to_ten]]
     event_names = [
-        [results.get(i).get_gp_name() for i in sorted(results.keys())]
+        [r.get_gp_name() if (r := results.get(i)) is not None else "---" for i in sorted(results.keys())]
         + [""] * len(summaries)
         + [""] * len(one_to_ten)
     ]
