@@ -16,7 +16,8 @@ tracer = trace.get_tracer(__name__)
 @tracer.start_as_current_span("plot_tyre")
 def plot_tyre(year: int, race_number: int, log: Logger):
     drivers = {}
-    sessions: Final[list[str]] = ['FP1', 'FP2', 'FP3', 'SQ', 'SR', 'Q', 'R']
+    sessions: Final[list[str]] = ['FP1', 'FP2', 'FP3', 'SQ', 'S', 'Q', 'R']
+    session = None
     for session_name in sessions:
         try:
             session = fastf1.get_session(year, race_number, session_name)
@@ -49,7 +50,10 @@ def plot_tyre(year: int, race_number: int, log: Logger):
                 else:
                     drivers[driver_name] = {'Sessions': session_names, 'Colors': bg_colors}
 
-    driver_names = list(drivers.keys())
+    if session is None:
+        return
+
+    driver_names = session.results.Abbreviation.to_list()
     # データの最大行数を取得
     max_rows = max(len(d["Sessions"]) for d in drivers.values())
 
