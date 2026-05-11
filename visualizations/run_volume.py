@@ -80,10 +80,12 @@ def plot_laptime(session: Session, log: Logger):
                 lap_times.append(lap.LapTime.total_seconds())
             elif pandas.isna(lap.PitOutTime):
                 i = lap.LapStartTime.total_seconds() + lap.LapTime.total_seconds() - lap.PitInTime.total_seconds()
-                lap_times.append(f"{lap.LapTime.total_seconds()}<br>({"{:.3f}".format(i)})")
+                lap_times.append(
+                    f"{lap.LapTime.total_seconds()}<br>({"{:.3f}".format(i)}<br>{"{:.3f}".format(lap.LapTime.total_seconds() - i)})")
             elif pandas.isna(lap.PitInTime):
                 o = lap.PitOutTime.total_seconds() - lap.LapStartTime.total_seconds()
-                lap_times.append(f"{lap.LapTime.total_seconds()}<br>({"{:.3f}".format(o)})")
+                lap_times.append(
+                    f"{lap.LapTime.total_seconds()}<br>({"{:.3f}".format(o)}<br>{"{:.3f}".format(lap.LapTime.total_seconds() - o)})")
             else:
                 i = lap.LapStartTime.total_seconds() + lap.LapTime.total_seconds() - lap.PitInTime.total_seconds()
                 o = lap.PitOutTime.total_seconds() - lap.LapStartTime.total_seconds()
