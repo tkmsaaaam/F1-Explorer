@@ -76,7 +76,18 @@ def plot_laptime(session: Session, log: Logger):
         bg_colors = []
         for i in range(0, len(driver_laps)):
             lap = driver_laps.iloc[i]
-            lap_times.append(lap.LapTime.total_seconds())
+            if pandas.isna(lap.PitInTime) and pandas.isna(lap.PitOutTime):
+                lap_times.append(lap.LapTime.total_seconds())
+            elif pandas.isna(lap.PitOutTime):
+                i = lap.LapStartTime.total_seconds() + lap.LapTime.total_seconds() - lap.PitInTime.total_seconds()
+                lap_times.append(f"{lap.LapTime.total_seconds()}<br>({"{:.3f}".format(i)})")
+            elif pandas.isna(lap.PitInTime):
+                o = lap.PitOutTime.total_seconds() - lap.LapStartTime.total_seconds()
+                lap_times.append(f"{lap.LapTime.total_seconds()}<br>({"{:.3f}".format(o)})")
+            else:
+                i = lap.LapStartTime.total_seconds() + lap.LapTime.total_seconds() - lap.PitInTime.total_seconds()
+                o = lap.PitOutTime.total_seconds() - lap.LapStartTime.total_seconds()
+                lap_times.append(f"{lap.LapTime.total_seconds()}<br>({"{:.3f}".format(i)}<br>/{"{:.3f}".format(o)})")
             compound = lap.Compound
             bg_colors.append(constants.compound_color.get(compound, "#dddddd"))
         if len(driver_laps) < max_laps:
