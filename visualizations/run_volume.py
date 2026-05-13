@@ -118,10 +118,12 @@ def plot_pit_time(session: Session, log: Logger):
         session: セッション
         log: ロガー
     """
-    header = [session.get_driver(driver_number)['Abbreviation'] for driver_number in session.drivers]
+    header = [session.get_driver(driver_number)['Abbreviation'] for driver_number in session.drivers] + ['avg']
 
     laps = session.laps
     data_rows = []
+    sum = 0
+    count = 0
 
     for driver in header:
         driver_laps = laps[laps['Driver'] == driver].sort_values(by='LapNumber')
@@ -136,8 +138,12 @@ def plot_pit_time(session: Session, log: Logger):
                     j].LapTime.total_seconds() - driver_laps.iloc[j].PitInTime.total_seconds()
                 outTime = lap.PitOutTime.total_seconds() - lap.LapStartTime.total_seconds()
                 pit = inTime + outTime
-                lap_times.append("{:.3f}".format(pit))
+                lap_times.append(f"{"{:.3f}".format(pit)}<br>{"{:.3f}".format(inTime)}<br>{"{:.3f}".format(outTime)}")
+                sum += pit
+                count += 1
         data_rows.append(lap_times)
+
+    data_rows.append([f"{count}<br>{"{:.3f}".format(sum / count)}"])
 
     # noinspection SpellCheckingInspection
     fig = graph_objects.Figure(data=[graph_objects.Table(
