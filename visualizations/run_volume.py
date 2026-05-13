@@ -111,6 +111,46 @@ def plot_laptime(session: Session, log: Logger):
     log.info(f"Saved plot to {output_path}")
 
 
+@tracer.start_as_current_span("plot_pit_time")
+def plot_pit_time(session: Session, log: Logger):
+    """pitのタイムの一覧を作成する
+    Args:
+        session: セッション
+        log: ロガー
+    """
+    header = [session.get_driver(driver_number)['Abbreviation'] for driver_number in session.drivers]
+
+    laps = session.laps
+    data_rows = []
+
+    for driver in header:
+        driver_laps = laps[laps['Driver'] == driver].sort_values(by='LapNumber')
+        lap_times = []
+        for i in range(0, len(driver_laps)):
+            lap = driver_laps.iloc[i]
+            if not pandas.isna(lap.PitOutTime):
+                j = i - 1
+                if j < 1:
+                    continue
+                inTime = driver_laps.iloc[j].LapStartTime.total_seconds() + driver_laps.iloc[
+                    j].LapTime.total_seconds() - driver_laps.iloc[j].PitInTime.total_seconds()
+                outTime = lap.PitOutTime.total_seconds() - lap.LapStartTime.total_seconds()
+                pit = inTime + outTime
+                lap_times.append("{:.3f}".format(pit))
+        data_rows.append(lap_times)
+
+    # noinspection SpellCheckingInspection
+    fig = graph_objects.Figure(data=[graph_objects.Table(
+        header={'values': header, 'fill_color': 'lightgrey', 'align': 'center'},
+        cells={'values': data_rows, 'align': 'center'}
+    )], layout={'autosize': True, 'margin': {'autoexpand': True}})
+
+    output_path = f"./images/{session.event.year}/{session.event.RoundNumber}_{session.event.Location}/{session.name.replace(' ', '')}/pittime_table.png"
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+    fig.write_image(output_path, width=1920, height=2160)
+    log.info(f"Saved plot to {output_path}")
+
+
 @tracer.start_as_current_span("plot_laptime_by_lap_number")
 def plot_laptime_by_lap_number(session: Session, log: Logger):
     """
