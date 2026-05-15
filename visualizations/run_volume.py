@@ -122,28 +122,32 @@ def plot_pit_time(session: Session, log: Logger):
 
     laps = session.laps
     data_rows = []
-    sum = 0
+    total = 0
     count = 0
 
     for driver in header:
         driver_laps = laps[laps['Driver'] == driver].sort_values(by='LapNumber')
         lap_times = []
         for i in range(0, len(driver_laps)):
-            lap = driver_laps.iloc[i]
-            if not pandas.isna(lap.PitOutTime):
+            inLap = driver_laps.iloc[i]
+            if not pandas.isna(inLap.PitOutTime):
                 j = i - 1
                 if j < 1:
                     continue
-                inTime = driver_laps.iloc[j].LapStartTime.total_seconds() + driver_laps.iloc[
-                    j].LapTime.total_seconds() - driver_laps.iloc[j].PitInTime.total_seconds()
-                outTime = lap.PitOutTime.total_seconds() - lap.LapStartTime.total_seconds()
-                pit = inTime + outTime
-                lap_times.append(f"{"{:.3f}".format(pit)}<br>{"{:.3f}".format(inTime)}<br>{"{:.3f}".format(outTime)}")
-                sum += pit
+                outLap = driver_laps.iloc[j]
+                inLapTime = outLap.LapTime.total_seconds()
+                outLapTime = inLap.LapTime.total_seconds()
+                sum = inLapTime + outLapTime
+
+                pitInTime = outLap.LapStartTime.total_seconds() + outLap.LapTime.total_seconds() - outLap.PitInTime.total_seconds()
+                pitOutTime = inLap.PitOutTime.total_seconds() - inLap.LapStartTime.total_seconds()
+                pit = pitInTime + pitOutTime
+                lap_times.append(f"{"{:.3f}".format(pit)}<br>{"{:.3f}".format(pitInTime)}<br>{"{:.3f}".format(pitOutTime)}<br>{"{:.3f}".format(inLapTime)}<br>{"{:.3f}".format(outLapTime)}<br>{"{:.3f}".format(sum)}")
+                total += pit
                 count += 1
         data_rows.append(lap_times)
 
-    data_rows.append([f"{count}<br>{"{:.3f}".format(sum / count)}"])
+    data_rows.append([f"{count}<br>{"{:.3f}".format(total / count)}"])
 
     # noinspection SpellCheckingInspection
     fig = graph_objects.Figure(data=[graph_objects.Table(
