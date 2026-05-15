@@ -127,6 +127,8 @@ def plot_pit_time(session: Session, log: Logger):
 
     for driver in header:
         driver_laps = laps[laps['Driver'] == driver].sort_values(by='LapNumber')
+        if driver_laps is None:
+            continue
         lap_times = []
         for i in range(0, len(driver_laps)):
             inLap = driver_laps.iloc[i]
