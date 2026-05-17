@@ -118,16 +118,19 @@ def plot_pit_time(session: Session, log: Logger):
         session: セッション
         log: ロガー
     """
-    header = [session.get_driver(driver_number)['Abbreviation'] for driver_number in session.drivers] + ['avg']
+    header = [""] + [session.get_driver(driver_number)['Abbreviation'] for driver_number in session.drivers] + ['avg']
 
     laps = session.laps
     data_rows = []
     total = 0
     count = 0
+    data_rows.append(["No<br>pit<br>in<br>out<br>in<br>out<br>sum"])
 
     for driver in header:
         driver_laps = laps[laps['Driver'] == driver].sort_values(by='LapNumber')
         if driver_laps is None:
+            continue
+        if len(driver_laps) < 1:
             continue
         lap_times = []
         for i in range(0, len(driver_laps)):
@@ -144,7 +147,8 @@ def plot_pit_time(session: Session, log: Logger):
                 pitInTime = outLap.LapStartTime.total_seconds() + outLap.LapTime.total_seconds() - outLap.PitInTime.total_seconds()
                 pitOutTime = inLap.PitOutTime.total_seconds() - inLap.LapStartTime.total_seconds()
                 pit = pitInTime + pitOutTime
-                lap_times.append(f"{"{:.3f}".format(pit)}<br>{"{:.3f}".format(pitInTime)}<br>{"{:.3f}".format(pitOutTime)}<br>{"{:.3f}".format(inLapTime)}<br>{"{:.3f}".format(outLapTime)}<br>{"{:.3f}".format(sum)}")
+                lap_times.append(
+                    f"{inLap.LapNumber}<br>{"{:.3f}".format(pit)}<br>{"{:.3f}".format(pitInTime)}<br>{"{:.3f}".format(pitOutTime)}<br>{"{:.3f}".format(inLapTime)}<br>{"{:.3f}".format(outLapTime)}<br>{"{:.3f}".format(sum)}")
                 total += pit
                 count += 1
         data_rows.append(lap_times)
