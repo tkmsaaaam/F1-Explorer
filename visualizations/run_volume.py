@@ -124,6 +124,8 @@ def plot_pit_time(session: Session, log: Logger):
     data_rows = []
     total = 0
     count = 0
+    fastest = 100
+    slowest = 0
     data_rows.append(["No<br>pit<br>in<br>out<br>in<br>out<br>sum"])
 
     for driver in header:
@@ -151,9 +153,13 @@ def plot_pit_time(session: Session, log: Logger):
                     f"{inLap.LapNumber}<br>{"{:.3f}".format(pit)}<br>{"{:.3f}".format(pitInTime)}<br>{"{:.3f}".format(pitOutTime)}<br>{"{:.3f}".format(inLapTime)}<br>{"{:.3f}".format(outLapTime)}<br>{"{:.3f}".format(sum)}")
                 total += pit
                 count += 1
+                if pit < fastest:
+                    fastest = pit
+                if pit > slowest:
+                    slowest = pit
         data_rows.append(lap_times)
 
-    data_rows.append([f"{count}<br>{"{:.3f}".format(total / count)}"])
+    data_rows.append([f"{count}<br>{"{:.3f}".format(total / count)}<br>{"{:.3f}".format(fastest)}<br>{"{:.3f}".format(slowest)}"])
 
     # noinspection SpellCheckingInspection
     fig = graph_objects.Figure(data=[graph_objects.Table(
