@@ -137,7 +137,7 @@ def plot_pit_time(session: Session, log: Logger):
         lap_times = []
         for i in range(0, len(driver_laps)):
             inLap = driver_laps.iloc[i]
-            if not pandas.isna(inLap.PitOutTime):
+            if pandas.isna(inLap.PitOutTime).empty:
                 j = i - 1
                 if j < 1:
                     continue
