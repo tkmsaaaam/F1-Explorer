@@ -118,7 +118,7 @@ def plot_pit_time(session: Session, log: Logger):
         session: セッション
         log: ロガー
     """
-    header = [""] + [session.get_driver(driver_number)['Abbreviation'] for driver_number in session.drivers] + ['avg']
+    header = [""]
 
     laps = session.laps
     data_rows = []
@@ -128,16 +128,16 @@ def plot_pit_time(session: Session, log: Logger):
     slowest = 0
     data_rows.append(["No<br>pit<br>in<br>out<br>in<br>out<br>sum"])
 
-    for driver in header:
+    for n in session.drivers:
+        driver = session.get_driver(n)['Abbreviation']
         driver_laps = laps[laps['Driver'] == driver].sort_values(by='LapNumber')
         if driver_laps is None:
             continue
-        if len(driver_laps) < 1:
-            continue
         lap_times = []
+        header.append(driver)
         for i in range(0, len(driver_laps)):
             inLap = driver_laps.iloc[i]
-            if pandas.isna(inLap.PitOutTime).empty:
+            if pandas.isna(inLap.PitOutTime) == False:
                 j = i - 1
                 if j < 1:
                     continue
@@ -159,6 +159,7 @@ def plot_pit_time(session: Session, log: Logger):
                     slowest = pit
         data_rows.append(lap_times)
 
+    header.append('avg')
     data_rows.append([f"{count}<br>{"{:.3f}".format(total / count)}<br>{"{:.3f}".format(fastest)}<br>{"{:.3f}".format(slowest)}"])
 
     # noinspection SpellCheckingInspection
