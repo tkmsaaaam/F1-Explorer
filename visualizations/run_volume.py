@@ -119,48 +119,48 @@ def plot_pit_time(session: Session, log: Logger):
         log: ロガー
     """
     header = [""]
-
-    laps = session.laps
-    data_rows = []
-    total = 0
-    count = 0
-    fastest = 100
-    slowest = 0
-    data_rows.append(["No<br>pit<br>in<br>out<br>in<br>out<br>sum"])
-
+    data_rows = [["No<br>pit<br>in<br>out<br>in<br>out<br>sum"]]
+    pits = []
     for n in session.drivers:
         driver = session.get_driver(n)['Abbreviation']
-        driver_laps = laps[laps['Driver'] == driver].sort_values(by='LapNumber')
+        driver_laps = session.laps[session.laps['Driver'] == driver].sort_values(by='LapNumber')
         if driver_laps is None:
             continue
         lap_times = []
-        header.append(driver)
         for i in range(0, len(driver_laps)):
-            inLap = driver_laps.iloc[i]
-            if pandas.isna(inLap.PitOutTime) == False:
-                j = i - 1
-                if j < 1:
-                    continue
-                outLap = driver_laps.iloc[j]
-                inLapTime = outLap.LapTime.total_seconds()
-                outLapTime = inLap.LapTime.total_seconds()
-                sum = inLapTime + outLapTime
-
-                pitInTime = outLap.LapStartTime.total_seconds() + outLap.LapTime.total_seconds() - outLap.PitInTime.total_seconds()
-                pitOutTime = inLap.PitOutTime.total_seconds() - inLap.LapStartTime.total_seconds()
-                pit = pitInTime + pitOutTime
-                lap_times.append(
-                    f"{inLap.LapNumber}<br>{"{:.3f}".format(pit)}<br>{"{:.3f}".format(pitInTime)}<br>{"{:.3f}".format(pitOutTime)}<br>{"{:.3f}".format(inLapTime)}<br>{"{:.3f}".format(outLapTime)}<br>{"{:.3f}".format(sum)}")
-                total += pit
-                count += 1
-                if pit < fastest:
-                    fastest = pit
-                if pit > slowest:
-                    slowest = pit
+            outLap = driver_laps.iloc[i]
+            if pandas.isna(outLap.PitOutTime) == True:
+                continue
+            j = i - 1
+            if j < 1:
+                continue
+            inLap = driver_laps.iloc[j]
+            pitInTime = outLap.LapStartTime.total_seconds() - inLap.PitInTime.total_seconds()
+            pitOutTime = outLap.PitOutTime.total_seconds() - outLap.LapStartTime.total_seconds()
+            pit = pitInTime + pitOutTime
+            total = inLap.LapTime.total_seconds() + outLap.LapTime.total_seconds()
+            lap_times.append(
+                f"{outLap.LapNumber}"
+                f"<br>{"{:.3f}".format(pit)}"
+                f"<br>{"{:.3f}".format(pitInTime)}"
+                f"<br>{"{:.3f}".format(pitOutTime)}"
+                f"<br>{"{:.3f}".format(inLap.LapTime.total_seconds())}"
+                f"<br>{"{:.3f}".format(outLap.LapTime.total_seconds())}"
+                f"<br>{"{:.3f}".format(total)}"
+            )
+            pits.append(pit)
+        if len(lap_times) < 1:
+            continue
+        header.append(driver)
         data_rows.append(lap_times)
 
     header.append('avg')
-    data_rows.append([f"{count}<br>{"{:.3f}".format(total / count)}<br>{"{:.3f}".format(fastest)}<br>{"{:.3f}".format(slowest)}"])
+    data_rows.append([
+        f"{len(pits)}"
+        f"<br>{"{:.3f}".format(sum(pits) / len(pits))}"
+        f"<br>{"{:.3f}".format(min(pits))}"
+        f"<br>{"{:.3f}".format(max(pits))}"
+    ])
 
     # noinspection SpellCheckingInspection
     fig = graph_objects.Figure(data=[graph_objects.Table(
