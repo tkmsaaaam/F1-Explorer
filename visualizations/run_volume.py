@@ -2,6 +2,7 @@ import os
 from logging import Logger
 
 import fastf1.plotting
+import numpy
 import pandas
 from fastf1.core import Session
 from matplotlib import pyplot as plt
@@ -138,7 +139,6 @@ def plot_pit_time(session: Session, log: Logger):
             pitInTime = outLap.LapStartTime.total_seconds() - inLap.PitInTime.total_seconds()
             pitOutTime = outLap.PitOutTime.total_seconds() - outLap.LapStartTime.total_seconds()
             pit = pitInTime + pitOutTime
-            total = inLap.LapTime.total_seconds() + outLap.LapTime.total_seconds()
             lap_times.append(
                 f"{outLap.LapNumber}"
                 f"<br>{"{:.3f}".format(pit)}"
@@ -146,7 +146,7 @@ def plot_pit_time(session: Session, log: Logger):
                 f"<br>{"{:.3f}".format(pitOutTime)}"
                 f"<br>{"{:.3f}".format(inLap.LapTime.total_seconds())}"
                 f"<br>{"{:.3f}".format(outLap.LapTime.total_seconds())}"
-                f"<br>{"{:.3f}".format(total)}"
+                f"<br>{"{:.3f}".format(inLap.LapTime.total_seconds() + outLap.LapTime.total_seconds())}"
             )
             pits.append(pit)
         if len(lap_times) < 1:
@@ -157,7 +157,7 @@ def plot_pit_time(session: Session, log: Logger):
     header.append('avg')
     data_rows.append([
         f"{len(pits)}"
-        f"<br>{"{:.3f}".format(sum(pits) / len(pits))}"
+        f"<br>{"{:.3f}".format(numpy.mean(pits))}"
         f"<br>{"{:.3f}".format(min(pits))}"
         f"<br>{"{:.3f}".format(max(pits))}"
     ])
