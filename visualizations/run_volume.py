@@ -136,17 +136,17 @@ def plot_pit_time(session: Session, log: Logger):
             if j < 1:
                 continue
             inLap = driver_laps.iloc[j]
-            pitInTime = outLap.LapStartTime.total_seconds() - inLap.PitInTime.total_seconds()
-            pitOutTime = outLap.PitOutTime.total_seconds() - outLap.LapStartTime.total_seconds()
+            pitInTime = (outLap.LapStartTime - inLap.PitInTime).total_seconds()
+            pitOutTime = (outLap.PitOutTime - outLap.LapStartTime).total_seconds()
             pit = pitInTime + pitOutTime
             lap_times.append(
                 f"{outLap.LapNumber}"
                 f"<br>{"{:.3f}".format(pit)}"
-                f"<br>{"{:.3f}".format(pitInTime)}"
-                f"<br>{"{:.3f}".format(pitOutTime)}"
+                f"<br>{pitInTime}"
+                f"<br>{pitOutTime}"
                 f"<br>{"{:.3f}".format(inLap.LapTime.total_seconds())}"
                 f"<br>{"{:.3f}".format(outLap.LapTime.total_seconds())}"
-                f"<br>{"{:.3f}".format(inLap.LapTime.total_seconds() + outLap.LapTime.total_seconds())}"
+                f"<br>{(inLap.LapTime + outLap.LapTime).total_seconds()}"
             )
             pits.append(pit)
         if len(lap_times) < 1:
