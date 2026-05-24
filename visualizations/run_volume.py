@@ -30,7 +30,11 @@ def plot_lap_number_by_timing(session: Session, log: Logger):
         if stint_laps.empty:
             continue
         driver_name = stint_laps.Driver.iloc[0]
-        color = fastf1.plotting.get_team_color(stint_laps.Team.iloc[0], session)
+        team = stint_laps.Team.iloc[0]
+        if team == '':
+            color = 'white'
+        else:
+            color = fastf1.plotting.get_team_color(team, session)
         stint_laps = stint_laps.sort_values(by='LapNumber')
         lap_numbers = stint_laps['LapNumber']
         lap_starts = stint_laps['LapStartDate']
@@ -189,7 +193,11 @@ def plot_laptime_by_lap_number(session: Session, log: Logger):
         if stint_laps.empty:
             continue
         driver_name = stint_laps.Driver.iloc[0]
-        color = fastf1.plotting.get_team_color(stint_laps.Team.iloc[0], session)
+        team = stint_laps.Team.iloc[0]
+        if team == '':
+            color = 'white'
+        else:
+            color = fastf1.plotting.get_team_color(team, session)
         stint_laps = stint_laps.sort_values(by='LapNumber')
         lap_times = stint_laps['LapTime'].dt.total_seconds().tolist()
         lap_numbers = stint_laps['LapNumber']
@@ -224,7 +232,11 @@ def plot_laptime_by_timing(session: Session, log: Logger):
         if stint_laps.empty:
             continue
         driver_name = stint_laps.Driver.iloc[0]
-        color = fastf1.plotting.get_team_color(stint_laps.Team.iloc[0], session)
+        team = stint_laps.Team.iloc[0]
+        if team == '':
+            color = 'white'
+        else:
+            color = fastf1.plotting.get_team_color(team, session)
         stint_laps = stint_laps.sort_values(by='LapNumber')
         lap_times = stint_laps['LapTime'].dt.total_seconds().tolist()
         if not len(stint_laps['LapStartDate']) > 0:

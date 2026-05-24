@@ -199,7 +199,11 @@ def plot_best_laptime(session: Session, log: Logger, key: str):
         if laps.empty:
             continue
         driver_name = laps.Driver.iloc[0]
-        color = fastf1.plotting.get_team_color(laps.Team.iloc[0], session)
+        team = laps.Team.iloc[0]
+        if team == '':
+            color = 'white'
+        else:
+            color = fastf1.plotting.get_team_color(team, session)
         for i in range(0, len(laps)):
             lap = laps.iloc[i]
             if not lap.IsAccurate:
@@ -255,7 +259,11 @@ def plot_best_speed(session: Session, log: Logger, key: str):
         if laps.empty:
             continue
         driver_name = laps.Driver.iloc[0]
-        color = fastf1.plotting.get_team_color(laps.Team.iloc[0], session)
+        team = laps.Team.iloc[0]
+        if team == '':
+            color = 'white'
+        else:
+            color = fastf1.plotting.get_team_color(team, session)
         for i in range(0, len(laps)):
             lap = laps.iloc[i]
             if not lap.IsAccurate:
