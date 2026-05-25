@@ -198,7 +198,6 @@ def plot_best_laptime(session: Session, log: Logger, key: str):
         laps = session.laps.pick_drivers(driver_number).sort_values(by='LapNumber')
         if laps.empty:
             continue
-        driver_name = laps.Driver.iloc[0]
         team = laps.Team.iloc[0]
         if team == '':
             color = 'white'
@@ -217,7 +216,7 @@ def plot_best_laptime(session: Session, log: Logger, key: str):
         if all_maximum < minimum:
             all_maximum = minimum
         data.append({
-            'Acronym': driver_name,
+            'Acronym': laps.Driver.iloc[0],
             key: minimum,
             'Color': color
         })
@@ -258,7 +257,6 @@ def plot_best_speed(session: Session, log: Logger, key: str):
         laps = session.laps.pick_drivers(driver_number).sort_values(by='LapNumber')
         if laps.empty:
             continue
-        driver_name = laps.Driver.iloc[0]
         team = laps.Team.iloc[0]
         if team == '':
             color = 'white'
@@ -277,7 +275,7 @@ def plot_best_speed(session: Session, log: Logger, key: str):
         if all_maximum < maximum:
             all_maximum = maximum
         data.append({
-            'Acronym': driver_name,
+            'Acronym': laps.Driver.iloc[0],
             key: maximum,
             'Color': color
         })

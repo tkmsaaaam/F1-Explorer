@@ -29,7 +29,6 @@ def plot_lap_number_by_timing(session: Session, log: Logger):
     for (stint_num, driver_number), stint_laps in grouped:
         if stint_laps.empty:
             continue
-        driver_name = stint_laps.Driver.iloc[0]
         team = stint_laps.Team.iloc[0]
         if team == '':
             color = 'white'
@@ -43,7 +42,7 @@ def plot_lap_number_by_timing(session: Session, log: Logger):
             ax.plot(lap_starts, lap_numbers, color=color,
                     linestyle="solid" if constants.camera[session.event.year].get(int(driver_number),
                                                                                   'black') == "black" else "dashed",
-                    label=driver_name)
+                    label=stint_laps.Driver.iloc[0])
         else:
             # noinspection PyTypeChecker
             ax.plot(lap_starts, lap_numbers, color=color,
@@ -192,7 +191,6 @@ def plot_laptime_by_lap_number(session: Session, log: Logger):
     for _, stint_laps in grouped:
         if stint_laps.empty:
             continue
-        driver_name = stint_laps.Driver.iloc[0]
         team = stint_laps.Team.iloc[0]
         if team == '':
             color = 'white'
@@ -204,7 +202,7 @@ def plot_laptime_by_lap_number(session: Session, log: Logger):
         ax.plot(lap_numbers, lap_times, color=color,
                 linestyle="solid" if constants.camera[session.event.year].get(int(stint_laps.DriverNumber.iloc[0]),
                                                                               'black') == "black" else "dashed",
-                label=driver_name)
+                label=stint_laps.Driver.iloc[0])
     # noinspection PyUnresolvedReferences
     minimum = session.laps.LapTime.min().total_seconds()
     ax.set_ylim(top=minimum, bottom=minimum * 1.25)
@@ -231,7 +229,6 @@ def plot_laptime_by_timing(session: Session, log: Logger):
     for _, stint_laps in grouped:
         if stint_laps.empty:
             continue
-        driver_name = stint_laps.Driver.iloc[0]
         team = stint_laps.Team.iloc[0]
         if team == '':
             color = 'white'
@@ -251,7 +248,7 @@ def plot_laptime_by_timing(session: Session, log: Logger):
         ax.plot(lap_starts, lap_times, color=color,
                 linestyle="solid" if constants.camera[session.event.year].get(stint_laps.DriverNumber.iloc[0],
                                                                               'black') == "black" else "dashed",
-                label=driver_name)
+                label=stint_laps.Driver.iloc[0])
     # noinspection PyUnresolvedReferences
     minimum = session.laps.LapTime.min().seconds
     ax.set_ylim(top=minimum, bottom=minimum * 1.25)
