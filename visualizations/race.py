@@ -61,8 +61,8 @@ def make_driver_laps_set(laps: Laps) -> set[DriverLaps]:
     result = set()
     grouped = laps.groupby(['DriverNumber'])
     for _, stint_laps in grouped:
-        driver: Driver = Driver(int(stint_laps.DriverNumber.iloc[0]), stint_laps.Driver.iloc[0],
-                                stint_laps.Team.iloc[0])
+        l = stint_laps.iloc[0]
+        driver: Driver = Driver(int(l.DriverNumber), l.Driver, l.Team)
         laps: dict[int, Lap] = {}
         for i in range(0, len(stint_laps)):
             # noinspection PyTypeChecker

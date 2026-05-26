@@ -328,11 +328,12 @@ def plot_flat_out(session: Session, log: Logger):
                     start_distance = 0
                     sum_time += e.Time.total_seconds() - start_time
                     start_time = 0
-        if lap.telemetry.Throttle.iloc[-1] > lap.telemetry.Throttle.max() - 3 and start_time != 0:
-            sum_distance += lap.telemetry.Distance.iloc[-1] - start_distance
-            sum_time += lap.telemetry.Time.iloc[-1].total_seconds() - start_time
-        x = sum_distance / lap.telemetry.Distance.iloc[-1]
-        y = sum_time / (lap.telemetry.Time.iloc[-1].total_seconds() - lap.telemetry.Time.iloc[0].total_seconds())
+        z = lap.telemetry.iloc[-1]
+        if z.Throttle > lap.telemetry.Throttle.max() - 3 and start_time != 0:
+            sum_distance += z.Distance - start_distance
+            sum_time += z.Time.total_seconds() - start_time
+        x = sum_distance / z.Distance
+        y = sum_time / (z.Time.total_seconds() - lap.telemetry.Time.iloc[0].total_seconds())
         color = fastf1.plotting.get_team_color(lap.Team, session)
         ax.scatter(x, y, c=color)
         ax.annotate(lap.Driver, (x, y), fontsize=9, ha='right')
