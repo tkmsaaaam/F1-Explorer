@@ -109,13 +109,12 @@ def laptime(log: Logger, filepath: str, filename: str, session: Session, r: int 
         ax.plot(lap_numbers, lap_times, color=color, label=lap_log.get_driver().get_name(), linewidth=0.5,
                 linestyle="solid" if constants.camera[session.event.year].get(lap_log.get_driver().get_number(),
                                                                               'black') == "black" else "dashed")
-    minimum = \
-        session.laps[(session.laps['IsAccurate']) & (session.laps['Deleted'] == False) & (
-                session.laps['TrackStatus'] == '1')].sort_values(by='LapTime').iloc[
-            0].LapTime.total_seconds()
-    maximum = session.laps[(session.laps['IsAccurate']) & (session.laps['Deleted'] == False) & (
-            session.laps['TrackStatus'] == '1')].sort_values(by='LapTime', ascending=False).iloc[
-        0].LapTime.total_seconds()
+    minimum = session.laps.sort_values(by='LapTime').LapTime.min().total_seconds()
+    maximum = session.laps[
+        (session.laps['IsAccurate'])
+        & (session.laps['Deleted'] == False)
+        & (session.laps['TrackStatus'] == '1')
+    ].sort_values(by='LapTime', ascending=False).LapTime.max().total_seconds()
     ax.legend(fontsize='small')
     ax.set_ylim(top=minimum - 0.1, bottom=maximum + 0.1)
     ax.grid(True)
