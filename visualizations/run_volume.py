@@ -145,8 +145,8 @@ def plot_pit_time(session: Session, log: Logger):
             lap_times.append(
                 f"{outLap.LapNumber}"
                 f"<br>{"{:.3f}".format(pit)}"
-                f"<br>{pitInTime}"
-                f"<br>{pitOutTime}"
+                f"<br>{"{:.3f}".format(pitInTime)}"
+                f"<br>{"{:.3f}".format(pitOutTime)}"
                 f"<br>{"{:.3f}".format(inLap.LapTime.total_seconds())}"
                 f"<br>{"{:.3f}".format(outLap.LapTime.total_seconds())}"
                 f"<br>{(inLap.LapTime + outLap.LapTime).total_seconds()}"
