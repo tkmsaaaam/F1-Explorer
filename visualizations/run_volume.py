@@ -109,9 +109,17 @@ def plot_laptime(session: Session, log: Logger):
         cells={'values': data_rows, 'fill_color': fill_colors, 'align': 'center'}
     )], layout={'autosize': True, 'margin': {'autoexpand': True}})
 
+    fig.update_layout(margin=dict(l=10, r=10, t=20, b=20), autosize=True)
+
+    cell_height = 70
+    header_height = 40
+    margin_top_bottom = 40
+    calculated_height = (max_laps * cell_height) + header_height + margin_top_bottom
+    image_height = max(1200, calculated_height)
+
     output_path = f"./images/{session.event.year}/{session.event.RoundNumber}_{session.event.Location}/{session.name.replace(' ', '')}/laptime_table.png"
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
-    fig.write_image(output_path, width=1920, height=2160)
+    fig.write_image(output_path, width=1920, height=image_height)
     log.info(f"Saved plot to {output_path}")
 
 
