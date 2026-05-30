@@ -71,6 +71,7 @@ def plot_laptime(session: Session, log: Logger):
     lap_numbers = list(range(1, max_laps + 1))
     data_rows = [lap_numbers]
     fill_colors = [["#f0f0f0"] * max_laps]
+    heights = {}
 
     for driver in header:
         if driver == 'Lap':
@@ -79,18 +80,26 @@ def plot_laptime(session: Session, log: Logger):
         lap_times = []
         bg_colors = []
         for i in range(0, len(driver_laps)):
+            if i not in heights:
+                heights[i] = 26
             lap = driver_laps.iloc[i]
             if pandas.isna(lap.PitInTime) and pandas.isna(lap.PitOutTime):
                 lap_times.append(lap.LapTime.total_seconds())
             elif pandas.isna(lap.PitOutTime):
+                if heights[i] < 65:
+                    heights[i] = 65
                 i = lap.LapStartTime.total_seconds() + lap.LapTime.total_seconds() - lap.PitInTime.total_seconds()
                 lap_times.append(
                     f"{lap.LapTime.total_seconds()}<br>({"{:.3f}".format(i)}<br>{"{:.3f}".format(lap.LapTime.total_seconds() - i)})")
             elif pandas.isna(lap.PitInTime):
+                if heights[i] < 65:
+                    heights[i] = 65
                 o = lap.PitOutTime.total_seconds() - lap.LapStartTime.total_seconds()
                 lap_times.append(
                     f"{lap.LapTime.total_seconds()}<br>({"{:.3f}".format(o)}<br>{"{:.3f}".format(lap.LapTime.total_seconds() - o)})")
             else:
+                if heights[i] < 65:
+                    heights[i] = 65
                 i = lap.LapStartTime.total_seconds() + lap.LapTime.total_seconds() - lap.PitInTime.total_seconds()
                 o = lap.PitOutTime.total_seconds() - lap.LapStartTime.total_seconds()
                 lap_times.append(f"{lap.LapTime.total_seconds()}<br>({"{:.3f}".format(i)}<br>/{"{:.3f}".format(o)})")
@@ -111,10 +120,9 @@ def plot_laptime(session: Session, log: Logger):
 
     fig.update_layout(margin=dict(l=10, r=10, t=20, b=20), autosize=True)
 
-    cell_height = 70
     header_height = 40
     margin_top_bottom = 40
-    calculated_height = (max_laps * cell_height) + header_height + margin_top_bottom
+    calculated_height = sum(heights.values()) + header_height + margin_top_bottom
     image_height = max(1200, calculated_height)
 
     output_path = f"./images/{session.event.year}/{session.event.RoundNumber}_{session.event.Location}/{session.name.replace(' ', '')}/laptime_table.png"
