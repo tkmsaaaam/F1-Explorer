@@ -76,7 +76,7 @@ def plot_laptime(session: Session, log: Logger):
     for driver in header:
         if driver == 'Lap':
             continue
-        driver_laps = laps[laps['Driver'] == driver].sort_values(by='LapNumber')
+        driver_laps = session.laps.pick_drivers(driver).sort_values(by='LapNumber')
         lap_times = []
         bg_colors = []
         for i in range(0, len(driver_laps)):
@@ -142,8 +142,7 @@ def plot_pit_time(session: Session, log: Logger):
     data_rows = [["No<br>pit<br>in<br>out<br>in<br>out<br>sum"]]
     pits = []
     for n in session.drivers:
-        driver = session.get_driver(n)['Abbreviation']
-        driver_laps = session.laps[session.laps['Driver'] == driver].sort_values(by='LapNumber')
+        driver_laps = session.laps.pick_drivers(n).sort_values(by='LapNumber')
         if driver_laps is None:
             continue
         lap_times = []
@@ -170,7 +169,7 @@ def plot_pit_time(session: Session, log: Logger):
             pits.append(pit)
         if len(lap_times) < 1:
             continue
-        header.append(driver)
+        header.append(session.get_driver(n).Abbreviation)
         data_rows.append(lap_times)
 
     header.append('avg')

@@ -26,9 +26,8 @@ def plot_tyre(year: int, race_number: int, log: Logger):
         session.load(weather=False, messages=False, telemetry=False)
         if datetime.datetime.now() < session.date:
             continue
-        laps = session.laps
         for driver in session.drivers:
-            driver_laps = laps[laps['DriverNumber'] == driver]
+            driver_laps = session.laps.pick_drivers(driver)
             session_names = []
             bg_colors = []
             stints = set()
