@@ -48,10 +48,18 @@ def __main():
     short_runs.plot_best_speed(session, log, 'SpeedI2')
     short_runs.plot_best_speed(session, log, 'SpeedST')
 
+    circuit = session.get_circuit_info()
+    fastest = session.laps.pick_fastest()
+
+    if circuit is None:
+        log.info("circuit info is None")
+        return
+    if fastest is None:
+        log.info("fastest info is None")
+        return
+
     base_path = f"./images/{session.event.year}/{session.event['RoundNumber']}_{session.event.Location}/{session.name.replace(' ', '')}"
-    corners = [0] + list(
-        session.get_circuit_info().corners['Distance']
-    ) + [session.laps.pick_fastest().get_telemetry().add_distance()['Distance'].iloc[-1]]
+    corners = [0] + list(circuit.corners['Distance']) + [fastest.get_telemetry().add_distance()['Distance'].iloc[-1]]
     short_runs.plot_mini_segment_on_circuit(session, log, corners, 'corners')
     short_runs.compute_and_save_segment_tables_plotly(session, base_path + "/corners", corners, log)
 

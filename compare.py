@@ -7,6 +7,7 @@ import fastf1
 from fastf1.core import Lap, Session
 from fastf1.mvapi import CircuitInfo
 from matplotlib import pyplot as plt
+# noinspection PyPackageRequirements
 from opentelemetry import trace
 from pandas.core.interchange.dataframe_protocol import DataFrame
 from plotly import graph_objects
@@ -89,7 +90,8 @@ def plot_brake_distance(log: Logger, comparison: Comparison):
     v_max = max(int(previous_car_data.Brake.max()), int(current_car_data.Brake.max()))
     ax.vlines(x=comparison.get_corners().values(), ymin=v_min, ymax=v_max, linestyles='dotted', colors='grey')
     for number, distance in comparison.get_corners().items():
-        ax.text(distance, v_min - 0.05, f"{number}\n{"{:.0f}".format(distance)}", va='center_baseline', ha='center', size='x-small')
+        ax.text(distance, v_min - 0.05, f"{number}\n{"{:.0f}".format(distance)}", va='center_baseline', ha='center',
+                size='x-small')
 
     ax.set_ylim(v_min - 0.1, v_max + 0.1)
     ax.legend(fontsize='small')
@@ -121,7 +123,8 @@ def plot_n_gear_distance(log: Logger, comparison: Comparison):
     v_max = max(int(previous_car_data.nGear.max()), int(current_car_data.nGear.max()))
     ax.vlines(x=comparison.get_corners().values(), ymin=v_min, ymax=v_max, linestyles='dotted', colors='grey')
     for number, distance in comparison.get_corners().items():
-        ax.text(distance, v_min - 0.25, f"{number}\n{"{:.0f}".format(distance)}", va='center_baseline', ha='center', size='x-small')
+        ax.text(distance, v_min - 0.25, f"{number}\n{"{:.0f}".format(distance)}", va='center_baseline', ha='center',
+                size='x-small')
 
     ax.set_ylim(v_min - 0.5, v_max + 0.5)
     ax.legend(fontsize='small')
@@ -153,7 +156,8 @@ def plot_rpm_distance(log: Logger, comparison: Comparison):
     v_max = max(int(previous_car_data.RPM.max()), int(current_car_data.RPM.max()))
     ax.vlines(x=comparison.get_corners().values(), ymin=v_min, ymax=v_max, linestyles='dotted', colors='grey')
     for number, distance in comparison.get_corners().items():
-        ax.text(distance, v_min - 250, f"{number}\n{"{:.0f}".format(distance)}", va='center_baseline', ha='center', size='x-small')
+        ax.text(distance, v_min - 250, f"{number}\n{"{:.0f}".format(distance)}", va='center_baseline', ha='center',
+                size='x-small')
 
     ax.set_ylim(v_min - 500, v_max + 500)
     ax.legend(fontsize='small')
@@ -186,7 +190,8 @@ def plot_speed_distance(log: Logger, comparison: Comparison):
     ax.vlines(x=comparison.get_corners().values(), ymin=v_min, ymax=v_max, linestyles='dotted', colors='grey')
     ax.hlines(y=list(range(0, int(v_max), 25)), xmin=0, xmax=previous_car_data.Distance.max(), colors='lightgrey')
     for number, distance in comparison.get_corners().items():
-        ax.text(distance, v_min - 5, f"{number}\n{"{:.0f}".format(distance)}", va='center_baseline', ha='center', size='x-small')
+        ax.text(distance, v_min - 5, f"{number}\n{"{:.0f}".format(distance)}", va='center_baseline', ha='center',
+                size='x-small')
     ax.set_ylim(v_min - 10, v_max + 10)
     ax.legend(fontsize='small')
     ax.grid(True)
@@ -218,7 +223,8 @@ def plot_throttle_distance(log: Logger, comparison: Comparison):
     ax.vlines(x=comparison.get_corners().values(), ymin=v_min, ymax=v_max, linestyles='dotted', colors='grey')
     ax.hlines(y=[10, 20, 30, 40, 50, 60, 70, 80, 90], xmin=0, xmax=previous_car_data.Distance.max(), colors='lightgrey')
     for number, distance in comparison.get_corners().items():
-        ax.text(distance, v_min - 2.5, f"{number}\n{"{:.0f}".format(distance)}", va='center_baseline', ha='center', size='x-small')
+        ax.text(distance, v_min - 2.5, f"{number}\n{"{:.0f}".format(distance)}", va='center_baseline', ha='center',
+                size='x-small')
     ax.set_ylim(v_min - 5, v_max + 5)
     ax.legend(fontsize='small')
     ax.grid(True)
@@ -312,6 +318,7 @@ def summary(log: Logger, comparison: Comparison):
     c_colors.append("#d4edda" if c_win else "white")
     p_colors.append("#d4edda" if not c_win else "white")
 
+    # noinspection SpellCheckingInspection
     titles.append("SpeedI1")
     c.append(comparison.get_current().get_lap().SpeedI1)
     p.append(comparison.get_previous().get_lap().SpeedI1)
@@ -320,6 +327,7 @@ def summary(log: Logger, comparison: Comparison):
     c_colors.append("#d4edda" if c_win else "white")
     p_colors.append("#d4edda" if not c_win else "white")
 
+    # noinspection SpellCheckingInspection
     titles.append("SpeedI2")
     c.append(comparison.get_current().get_lap().SpeedI2)
     p.append(comparison.get_previous().get_lap().SpeedI2)
@@ -340,7 +348,8 @@ def summary(log: Logger, comparison: Comparison):
     c.append(comparison.get_current().get_lap().telemetry.Speed.max())
     p.append(comparison.get_previous().get_lap().telemetry.Speed.max())
     title_colors.append("lightgray")
-    c_win = comparison.get_current().get_lap().telemetry.Speed.max() < comparison.get_previous().get_lap().telemetry.Speed.max()
+    c_win = float(comparison.get_current().get_lap().telemetry.Speed.max()) < float(
+        comparison.get_previous().get_lap().telemetry.Speed.max())
     c_colors.append("#d4edda" if c_win else "white")
     p_colors.append("#d4edda" if not c_win else "white")
 
@@ -410,10 +419,10 @@ def __main():
     setup.fast_f1()
 
     year = config['Year']
-    round = config['RoundName']
+    race = config['RoundName']
     session = config['Session']
     try:
-        current = fastf1.get_session(year, round, session)
+        current = fastf1.get_session(year, race, session)
     except Exception as exception:
         log.warning(exception.args)
         return
@@ -425,7 +434,7 @@ def __main():
         return
 
     try:
-        previous = fastf1.get_session(year - 1, round, session)
+        previous = fastf1.get_session(year - 1, race, session)
     except Exception as exception:
         log.warning(exception.args)
         return
@@ -436,13 +445,13 @@ def __main():
         log.warning(exception.args)
         return
 
-    log.info(f"{round} {session}")
+    log.info(f"{race} {session}")
 
     circuit = current.get_circuit_info()
     if circuit is None:
         return
 
-    comparison = Comparison(year, round, session, current_summary, previous_summary, circuit)
+    comparison = Comparison(year, race, session, current_summary, previous_summary, circuit)
     summary(log, comparison)
 
     plot_brake_distance(log, comparison)
