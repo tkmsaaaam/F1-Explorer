@@ -15,6 +15,7 @@ from matplotlib import pyplot as plt
 from matplotlib.collections import LineCollection
 from matplotlib.colorbar import ColorbarBase
 from matplotlib.pyplot import colormaps
+# noinspection PyPackageRequirements
 from opentelemetry import trace
 
 import constants
@@ -61,7 +62,7 @@ def compute_and_save_segment_tables_plotly(
         log: ロガー
     """
     segment_boundaries = sorted(segment_boundaries)
-    driver_times = {}
+    driver_times: dict[str, list[float | None]] = {}
     abbreviations = [session.get_driver(d).Abbreviation for d in session.drivers]
 
     for driver_number in session.drivers:
@@ -80,23 +81,33 @@ def compute_and_save_segment_tables_plotly(
                 times.append(None)
         driver_times[driver_number] = times
 
-    # セグメント名と距離差
+    circuit = session.get_circuit_info()
+    if circuit is None:
+        return
+        # セグメント名と距離差
     segment_rows = []
     for i in range(1, len(segment_boundaries)):
         name = f"{i}"
         dist = round(segment_boundaries[i] - segment_boundaries[i - 1], 1)
-        corners_df = session.get_circuit_info().corners
+        corners_df = circuit.corners
         filtered = corners_df[
             (corners_df['Distance'] >= segment_boundaries[i - 1]) & (corners_df['Distance'] <= segment_boundaries[i])
             ]
         row = [name, dist, filtered['Number'].tolist()]
         for driver_number in session.drivers:
-            times = driver_times.get(driver_number)
-            if times and times[i] is not None and times[i - 1] is not None:
-                delta = round(times[i] - times[i - 1], 3)
-                row.append(delta)
-            else:
+            t = driver_times.get(driver_number)
+            if t is None:
                 row.append(0)
+                continue
+            c = t[i]
+            b = t[i - 1]
+            if c is None:
+                row.append(0)
+                continue
+            if b is None:
+                row.append(0)
+                continue
+            row.append(round(c - b, 3))
         segment_rows.append(row)
 
     segment_header = ["segment", "distance", "corners"] + abbreviations
@@ -132,8 +143,11 @@ def compute_and_save_segment_tables_plotly(
     fig_ranks.write_image(f"{filename_base}_ranks.png", width=1920, height=1080)
     log.info(f"Segment rank table saved to {filename_base}_ranks.png")
 
-    # セッション最速ラップのドライバー
-    best_driver_number = session.laps.pick_fastest().DriverNumber
+    best = session.laps.pick_fastest()
+    if best is None:
+        return
+        # セッション最速ラップのドライバー
+    best_driver_number = best.DriverNumber
     best_times = driver_times.get(best_driver_number)
 
     if not best_times or len(best_times) < 2:
@@ -142,30 +156,43 @@ def compute_and_save_segment_tables_plotly(
 
     best_deltas = []
     for i in range(1, len(best_times)):
-        if best_times[i] is not None and best_times[i - 1] is not None:
-            best_deltas.append(best_times[i] - best_times[i - 1])
+        c = best_times[i]
+        b = best_times[i - 1]
+        if b is not None and c is not None:
+            best_deltas.append(b - c)
         else:
             best_deltas.append(None)
 
-    # ギャップ表
+    circuit = session.get_circuit_info()
+    if circuit is None:
+        return
+        # ギャップ表
     gap_rows = []
     for i in range(1, len(segment_boundaries)):
         name = f"{i}"
         dist = round(segment_boundaries[i] - segment_boundaries[i - 1], 1)
-        corners_df = session.get_circuit_info().corners
+        corners_df = circuit.corners
         filtered = corners_df[
             (corners_df['Distance'] >= segment_boundaries[i - 1]) & (corners_df['Distance'] <= segment_boundaries[i])
             ]
         row = [name, dist, filtered['Number'].tolist()]
         best_time = best_deltas[i - 1]
+        if best_time is None:
+            continue
         for driver_number in session.drivers:
-            times = driver_times.get(driver_number)
-            if (times and best_time is not None and
-                    times[i] is not None and times[i - 1] is not None):
-                gap = round((times[i] - times[i - 1]) - best_time, 3)
-                row.append(gap)
-            else:
+            t = driver_times.get(driver_number)
+            if t is None:
                 row.append(0)
+                continue
+            c = t[i]
+            b = t[i - 1]
+            if c is None:
+                row.append(0)
+                continue
+            if b is None:
+                row.append(0)
+                continue
+            row.append(round((c - b) - best_time, 3))
         gap_rows.append(row)
 
     gap_header = ["segment", "distance", "corners"] + abbreviations
@@ -318,7 +345,7 @@ def plot_flat_out(session: Session, log: Logger):
         sum_time = 0
         for i in range(0, len(lap.telemetry)):
             e = lap.telemetry.iloc[i]
-            if e.Throttle > lap.telemetry.Throttle.max() - 3:
+            if e.Throttle > float(lap.telemetry.Throttle.max()) - 3:
                 if start_distance == 0:
                     start_distance = e.Distance
                     start_time = e.Time.total_seconds()
@@ -329,7 +356,7 @@ def plot_flat_out(session: Session, log: Logger):
                     sum_time += e.Time.total_seconds() - start_time
                     start_time = 0
         z = lap.telemetry.iloc[-1]
-        if z.Throttle > lap.telemetry.Throttle.max() - 3 and start_time != 0:
+        if z.Throttle > float(lap.telemetry.Throttle.max()) - 3 and start_time != 0:
             sum_distance += z.Distance - start_distance
             sum_time += z.Time.total_seconds() - start_time
         x = sum_distance / z.Distance
@@ -488,7 +515,7 @@ def plot_speed_and_laptime(session: Session, log: Logger):
         if lap is None:
             continue
         car_data = lap.get_car_data()
-        max_speed = car_data.Speed.max()
+        max_speed: float = car_data.Speed.max()
         top_speeds.append(max_speed)
         y = lap.LapTime.total_seconds()
         lap_times.append(y)
@@ -513,6 +540,8 @@ def plot_speed_distance(session: Session, log: Logger):
         log: ロガー
     """
     circuit_info = session.get_circuit_info()
+    if circuit_info is None:
+        return
     for driver_number in session.drivers:
         fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
 
@@ -526,8 +555,8 @@ def plot_speed_distance(session: Session, log: Logger):
 
         ax.plot(car_data.Distance, car_data.Speed,
                 color=team_color, label=laps.Driver, linestyle=style)
-        v_min = car_data.Speed.min()
-        v_max = car_data.Speed.max()
+        v_min: float = car_data.Speed.min()
+        v_max: float = car_data.Speed.max()
         ax.vlines(x=circuit_info.corners.Distance, ymin=v_min - 20, ymax=v_max + 20,
                   linestyles='dotted', colors='grey')
         for _, corner in circuit_info.corners.iterrows():
@@ -554,6 +583,8 @@ def plot_speed_distance_comparison(session: Session, log: Logger):
     driver_numbers = session.drivers
     num_groups = math.ceil(len(driver_numbers) / drivers_per_fig)
     circuit_info = session.get_circuit_info()
+    if circuit_info is None:
+        return
     for group_index in range(num_groups):
         start = group_index * drivers_per_fig
         if group_index == num_groups - 1:
@@ -577,7 +608,9 @@ def plot_speed_distance_comparison(session: Session, log: Logger):
             if laps is None:
                 continue
             car_data = laps.get_car_data().add_distance()
-            v_min, v_max = min(v_min, car_data.Speed.min()), max(v_max, car_data.Speed.max())
+            minimum: float = car_data.Speed.min()
+            maximum: float = car_data.Speed.max()
+            v_min, v_max = min(v_min, minimum), max(v_max, maximum)
 
         if v_min == float('inf') or v_max == float('-inf'):
             continue
@@ -670,6 +703,8 @@ def plot_time_distance_comparison(session: Session, log: Logger):
     driver_numbers = session.drivers
     num_groups = math.ceil(len(driver_numbers) / drivers_per_fig)
     circuit_info = session.get_circuit_info()
+    if circuit_info is None:
+        return
 
     for group_index in range(num_groups):
         start = group_index * drivers_per_fig
@@ -786,6 +821,9 @@ def plot_time_distance_comparison(session: Session, log: Logger):
 def _plot_driver_telemetry(session: Session, log: Logger,
                            driver_numbers: list[int], key: str, label, value_func):
     group_size = 5
+    circuit_info = session.get_circuit_info()
+    if circuit_info is None:
+        return
     for i in range(0, len(driver_numbers), group_size):
         if i + group_size >= len(driver_numbers):
             group = driver_numbers[i:]
@@ -816,7 +854,7 @@ def _plot_driver_telemetry(session: Session, log: Logger,
             continue
 
         # コーナー線と番号
-        for _, corner in session.get_circuit_info().corners.iterrows():
+        for _, corner in circuit_info.corners.iterrows():
             ax.axvline(x=corner.Distance, linestyle='dotted', color='grey', linewidth=0.8)
             ax.text(corner.Distance, v_min - (v_max - v_min) * 0.05,
                     f"{corner.Number}{corner.Letter}",
@@ -851,10 +889,15 @@ def make_mini_segment(session: Session, log: Logger, corner_map: dict[str, list[
         separators: コーナー以外の境界
     """
     fastest_lap = session.laps.pick_fastest()
+    if fastest_lap is None:
+        return []
+    circuit_info = session.get_circuit_info()
+    if circuit_info is None:
+        return []
     car_data = fastest_lap.get_telemetry().add_distance()
     segment_boundaries = [0.0, car_data['Distance'].iloc[-1]]
 
-    corners_df = session.get_circuit_info().corners
+    corners_df = circuit_info.corners
     for c in range(0, len(corners_df)):
         corner = corners_df.iloc[c]
         i = str(corner['Number'])
@@ -880,6 +923,8 @@ def plot_mini_segment_on_circuit(session: Session, log: Logger, segment_boundari
     """
     # ベストタイムを記録したドライバーのベストラップを取得
     fastest_lap = session.laps.pick_fastest()
+    if fastest_lap is None:
+        return
     driver = fastest_lap.Driver
     car_data = fastest_lap.get_telemetry().add_distance()
 
@@ -900,8 +945,8 @@ def plot_mini_segment_on_circuit(session: Session, log: Logger, segment_boundari
         ax.plot(seg_x, seg_y, color=color, linewidth=3)
 
         mid_index = mask[mask].index[len(mask[mask]) // 2]
-        mid_x = car_data.loc[mid_index, 'X']
-        mid_y = car_data.loc[mid_index, 'Y']
+        mid_x: float = car_data.loc[mid_index, 'X']
+        mid_y: float = car_data.loc[mid_index, 'Y']
         ax.text(mid_x, mid_y, f"{i}", fontsize=8, color='blue', ha='center',
                 va='center')
 
@@ -982,6 +1027,9 @@ def plot_telemetry(session: Session, log: Logger,
         label: プロットするテレメトリーのラベル
         value_func: プロットするテレメトリー
     """
+    circuit_info = session.get_circuit_info()
+    if circuit_info is None:
+        return
     fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
 
     v_min, v_max = float('inf'), float('-inf')
@@ -1006,7 +1054,7 @@ def plot_telemetry(session: Session, log: Logger,
         name = name + f"{driver_name}_"
 
     # コーナー線と番号
-    for _, corner in session.get_circuit_info().corners.iterrows():
+    for _, corner in circuit_info.corners.iterrows():
         ax.axvline(x=corner.Distance, linestyle='dotted', color='grey', linewidth=0.8)
         ax.text(corner.Distance, v_min - (v_max - v_min) * 0.05,
                 f"{corner.Number}{corner.Letter}",

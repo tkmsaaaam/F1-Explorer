@@ -109,14 +109,14 @@ def laptime(log: Logger, filepath: str, filename: str, session: Session, r: int 
         ax.plot(lap_numbers, lap_times, color=color, label=lap_log.get_driver().get_name(), linewidth=0.5,
                 linestyle="solid" if constants.camera[session.event.year].get(lap_log.get_driver().get_number(),
                                                                               'black') == "black" else "dashed")
-    minimum = session.laps.sort_values(by='LapTime').LapTime.min().total_seconds()
-    maximum = session.laps[
+    minimum: datetime.timedelta = session.laps.sort_values(by='LapTime').LapTime.min()
+    maximum: datetime.timedelta = session.laps[
         (session.laps['IsAccurate'])
         & (session.laps['Deleted'] == False)
         & (session.laps['TrackStatus'] == '1')
-    ].sort_values(by='LapTime', ascending=False).LapTime.max().total_seconds()
+    ].sort_values(by='LapTime', ascending=False).LapTime.max()
     ax.legend(fontsize='small')
-    ax.set_ylim(top=minimum - 0.1, bottom=maximum + 0.1)
+    ax.set_ylim(top=minimum.total_seconds() - 0.1, bottom=maximum.total_seconds() + 0.1)
     ax.grid(True)
     output_path = f"{filepath}/{filename}.png"
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
@@ -124,7 +124,7 @@ def laptime(log: Logger, filepath: str, filename: str, session: Session, r: int 
     log.info(f"Saved plot to {output_path}")
     plt.close(fig)
     if r is not None:
-        ax.set_ylim(top=minimum, bottom=minimum + r)
+        ax.set_ylim(top=minimum.total_seconds(), bottom=minimum.total_seconds() + r)
         ax.grid(True)
         output_path = f"{filepath}/{filename}_{r}.png"
         os.makedirs(os.path.dirname(output_path), exist_ok=True)
