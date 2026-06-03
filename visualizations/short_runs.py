@@ -487,8 +487,7 @@ def plot_gear_shift_on_track(session: Session, log: Logger):
         ax.axis('equal')
         ax.tick_params(labelleft=False, left=False, labelbottom=False, bottom=False)
 
-        cbar = fig.colorbar(mappable=lc_comp, label="Gear",
-                            boundaries=np.arange(1, 10))
+        cbar = fig.colorbar(mappable=lc_comp, label="Gear", boundaries=np.arange(1, 10))
         cbar.set_ticks(np.arange(1.5, 9.5))
         cbar.set_ticklabels(np.arange(1, 9))
         output_path = f"./images/{session.event.year}/{session.event.RoundNumber}_{session.event.Location}/{session.name.replace(' ', '')}/shift_on_track/{driver_number}_{lap.Driver}.png"
@@ -557,8 +556,7 @@ def plot_speed_distance(session: Session, log: Logger):
                 color=team_color, label=laps.Driver, linestyle=style)
         v_min: float = car_data.Speed.min()
         v_max: float = car_data.Speed.max()
-        ax.vlines(x=circuit_info.corners.Distance, ymin=v_min - 20, ymax=v_max + 20,
-                  linestyles='dotted', colors='grey')
+        ax.vlines(x=circuit_info.corners.Distance, ymin=v_min - 20, ymax=v_max + 20, linestyles='dotted', colors='grey')
         for _, corner in circuit_info.corners.iterrows():
             txt = f"{corner.Number}{corner.Letter}"
             ax.text(corner.Distance, v_min - 30, txt,
@@ -844,8 +842,8 @@ def _plot_driver_telemetry(session: Session, log: Logger,
             line_style = 'solid' if camera_color == 'black' else 'dashed'
 
             y_data = value_func(car_data)
-            ax.plot(car_data.Distance, y_data, label=driver_name, linewidth=1,
-                    color=team_color, linestyle=line_style, alpha=0.5)
+            ax.plot(car_data.Distance, y_data, label=driver_name, linewidth=1, color=team_color, linestyle=line_style,
+                    alpha=0.5)
             v_min, v_max = min(v_min, y_data.min()), max(v_max, y_data.max())
 
         if v_min == float('inf') or v_max == float('-inf'):
@@ -856,8 +854,7 @@ def _plot_driver_telemetry(session: Session, log: Logger,
         # コーナー線と番号
         for _, corner in circuit_info.corners.iterrows():
             ax.axvline(x=corner.Distance, linestyle='dotted', color='grey', linewidth=0.8)
-            ax.text(corner.Distance, v_min - (v_max - v_min) * 0.05,
-                    f"{corner.Number}{corner.Letter}",
+            ax.text(corner.Distance, v_min - (v_max - v_min) * 0.05, f"{corner.Number}{corner.Letter}",
                     va='center_baseline', ha='center', size='small')
 
         ax.set_ylim(v_min - 0.1 * (v_max - v_min), v_max + 0.1 * (v_max - v_min))
@@ -895,17 +892,22 @@ def make_mini_segment(session: Session, log: Logger, corner_map: dict[str, list[
     if circuit_info is None:
         return []
     car_data = fastest_lap.get_telemetry().add_distance()
-    segment_boundaries = [0.0, car_data['Distance'].iloc[-1]]
+    segment_boundaries = [0]
+    z = car_data.iloc[-1]
+    if z is not None:
+        segment_boundaries.append(z.Distance)
 
     corners_df = circuit_info.corners
     for c in range(0, len(corners_df)):
         corner = corners_df.iloc[c]
+        if corner is None:
+            continue
         i = str(corner['Number'])
         if not i in corner_map:
             continue
         diffs = corner_map[i]
         for d in diffs:
-            segment_boundaries.append(corner['Distance'] + d)
+            segment_boundaries.append(corner.Distance + d)
     for s in separators:
         segment_boundaries.append(s)
     log.info(f"{corner_map} {separators} corners_list: {corners_df}, segment_list: {segment_boundaries}")
@@ -945,10 +947,9 @@ def plot_mini_segment_on_circuit(session: Session, log: Logger, segment_boundari
         ax.plot(seg_x, seg_y, color=color, linewidth=3)
 
         mid_index = mask[mask].index[len(mask[mask]) // 2]
-        mid_x: float = car_data.loc[mid_index, 'X']
-        mid_y: float = car_data.loc[mid_index, 'Y']
-        ax.text(mid_x, mid_y, f"{i}", fontsize=8, color='blue', ha='center',
-                va='center')
+        mid_x: float = car_data.X.loc[mid_index]
+        mid_y: float = car_data.Y.loc[mid_index]
+        ax.text(mid_x, mid_y, f"{i}", fontsize=8, color='blue', ha='center', va='center')
 
     ax.set_aspect('equal')
     ax.set_title(f"Mini Segments of Best Lap - {driver}")
