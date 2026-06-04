@@ -910,7 +910,7 @@ def make_mini_segment(session: Session, log: Logger, corner_map: dict[str, list[
             segment_boundaries.append(corner.Distance + d)
     for s in separators:
         segment_boundaries.append(s)
-    log.info(f"{corner_map} {separators} corners_list: {corners_df}, segment_list: {segment_boundaries}")
+    log.info(f"{corner_map} {separators} corners_list: {list(corners_df.Distance)}, segment_list: {segment_boundaries}")
     return segment_boundaries
 
 
