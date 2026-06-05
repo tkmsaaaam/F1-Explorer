@@ -888,15 +888,14 @@ def make_mini_segment(session: Session, log: Logger, corner_map: dict[str, list[
     fastest_lap = session.laps.pick_fastest()
     if fastest_lap is None:
         return []
-    circuit_info = session.get_circuit_info()
-    if circuit_info is None:
-        return []
     car_data = fastest_lap.get_telemetry().add_distance()
     segment_boundaries = [0]
     z = car_data.iloc[-1]
     if z is not None:
         segment_boundaries.append(z.Distance)
-
+    circuit_info = session.get_circuit_info()
+    if circuit_info is None:
+        return segment_boundaries
     corners_df = circuit_info.corners
     for c in range(0, len(corners_df)):
         corner = corners_df.iloc[c]
