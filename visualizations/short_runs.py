@@ -74,11 +74,9 @@ def compute_and_save_segment_tables_plotly(
         times: list[float | None] = []
         for dist in segment_boundaries:
             before_point = car_data[car_data['Distance'] < dist]
-            if not before_point.empty:
-                time_before = before_point.iloc[-1]['Time'].total_seconds()
-                times.append(time_before)
-            else:
-                times.append(None)
+            times.append(
+                before_point.iloc[-1]['Time'].total_seconds() if not before_point.empty else None
+            )
         driver_times[driver_number] = times
 
     circuit = session.get_circuit_info()
@@ -120,7 +118,6 @@ def compute_and_save_segment_tables_plotly(
     fig_segment.write_image(f"{filename_base}_durations.png", width=1920, height=1080)
     log.info(f"Segment table saved to {filename_base}_durations.png")
 
-    # ランク表
     segment_rank_rows = []
     for row in segment_rows:
         name, dist = row[0], row[1]
@@ -128,10 +125,9 @@ def compute_and_save_segment_tables_plotly(
         time_with_driver = [(t, d) for t, d in zip(times, session.drivers) if t is not None]
         sorted_times = sorted(time_with_driver)
         time_to_rank = {d: rank + 1 for rank, (_, d) in enumerate(sorted_times)}
-        rank_row = [name, dist]
-        for d in session.drivers:
-            rank_row.append(time_to_rank.get(d, None))
-        segment_rank_rows.append(rank_row)
+        segment_rank_rows.append(
+            [name, dist] + [time_to_rank.get(d, None) for d in session.drivers]
+        )
 
     rank_header = ["segment", "distance"] + abbreviations
     rank_data = list(zip(*segment_rank_rows))
@@ -158,15 +154,13 @@ def compute_and_save_segment_tables_plotly(
     for i in range(1, len(best_times)):
         c = best_times[i]
         b = best_times[i - 1]
-        if b is not None and c is not None:
-            best_deltas.append(b - c)
-        else:
-            best_deltas.append(None)
+        best_deltas.append(
+            b - c if b is not None and c is not None else None
+        )
 
     circuit = session.get_circuit_info()
     if circuit is None:
         return
-        # ギャップ表
     gap_rows = []
     for i in range(1, len(segment_boundaries)):
         name = f"{i}"
@@ -226,10 +220,7 @@ def plot_best_laptime(session: Session, log: Logger, key: str):
         if laps.empty:
             continue
         team = laps.Team.iloc[0]
-        if team == '':
-            color = 'white'
-        else:
-            color = fastf1.plotting.get_team_color(team, session)
+        color = 'white' if team == '' else fastf1.plotting.get_team_color(team, session)
         for i in range(0, len(laps)):
             lap = laps.iloc[i]
             if not lap.IsAccurate:
@@ -285,10 +276,7 @@ def plot_best_speed(session: Session, log: Logger, key: str):
         if laps.empty:
             continue
         team = laps.Team.iloc[0]
-        if team == '':
-            color = 'white'
-        else:
-            color = fastf1.plotting.get_team_color(team, session)
+        color = 'white' if team == '' else fastf1.plotting.get_team_color(team, session)
         for i in range(0, len(laps)):
             lap = laps.iloc[i]
             if not lap.IsAccurate:
@@ -585,10 +573,8 @@ def plot_speed_distance_comparison(session: Session, log: Logger):
         return
     for group_index in range(num_groups):
         start = group_index * drivers_per_fig
-        if group_index == num_groups - 1:
-            driver_group = driver_numbers[start:]
-        else:
-            driver_group = driver_numbers[start:start + drivers_per_fig]
+        driver_group = driver_numbers[start:] if group_index == num_groups - 1 else driver_numbers[
+            start:start + drivers_per_fig]
         fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
         for driver_number in driver_group:
             laps = session.laps.pick_drivers(driver_number).pick_fastest()
@@ -613,14 +599,11 @@ def plot_speed_distance_comparison(session: Session, log: Logger):
         if v_min == float('inf') or v_max == float('-inf'):
             continue
 
-        ax.vlines(x=circuit_info.corners.Distance, ymin=v_min - 20, ymax=v_max + 20,
-                  linestyles='dotted', colors='grey')
+        ax.vlines(x=circuit_info.corners.Distance, ymin=v_min - 20, ymax=v_max + 20, linestyles='dotted', colors='grey')
 
         for _, corner in circuit_info.corners.iterrows():
             txt = f"{corner.Number}{corner.Letter}"
-            ax.text(corner.Distance, v_min - 30, txt,
-                    va='center_baseline', ha='center', size='small')
-
+            ax.text(corner.Distance, v_min - 30, txt, va='center_baseline', ha='center', size='small')
         ax.set_ylim(v_min - 40, v_max + 20)
         ax.legend(fontsize='small')
         ax.grid(True)
@@ -660,13 +643,11 @@ def plot_speed_on_track(session: Session, log: Logger):
         fig.subplots_adjust(left=0.1, right=0.9, top=0.9, bottom=0.12)
         ax.axis('off')
 
-        ax.plot(lap.telemetry['X'], lap.telemetry['Y'],
-                color='black', linestyle='-', linewidth=16, zorder=0)
+        ax.plot(lap.telemetry['X'], lap.telemetry['Y'], color='black', linestyle='-', linewidth=16, zorder=0)
 
         colormap = cm.get_cmap("plasma")
         norm = plt.Normalize(color.min(), color.max())
-        lc = LineCollection(segments, cmap=colormap, norm=norm,
-                            linestyle='-', linewidth=5)
+        lc = LineCollection(segments, cmap=colormap, norm=norm, linestyle='-', linewidth=5)
 
         lc.set_array(color)
 
@@ -675,8 +656,7 @@ def plot_speed_on_track(session: Session, log: Logger):
 
         color_bar_axes = fig.add_axes(axes)
         normal_legend = mpl.colors.Normalize(vmin=color.min(), vmax=color.max())
-        mpl.colorbar.ColorbarBase(color_bar_axes, norm=normal_legend, cmap=colormap,
-                                  orientation="horizontal")
+        mpl.colorbar.ColorbarBase(color_bar_axes, norm=normal_legend, cmap=colormap, orientation="horizontal")
         ax.grid(True)
         output_path = f"./images/{session.event.year}/{session.event.RoundNumber}_{session.event.Location}/{session.name.replace(' ', '')}/speed_on_track/{driver_number}_{lap.Driver}.png"
         os.makedirs(os.path.dirname(output_path), exist_ok=True)
@@ -823,10 +803,7 @@ def _plot_driver_telemetry(session: Session, log: Logger,
     if circuit_info is None:
         return
     for i in range(0, len(driver_numbers), group_size):
-        if i + group_size >= len(driver_numbers):
-            group = driver_numbers[i:]
-        else:
-            group = driver_numbers[i:i + group_size]
+        group = driver_numbers[i:] if i + group_size >= len(driver_numbers) else driver_numbers[i:i + group_size]
         fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
         v_min, v_max = float('inf'), float('-inf')
 
@@ -889,10 +866,7 @@ def make_mini_segment(session: Session, log: Logger, corner_map: dict[str, list[
     if fastest_lap is None:
         return []
     car_data = fastest_lap.get_telemetry().add_distance()
-    segment_boundaries = [0]
-    z = car_data.iloc[-1]
-    if z is not None:
-        segment_boundaries.append(z.Distance)
+    segment_boundaries = [0] + [car_data.iloc[-1].Distance] if car_data.iloc[-1] is not None else []
     circuit_info = session.get_circuit_info()
     if circuit_info is None:
         return segment_boundaries
@@ -907,10 +881,8 @@ def make_mini_segment(session: Session, log: Logger, corner_map: dict[str, list[
         diffs = corner_map[i]
         for d in diffs:
             segment_boundaries.append(corner.Distance + d)
-    for s in separators:
-        segment_boundaries.append(s)
     log.info(f"{corner_map} {separators} corners_list: {list(corners_df.Distance)}, segment_list: {segment_boundaries}")
-    return segment_boundaries
+    return segment_boundaries + separators
 
 
 @tracer.start_as_current_span("plot_mini_segment_on_circuit")
