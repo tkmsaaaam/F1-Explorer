@@ -52,26 +52,12 @@ def plot_tyre(year: int, race_number: int, log: Logger):
     if session is None:
         return
 
-    driver_names = session.results.Abbreviation.to_list()
-    # データの最大行数を取得
     max_rows = max(len(d["Sessions"]) for d in drivers.values())
+    table_columns = [v["Sessions"] + [""] * (max_rows - len(v["Sessions"])) for v in drivers.values()]
+    table_colors = [v["Colors"] + ["white"] * (max_rows - len(v["Colors"])) for v in drivers.values()]
 
-    # 各ドライバー列のデータと背景色を作成
-    table_columns = []
-    table_colors = []
-
-    for name in driver_names:
-        s = drivers[name]["Sessions"]
-        colors = drivers[name]["Colors"]
-        # 足りないところは空白 + 白で埋める
-        padded_sessions = s + [""] * (max_rows - len(sessions))
-        padded_colors = colors + ["white"] * (max_rows - len(colors))
-        table_columns.append(padded_sessions)
-        table_colors.append(padded_colors)
-
-    # 表を作成
     fig = graph_objects.Figure(data=[graph_objects.Table(
-        header={'values': driver_names, 'fill_color': 'lightgrey', 'align': 'center'},
+        header={'values': list(drivers.keys()), 'fill_color': 'lightgrey', 'align': 'center'},
         cells={'values': table_columns, 'fill_color': table_colors, 'align': 'center'}
     )])
 
