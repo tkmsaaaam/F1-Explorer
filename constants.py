@@ -110,6 +110,22 @@ compound_color: Final[dict[str, str]] = {
     "WET": "blue"
 }
 
+compound_counts: Final[dict[str, int]] = {
+    "white": 2,
+    "yellow": 3,
+    "red": 8,
+    "green": 5,
+    "blue": 2
+}
+
+compound_counts_sprint: Final[dict[str, int]] = {
+    "white": 2,
+    "yellow": 4,
+    "red": 6,
+    "green": 5,
+    "blue": 2
+}
+
 # for tracker
 team_color: Final[dict[int, dict[int, str]]] = {
     2025: {
