@@ -111,19 +111,19 @@ compound_color: Final[dict[str, str]] = {
 }
 
 compound_counts: Final[dict[str, int]] = {
-    "white": 2,
-    "yellow": 3,
-    "red": 8,
-    "green": 5,
-    "blue": 2
+    "HARD": 2,
+    "MEDIUM": 3,
+    "SOFT": 8,
+    "INTERMEDIATE": 5,
+    "WET": 2
 }
 
 compound_counts_sprint: Final[dict[str, int]] = {
-    "white": 2,
-    "yellow": 4,
-    "red": 6,
-    "green": 5,
-    "blue": 2
+    "HARD": 2,
+    "MEDIUM": 4,
+    "SOFT": 6,
+    "INTERMEDIATE": 5,
+    "WET": 2
 }
 
 # for tracker

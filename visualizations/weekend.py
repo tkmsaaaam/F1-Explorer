@@ -25,22 +25,23 @@ def plot_tyre(year: int, race_number: int, log: Logger):
         except ValueError:
             continue
         session.load(weather=False, messages=False, telemetry=False)
-        if session is not None and len(session.drivers) > 0:
-            order = [d for d in session.results.Abbreviation]
+        if session is None:
+            continue
         if datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None) < session.date:
             continue
+        order = [d for d in session.results.Abbreviation]
         for driver in session.drivers:
             driver_laps = session.laps.pick_drivers(driver)
             laps = driver_laps[driver_laps['FreshTyre']].drop_duplicates(subset=['Stint'], keep='first')
             session_names = [session_name for _ in range(len(laps))]
-            bg_colors = [constants.compound_color.get(lap.Compound, "#dddddd") for lap in laps.itertuples()]
+            compounds = [lap.Compound for lap in laps.itertuples()]
             driver_name = session.get_driver(driver)['Abbreviation']
             if len(session_names) > 0:
                 if driver_name in drivers:
                     drivers[driver_name]['Sessions'].extend(session_names)
-                    drivers[driver_name]['Colors'].extend(bg_colors)
+                    drivers[driver_name]['Compounds'].extend(compounds)
                 else:
-                    drivers[driver_name] = {'Sessions': session_names, 'Colors': bg_colors}
+                    drivers[driver_name] = {'Sessions': session_names, 'Compounds': compounds}
 
     if session is None:
         return
@@ -49,16 +50,17 @@ def plot_tyre(year: int, race_number: int, log: Logger):
     diff = set(drivers.keys()) - set(order)
     l = order + list(diff)
     table_columns = [
-        [(f"{drivers.get(v)['Colors'].count(color)}("
-          f"{constants.compound_counts_sprint.get(color, 0) if sprint else constants.compound_counts_sprint.get(color, 0)}"
-          f")")
-         for color in constants.compound_color.values()
-         ] +
-        drivers.get(v)["Sessions"] + [""] * (max_rows - len(drivers.get(v)["Sessions"])) for v in l
+        [(f"{drivers.get(v, {'Compounds': []})['Compounds'].count(name)}("
+          f"{constants.compound_counts_sprint.get(name, 0)
+          if sprint else constants.compound_counts_sprint.get(name, 0)})")
+         for name, color in constants.compound_color.items()] +
+        drivers.get(v, {'Sessions': []})["Sessions"] + [""] * (
+                    max_rows - len(drivers.get(v, {'Sessions': []})["Sessions"])) for v in l
     ]
     table_colors = [
         [color for color in constants.compound_color.values()] +
-        drivers.get(v)["Colors"] + ["white"] * (max_rows - len(drivers.get(v)["Colors"])) for v in l
+        [constants.compound_color.get(name, "white") for name in drivers.get(v, {'Compounds': []})["Compounds"]] +
+        ["white"] * (max_rows - len(drivers.get(v, {'Compounds': []})["Compounds"])) for v in l
     ]
 
     fig = graph_objects.Figure(data=[graph_objects.Table(
