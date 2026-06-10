@@ -32,10 +32,10 @@ def plot_tyre(year: int, race_number: int, log: Logger):
         order = [d for d in session.results.Abbreviation]
         for driver in session.drivers:
             driver_laps = session.laps.pick_drivers(driver)
-            laps = driver_laps[driver_laps['FreshTyre']].drop_duplicates(subset=['Stint'], keep='first')
+            laps = driver_laps[driver_laps.FreshTyre].drop_duplicates(subset=['Stint'], keep='first')
             session_names = [session_name for _ in range(len(laps))]
             compounds = [lap.Compound for lap in laps.itertuples()]
-            driver_name = session.get_driver(driver)['Abbreviation']
+            driver_name = session.get_driver(driver).Abbreviation
             if len(session_names) > 0:
                 if driver_name in drivers:
                     drivers[driver_name]['Sessions'].extend(session_names)
@@ -47,28 +47,29 @@ def plot_tyre(year: int, race_number: int, log: Logger):
         return
     sprint = session.event.EventFormat == 'sprint_qualifying'
     max_rows = max(len(d["Sessions"]) for d in drivers.values())
-    diff = set(drivers.keys()) - set(order)
-    l = order + list(diff)
-    table_columns = [
-        [(f"{drivers.get(v, {'Compounds': []})['Compounds'].count(name)}("
-          f"{constants.compound_counts_sprint.get(name, 0)
-          if sprint else constants.compound_counts_sprint.get(name, 0)})")
-         for name, color in constants.compound_color.items()] +
-        drivers.get(v, {'Sessions': []})["Sessions"] + [""] * (
-                    max_rows - len(drivers.get(v, {'Sessions': []})["Sessions"])) for v in l
-    ]
-    table_colors = [
-        [color for color in constants.compound_color.values()] +
-        [constants.compound_color.get(name, "white") for name in drivers.get(v, {'Compounds': []})["Compounds"]] +
-        ["white"] * (max_rows - len(drivers.get(v, {'Compounds': []})["Compounds"])) for v in l
-    ]
+    names = order + list(set(drivers.keys()) - set(order))
+    table_columns = []
+    table_colors = []
+    for v in names:
+        driver_data = drivers.get(v, {'Compounds': [], 'Sessions': []})
+        compounds = driver_data.get('Compounds', [])
+        col_counts = [
+            f"{compounds.count(name)}({constants.compound_counts_sprint.get(name, 0) if sprint
+            else constants.compound_counts.get(name, 0)})" for name in constants.compound_color.keys()
+        ]
+        session_list = driver_data.get('Sessions', [])
+        padding_len = max_rows - len(session_list)
+        driver_column = col_counts + session_list + [""] * padding_len
+        table_columns.append(driver_column)
+        compound_colors = [constants.compound_color.get(name, "white") for name in compounds]
+        driver_color = list(constants.compound_color.values()) + compound_colors + ["white"] * padding_len
+        table_colors.append(driver_color)
 
     fig = graph_objects.Figure(data=[graph_objects.Table(
-        header={'values': l, 'fill_color': 'lightgrey', 'align': 'center'},
+        header={'values': names, 'fill_color': 'lightgrey', 'align': 'center'},
         cells={'values': table_columns, 'fill_color': table_colors, 'align': 'center'}
     )])
 
-    session = fastf1.get_session(year, race_number, 'FP1')
     output_path = f"./images/{session.event.year}/{session.event.RoundNumber}_{session.event.Location}/tyres.png"
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     fig.write_image(output_path, width=1920, height=1080)
