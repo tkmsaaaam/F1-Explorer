@@ -36,12 +36,13 @@ def plot_tyre(year: int, race_number: int, log: Logger):
             session_names = [session_name for _ in range(len(laps))]
             compounds = [lap.Compound for lap in laps.itertuples()]
             driver_name = session.get_driver(driver).Abbreviation
-            if len(session_names) > 0:
-                if driver_name in drivers:
-                    drivers[driver_name]['Sessions'].extend(session_names)
-                    drivers[driver_name]['Compounds'].extend(compounds)
-                else:
-                    drivers[driver_name] = {'Sessions': session_names, 'Compounds': compounds}
+            if len(session_names) <= 0:
+                continue
+            if driver_name not in drivers:
+                drivers[driver_name] = {'Sessions': session_names, 'Compounds': compounds}
+            drivers[driver_name]['Sessions'].extend(session_names)
+            drivers[driver_name]['Compounds'].extend(compounds)
+
 
     if session is None:
         return
