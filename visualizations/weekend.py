@@ -33,16 +33,13 @@ def plot_tyre(year: int, race_number: int, log: Logger):
         for driver in session.drivers:
             driver_laps = session.laps.pick_drivers(driver)
             laps = driver_laps[driver_laps.FreshTyre].drop_duplicates(subset=['Stint'], keep='first')
-            session_names = [session_name for _ in range(len(laps))]
-            compounds = [lap.Compound for lap in laps.itertuples()]
-            driver_name = session.get_driver(driver).Abbreviation
-            if len(session_names) <= 0:
+            if len(laps) <= 0:
                 continue
-            if driver_name not in drivers:
-                drivers[driver_name] = {'Sessions': session_names, 'Compounds': compounds}
-            drivers[driver_name]['Sessions'].extend(session_names)
-            drivers[driver_name]['Compounds'].extend(compounds)
-
+            d = session.get_driver(driver).Abbreviation
+            if d not in drivers:
+                drivers[d] = {'Sessions': [], 'Compounds': []}
+            drivers[d]['Sessions'].extend([session_name for _ in range(len(laps))])
+            drivers[d]['Compounds'].extend([lap.Compound for lap in laps.itertuples()])
 
     if session is None:
         return
@@ -60,11 +57,9 @@ def plot_tyre(year: int, race_number: int, log: Logger):
         ]
         session_list = driver_data.get('Sessions', [])
         padding_len = max_rows - len(session_list)
-        driver_column = col_counts + session_list + [""] * padding_len
-        table_columns.append(driver_column)
+        table_columns.append(col_counts + session_list + [""] * padding_len)
         compound_colors = [constants.compound_color.get(name, "white") for name in compounds]
-        driver_color = list(constants.compound_color.values()) + compound_colors + ["white"] * padding_len
-        table_colors.append(driver_color)
+        table_colors.append(list(constants.compound_color.values()) + compound_colors + ["white"] * padding_len)
 
     fig = graph_objects.Figure(data=[graph_objects.Table(
         header={'values': names, 'fill_color': 'lightgrey', 'align': 'center'},
