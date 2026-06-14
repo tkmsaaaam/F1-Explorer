@@ -349,7 +349,10 @@ def plot_flat_out(session: Session, log: Logger):
             sum_time += z.Time.total_seconds() - start_time
         x = sum_distance / z.Distance
         y = sum_time / (z.Time.total_seconds() - lap.telemetry.Time.iloc[0].total_seconds())
-        color = fastf1.plotting.get_team_color(lap.Team, session)
+        try:
+            color = fastf1.plotting.get_team_color(lap.Team, session)
+        except AttributeError:
+            color = 'gray'
         ax.scatter(x, y, c=color)
         ax.annotate(lap.Driver, (x, y), fontsize=9, ha='right')
     ax.grid(True)
@@ -377,7 +380,10 @@ def plot_ideal_best(session: Session, log: Logger):
         if laps.empty:
             continue
         acronym = laps.Driver.iloc[0]
-        color = fastf1.plotting.get_team_color(laps.Team.iloc[0], session)
+        try:
+            color = fastf1.plotting.get_team_color(laps.Team.iloc[0], session)
+        except AttributeError:
+            color = 'gray'
         for i in range(1, len(laps)):
             lap = laps.iloc[i]
             if not lap.IsAccurate:
@@ -420,7 +426,10 @@ def plot_ideal_best_diff(session: Session, log: Logger):
         if laps.empty:
             continue
         acronym = laps.Driver.iloc[0]
-        color = fastf1.plotting.get_team_color(laps.Team.iloc[0], session)
+        try:
+            color = fastf1.plotting.get_team_color(laps.Team.iloc[0], session)
+        except AttributeError:
+            color = 'gray'
         for i in range(1, len(laps)):
             lap = laps.iloc[i]
             if not lap.IsAccurate:
@@ -507,7 +516,11 @@ def plot_speed_and_laptime(session: Session, log: Logger):
         y = lap.LapTime.total_seconds()
         lap_times.append(y)
         ax.annotate(lap.Driver, (max_speed, y), fontsize=9, ha='right')
-        driver_colors.append(fastf1.plotting.get_team_color(lap.Team, session))
+        try:
+            color = fastf1.plotting.get_team_color(lap.Team, session)
+        except AttributeError:
+            color = 'gray'
+        driver_colors.append(color)
 
     ax.scatter(top_speeds, lap_times, c=driver_colors)
     ax.grid(True)
@@ -536,7 +549,10 @@ def plot_speed_distance(session: Session, log: Logger):
         if laps is None:
             continue
         car_data = laps.get_car_data().add_distance()
-        team_color = fastf1.plotting.get_team_color(laps.Team, session)
+        try:
+            team_color = fastf1.plotting.get_team_color(laps.Team, session)
+        except AttributeError:
+            team_color = 'gray'
         style = "solid" if constants.camera[session.event.year].get(int(driver_number),
                                                                     'black') == "black" else "dashed"
 
@@ -581,7 +597,10 @@ def plot_speed_distance_comparison(session: Session, log: Logger):
             if laps is None:
                 continue
             car_data = laps.get_car_data().add_distance()
-            team_color = fastf1.plotting.get_team_color(laps.Team, session)
+            try:
+                team_color = fastf1.plotting.get_team_color(laps.Team, session)
+            except AttributeError:
+                team_color = 'gray'
             style = "solid" if constants.camera[session.event.year].get(int(driver_number),
                                                                         'black') == "black" else "dashed"
             ax.plot(car_data.Distance, car_data.Speed,
@@ -726,7 +745,10 @@ def plot_time_distance_comparison(session: Session, log: Logger):
             tm = tm[np.sort(uniq_idx)]
             interp_time = np.interp(common_distance, dist, tm)
             delta = interp_time - ref_time
-            team_color = fastf1.plotting.get_team_color(lap.Team, session)
+            try:
+                team_color = fastf1.plotting.get_team_color(lap.Team, session)
+            except AttributeError:
+                team_color = 'gray'
             style = (
                 "solid"
                 if constants.camera[session.event.year].get(
@@ -814,7 +836,10 @@ def _plot_driver_telemetry(session: Session, log: Logger,
 
             car_data = laps.get_car_data().add_distance()
             driver_name = laps.Driver
-            team_color = fastf1.plotting.get_team_color(laps.Team, session)
+            try:
+                team_color = fastf1.plotting.get_team_color(laps.Team, session)
+            except AttributeError:
+                team_color = 'gray'
             camera_color = constants.camera[session.event.year].get(int(driver_number), 'black')
             line_style = 'solid' if camera_color == 'black' else 'dashed'
 
@@ -1074,7 +1099,11 @@ def plot_tyre_age_and_laptime(session: Session, log: Logger):
         lap_times.append(lap.LapTime.total_seconds())
         tyre_life_list.append(tyre_life)
         ax.annotate(lap.Driver, (tyre_life, lap.LapTime.total_seconds()), fontsize=9, ha='right')
-        driver_colors.append(fastf1.plotting.get_team_color(lap.Team, session))
+        try:
+            color = fastf1.plotting.get_team_color(lap.Team, session)
+        except AttributeError:
+            color = 'gray'
+        driver_colors.append(color)
 
     ax.scatter(tyre_life_list, lap_times, c=driver_colors)
     output_path = f"./images/{session.event.year}/{session.event.RoundNumber}_{session.event.Location}/{session.name.replace(' ', '')}/tyre_age_and_laptime.png"
