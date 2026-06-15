@@ -2,7 +2,7 @@ import os
 from logging import Logger
 
 import fastf1
-from fastf1.core import Session, Laps
+from fastf1.core import Session, Laps, Lap
 from matplotlib import pyplot as plt
 # noinspection PyPackageRequirements
 from opentelemetry import trace
@@ -26,10 +26,12 @@ def make_stint_set(min_consecutive_laps: int, all_laps: Laps, compound: str) -> 
         first_lap = stint_laps.iloc[0]
         lap_map: dict[int, float] = {}
         for i in range(0, len(stint_laps)):
+            # noinspection PyTypeChecker
+            lap: Lap = stint_laps.iloc[i]
             # noinspection PyUnresolvedReferences
-            if stint_laps.iloc[i].LapTime.total_seconds() > all_laps.LapTime.min().total_seconds() * 1.2:
+            if lap.LapTime.total_seconds() > all_laps.LapTime.min().total_seconds() * 1.2:
                 continue
-            lap_map[stint_laps.iloc[i].TyreLife] = stint_laps.iloc[i].LapTime.total_seconds()
+            lap_map[lap.TyreLife] = lap.LapTime.total_seconds()
         driver: Driver = Driver(driver_number, first_lap.Driver, first_lap.Team)
         stint: Stint = Stint(compound, lap_map, driver)
         stints.add(stint)
