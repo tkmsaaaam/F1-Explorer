@@ -1,7 +1,6 @@
 import math
 import os
 from logging import Logger
-from typing import Final
 
 import fastf1
 import matplotlib as mpl
@@ -74,9 +73,7 @@ def compute_and_save_segment_tables_plotly(
         times: list[float | None] = []
         for dist in segment_boundaries:
             before_point = car_data[car_data['Distance'] < dist]
-            times.append(
-                before_point.iloc[-1]['Time'].total_seconds() if not before_point.empty else None
-            )
+            times.append(before_point.iloc[-1]['Time'].total_seconds() if not before_point.empty else None)
         driver_times[driver_number] = times
 
     circuit = session.get_circuit_info()
@@ -125,9 +122,7 @@ def compute_and_save_segment_tables_plotly(
         time_with_driver = [(t, d) for t, d in zip(times, session.drivers) if t is not None]
         sorted_times = sorted(time_with_driver)
         time_to_rank = {d: rank + 1 for rank, (_, d) in enumerate(sorted_times)}
-        segment_rank_rows.append(
-            [name, dist] + [time_to_rank.get(d, None) for d in session.drivers]
-        )
+        segment_rank_rows.append([name, dist] + [time_to_rank.get(d, None) for d in session.drivers])
 
     rank_header = ["segment", "distance"] + abbreviations
     rank_data = list(zip(*segment_rank_rows))
@@ -154,9 +149,7 @@ def compute_and_save_segment_tables_plotly(
     for i in range(1, len(best_times)):
         c = best_times[i]
         b = best_times[i - 1]
-        best_deltas.append(
-            b - c if b is not None and c is not None else None
-        )
+        best_deltas.append(b - c if b is not None and c is not None else None)
 
     circuit = session.get_circuit_info()
     if circuit is None:
@@ -200,9 +193,6 @@ def compute_and_save_segment_tables_plotly(
     log.info(f"Gap table saved to {filename_base}_gaps_to_best.png")
 
 
-MINIMUM_LAPTIME: Final = 135
-
-
 @tracer.start_as_current_span("plot_best_laptime")
 def plot_best_laptime(session: Session, log: Logger, key: str):
     """keyを順位で並べる
@@ -212,32 +202,14 @@ def plot_best_laptime(session: Session, log: Logger, key: str):
         key: 並べる対象
     """
     data = []
-    all_minimum = MINIMUM_LAPTIME
-    all_maximum = 0
     for driver_number in session.drivers:
-        minimum = MINIMUM_LAPTIME
-        laps = session.laps.pick_drivers(driver_number).sort_values(by='LapNumber')
+        laps = session.laps[session.laps.IsAccurate].pick_drivers(driver_number).sort_values(by='LapNumber')
         if laps.empty:
             continue
         team = laps.Team.iloc[0]
         color = 'white' if team == '' else fastf1.plotting.get_team_color(team, session)
-        for i in range(0, len(laps)):
-            lap = laps.iloc[i]
-            if not lap.IsAccurate:
-                continue
-            if minimum > lap[key].total_seconds():
-                minimum = lap[key].total_seconds()
-        if minimum == MINIMUM_LAPTIME:
-            continue
-        if all_minimum > minimum:
-            all_minimum = minimum
-        if all_maximum < minimum:
-            all_maximum = minimum
-        data.append({
-            'Acronym': laps.Driver.iloc[0],
-            key: minimum,
-            'Color': color
-        })
+        l = [laps.iloc[i][key].total_seconds() for i in range(0, len(laps))]
+        data.append({'Acronym': laps.Driver.iloc[0], key: min(l), 'Color': color})
     if len(data) == 0:
         return
     df = pandas.DataFrame(data).sort_values(key)
@@ -249,10 +221,7 @@ def plot_best_laptime(session: Session, log: Logger, key: str):
         text_auto=True,
         color_discrete_map={row["Acronym"]: row["Color"] for _, row in df.iterrows()}
     )
-    fig.update_yaxes(
-        range=[all_minimum - 0.1, all_maximum + 0.1],
-        tickformat=".3f"
-    )
+    fig.update_yaxes(range=[min([i[key] for i in data]) - 0.1, max([i[key] for i in data]) + 0.1], tickformat=".3f")
     output_path = f"./images/{session.event.year}/{session.event.RoundNumber}_{session.event.Location}/{session.name.replace(' ', '')}/{key}.png"
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     fig.write_image(output_path, width=1920, height=1080)
@@ -268,32 +237,14 @@ def plot_best_speed(session: Session, log: Logger, key: str):
         key: セクター
     """
     data = []
-    all_minimum = 1000
-    all_maximum = 0
     for driver_number in session.drivers:
-        maximum = 0
-        laps = session.laps.pick_drivers(driver_number).sort_values(by='LapNumber')
+        laps = session.laps[session.laps.IsAccurate].pick_drivers(driver_number).sort_values(by='LapNumber')
         if laps.empty:
             continue
         team = laps.Team.iloc[0]
         color = 'white' if team == '' else fastf1.plotting.get_team_color(team, session)
-        for i in range(0, len(laps)):
-            lap = laps.iloc[i]
-            if not lap.IsAccurate:
-                continue
-            if maximum < lap[key]:
-                maximum = lap[key]
-        if maximum == 0:
-            continue
-        if all_minimum > maximum:
-            all_minimum = maximum
-        if all_maximum < maximum:
-            all_maximum = maximum
-        data.append({
-            'Acronym': laps.Driver.iloc[0],
-            key: maximum,
-            'Color': color
-        })
+        maximum = max([laps.iloc[i][key] for i in range(0, len(laps))])
+        data.append({'Acronym': laps.Driver.iloc[0], key: maximum, 'Color': color})
     df = pandas.DataFrame(data).sort_values(key, ascending=False)
     fig = px.bar(
         df,
@@ -303,10 +254,7 @@ def plot_best_speed(session: Session, log: Logger, key: str):
         text_auto=True,
         color_discrete_map={row["Acronym"]: row["Color"] for _, row in df.iterrows()}
     )
-    fig.update_yaxes(
-        range=[all_minimum - 5, all_maximum + 5],
-        tickformat=".1f"  # 小数点1桁で表示
-    )
+    fig.update_yaxes(range=[min([i[key] for i in data]) - 5, max([i[key] for i in data]) + 5], tickformat=".1f")
     output_path = f"./images/{session.event.year}/{session.event.RoundNumber}_{session.event.Location}/{session.name.replace(' ', '')}/{key}.png"
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     fig.write_image(output_path, width=1920, height=1080)
@@ -373,32 +321,22 @@ def plot_ideal_best(session: Session, log: Logger):
     """
     fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
     for driver_number in session.drivers:
-        laps = session.laps.pick_drivers(driver_number).sort_values(by='LapNumber')
-        sec1 = 60
-        sec2 = 60
-        sec3 = 60
+        laps = session.laps[session.laps.IsAccurate].pick_drivers(driver_number).sort_values(by='LapNumber')
         if laps.empty:
             continue
+        fastest = laps.pick_fastest()
+        if fastest is None:
+            continue
+        x = fastest.LapTime.total_seconds()
+        sec1 = min([laps.iloc[i].Sector1Time.total_seconds() for i in range(0, len(laps))])
+        sec2 = min([laps.iloc[i].Sector2Time.total_seconds() for i in range(0, len(laps))])
+        sec3 = min([laps.iloc[i].Sector3Time.total_seconds() for i in range(0, len(laps))])
+        y = sec1 + sec2 + sec3
         acronym = laps.Driver.iloc[0]
         try:
             color = fastf1.plotting.get_team_color(laps.Team.iloc[0], session)
         except AttributeError:
             color = 'gray'
-        for i in range(1, len(laps)):
-            lap = laps.iloc[i]
-            if not lap.IsAccurate:
-                continue
-            if sec1 > lap.Sector1Time.total_seconds():
-                sec1 = lap.Sector1Time.total_seconds()
-            if sec2 > lap.Sector2Time.total_seconds():
-                sec2 = lap.Sector2Time.total_seconds()
-            if sec3 > lap.Sector3Time.total_seconds():
-                sec3 = lap.Sector3Time.total_seconds()
-        fastest = session.laps.pick_drivers(driver_number).pick_fastest()
-        if fastest is None:
-            continue
-        x = fastest.LapTime.total_seconds()
-        y = sec1 + sec2 + sec3
         ax.scatter(x, y, c=color)
         ax.annotate(acronym, (x, y), fontsize=9, ha='right')
     ax.grid(True)
@@ -419,10 +357,7 @@ def plot_ideal_best_diff(session: Session, log: Logger):
     """
     fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
     for driver_number in session.drivers:
-        laps = session.laps.pick_drivers(driver_number).sort_values(by='LapNumber')
-        sec1 = 60
-        sec2 = 60
-        sec3 = 60
+        laps = session.laps[session.laps.IsAccurate].pick_drivers(driver_number).sort_values(by='LapNumber')
         if laps.empty:
             continue
         acronym = laps.Driver.iloc[0]
@@ -430,18 +365,11 @@ def plot_ideal_best_diff(session: Session, log: Logger):
             color = fastf1.plotting.get_team_color(laps.Team.iloc[0], session)
         except AttributeError:
             color = 'gray'
-        for i in range(1, len(laps)):
-            lap = laps.iloc[i]
-            if not lap.IsAccurate:
-                continue
-            if sec1 > lap.Sector1Time.total_seconds():
-                sec1 = lap.Sector1Time.total_seconds()
-            if sec2 > lap.Sector2Time.total_seconds():
-                sec2 = lap.Sector2Time.total_seconds()
-            if sec3 > lap.Sector3Time.total_seconds():
-                sec3 = lap.Sector3Time.total_seconds()
+        sec1 = min([laps.iloc[i].Sector1Time.total_seconds() for i in range(0, len(laps))])
+        sec2 = min([laps.iloc[i].Sector2Time.total_seconds() for i in range(0, len(laps))])
+        sec3 = min([laps.iloc[i].Sector3Time.total_seconds() for i in range(0, len(laps))])
         y = sec1 + sec2 + sec3
-        fastest = session.laps.pick_drivers(driver_number).pick_fastest()
+        fastest = laps.pick_fastest()
         if fastest is None:
             continue
         x = y - fastest.LapTime.total_seconds()
@@ -556,8 +484,7 @@ def plot_speed_distance(session: Session, log: Logger):
         style = "solid" if constants.camera[session.event.year].get(int(driver_number),
                                                                     'black') == "black" else "dashed"
 
-        ax.plot(car_data.Distance, car_data.Speed,
-                color=team_color, label=laps.Driver, linestyle=style)
+        ax.plot(car_data.Distance, car_data.Speed, color=team_color, label=laps.Driver, linestyle=style)
         v_min: float = car_data.Speed.min()
         v_max: float = car_data.Speed.max()
         ax.vlines(x=circuit_info.corners.Distance, ymin=v_min - 20, ymax=v_max + 20, linestyles='dotted', colors='grey')
@@ -709,21 +636,16 @@ def plot_time_distance_comparison(session: Session, log: Logger):
         lap_map: dict[str, Lap] = {}
         for driver_number in driver_group:
             lap = session.laps.pick_drivers(driver_number).pick_fastest()
-            if lap is not None:
-                lap_map[str(driver_number)] = lap
+            if lap is None:
+                continue
+            lap_map[str(driver_number)] = lap
         if not lap_map:
             continue
-        fastest_driver_number = min(
-            lap_map.keys(),
-            key=lambda dn: lap_map[dn].LapTime.total_seconds()
-        )
+        fastest_driver_number = min(lap_map.keys(), key=lambda dn: lap_map[dn].LapTime.total_seconds())
         fastest_lap = lap_map[fastest_driver_number]
         fastest_car_data = fastest_lap.get_car_data().add_distance()
         fastest_dist = fastest_car_data["Distance"].to_numpy()
-        fastest_time = np.array(
-            [t.total_seconds() for t in fastest_car_data["Time"]],
-            dtype=float
-        )
+        fastest_time = np.array([t.total_seconds() for t in fastest_car_data["Time"]], dtype=float)
         uniq_idx = np.unique(fastest_dist, return_index=True)[1]
         fastest_dist = fastest_dist[np.sort(uniq_idx)]
         fastest_time = fastest_time[np.sort(uniq_idx)]
@@ -736,10 +658,7 @@ def plot_time_distance_comparison(session: Session, log: Logger):
         for driver_number, lap in lap_map.items():
             car_data = lap.get_car_data().add_distance()
             dist = car_data["Distance"].to_numpy()
-            tm = np.array(
-                [t.total_seconds() for t in car_data["Time"]],
-                dtype=float
-            )
+            tm = np.array([t.total_seconds() for t in car_data["Time"]], dtype=float)
             uniq_idx = np.unique(dist, return_index=True)[1]
             dist = dist[np.sort(uniq_idx)]
             tm = tm[np.sort(uniq_idx)]
@@ -794,9 +713,7 @@ def plot_time_distance_comparison(session: Session, log: Logger):
                 size="small"
             )
         ax.axhline(0, linestyle="--", linewidth=1)
-        ax.set_xlabel(
-            f"Distance (m) - {fastest_lap.Driver} reference"
-        )
+        ax.set_xlabel(f"Distance (m) - {fastest_lap.Driver} reference")
         ax.set_ylabel("Delta Time (s)")
         ax.set_title(
             f"{session.event['EventName']} {session.name}\n"
@@ -853,7 +770,6 @@ def _plot_driver_telemetry(session: Session, log: Logger,
         if v_min == 0.0 and v_max == 0.0:
             continue
 
-        # コーナー線と番号
         for _, corner in circuit_info.corners.iterrows():
             ax.axvline(x=corner.Distance, linestyle='dotted', color='grey', linewidth=0.8)
             ax.text(corner.Distance, v_min - (v_max - v_min) * 0.05, f"{corner.Number}{corner.Letter}",
