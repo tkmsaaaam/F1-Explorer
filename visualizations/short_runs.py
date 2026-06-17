@@ -62,7 +62,6 @@ def compute_and_save_segment_tables_plotly(
     """
     segment_boundaries = sorted(segment_boundaries)
     driver_times: dict[str, list[float | None]] = {}
-    abbreviations = [session.get_driver(d).Abbreviation for d in session.drivers]
 
     for driver_number in session.drivers:
         laps = session.laps.pick_drivers(driver_number).pick_fastest()
@@ -72,14 +71,16 @@ def compute_and_save_segment_tables_plotly(
         car_data = laps.get_car_data().add_distance()
         times: list[float | None] = []
         for dist in segment_boundaries:
-            before_point = car_data[car_data['Distance'] < dist]
-            times.append(before_point.iloc[-1]['Time'].total_seconds() if not before_point.empty else None)
+            last_point = car_data[car_data['Distance'] < dist]
+            if not last_point.empty:
+                times.append(last_point.iloc[-1]['Time'].total_seconds())
+            else:
+                times.append(None)
         driver_times[driver_number] = times
 
     circuit = session.get_circuit_info()
     if circuit is None:
         return
-        # セグメント名と距離差
     segment_rows = []
     for i in range(1, len(segment_boundaries)):
         name = f"{i}"
@@ -104,6 +105,8 @@ def compute_and_save_segment_tables_plotly(
                 continue
             row.append(round(c - b, 3))
         segment_rows.append(row)
+
+    abbreviations = [session.get_driver(d).Abbreviation for d in session.drivers]
 
     segment_header = ["segment", "distance", "corners"] + abbreviations
     segment_data = list(zip(*segment_rows))
@@ -137,7 +140,6 @@ def compute_and_save_segment_tables_plotly(
     best = session.laps.pick_fastest()
     if best is None:
         return
-        # セッション最速ラップのドライバー
     best_driver_number = best.DriverNumber
     best_times = driver_times.get(best_driver_number)
 
@@ -438,8 +440,7 @@ def plot_speed_and_laptime(session: Session, log: Logger):
         lap = session.laps.pick_drivers(driver_number).pick_fastest()
         if lap is None:
             continue
-        car_data = lap.get_car_data()
-        max_speed: float = car_data.Speed.max()
+        max_speed: float = lap.get_car_data().Speed.max()
         top_speeds.append(max_speed)
         y = lap.LapTime.total_seconds()
         lap_times.append(y)
@@ -476,22 +477,20 @@ def plot_speed_distance(session: Session, log: Logger):
         laps = session.laps.pick_drivers(driver_number).pick_fastest()
         if laps is None:
             continue
-        car_data = laps.get_car_data().add_distance()
         try:
             team_color = fastf1.plotting.get_team_color(laps.Team, session)
         except AttributeError:
             team_color = 'gray'
         style = "solid" if constants.camera[session.event.year].get(int(driver_number),
                                                                     'black') == "black" else "dashed"
-
+        car_data = laps.get_car_data().add_distance()
         ax.plot(car_data.Distance, car_data.Speed, color=team_color, label=laps.Driver, linestyle=style)
         v_min: float = car_data.Speed.min()
         v_max: float = car_data.Speed.max()
         ax.vlines(x=circuit_info.corners.Distance, ymin=v_min - 20, ymax=v_max + 20, linestyles='dotted', colors='grey')
         for _, corner in circuit_info.corners.iterrows():
             txt = f"{corner.Number}{corner.Letter}"
-            ax.text(corner.Distance, v_min - 30, txt,
-                    va='center_baseline', ha='center', size='small')
+            ax.text(corner.Distance, v_min - 30, txt, va='center_baseline', ha='center', size='small')
         ax.set_ylim(v_min - 40, v_max + 20)
         ax.grid(True)
         output_path = f"./images/{session.event.year}/{session.event.RoundNumber}_{session.event.Location}/{session.name.replace(' ', '')}/speed_distance/{driver_number}_{laps.Driver}.png"
@@ -523,15 +522,15 @@ def plot_speed_distance_comparison(session: Session, log: Logger):
             laps = session.laps.pick_drivers(driver_number).pick_fastest()
             if laps is None:
                 continue
-            car_data = laps.get_car_data().add_distance()
             try:
                 team_color = fastf1.plotting.get_team_color(laps.Team, session)
             except AttributeError:
                 team_color = 'gray'
             style = "solid" if constants.camera[session.event.year].get(int(driver_number),
                                                                         'black') == "black" else "dashed"
-            ax.plot(car_data.Distance, car_data.Speed,
-                    color=team_color, label=laps.Driver, linestyle=style, linewidth=1, alpha=0.5)
+            car_data = laps.get_car_data().add_distance()
+            ax.plot(car_data.Distance, car_data.Speed, color=team_color, label=laps.Driver, linestyle=style,
+                    linewidth=1, alpha=0.5)
         v_min, v_max = float('inf'), float('-inf')
         for driver_number in driver_group:
             laps = session.laps.pick_drivers(driver_number).pick_fastest()
@@ -541,12 +540,9 @@ def plot_speed_distance_comparison(session: Session, log: Logger):
             minimum: float = car_data.Speed.min()
             maximum: float = car_data.Speed.max()
             v_min, v_max = min(v_min, minimum), max(v_max, maximum)
-
         if v_min == float('inf') or v_max == float('-inf'):
             continue
-
         ax.vlines(x=circuit_info.corners.Distance, ymin=v_min - 20, ymax=v_max + 20, linestyles='dotted', colors='grey')
-
         for _, corner in circuit_info.corners.iterrows():
             txt = f"{corner.Number}{corner.Letter}"
             ax.text(corner.Distance, v_min - 30, txt, va='center_baseline', ha='center', size='small')
@@ -575,13 +571,6 @@ def plot_speed_on_track(session: Session, log: Logger):
         lap = session.laps.pick_drivers(driver_number).pick_fastest()
         if lap is None:
             continue
-        x = lap.telemetry['X']
-        y = lap.telemetry['Y']
-        color = lap.telemetry['Speed']
-
-        points = np.array([x, y]).T.reshape(-1, 1, 2)
-        segments = np.concatenate([points[:-1], points[1:]], axis=1)
-
         fig, ax = plt.subplots(sharex=True, sharey=True, figsize=(12.8, 7.2), layout='tight')
         rect = 0, 0.08, 1, 1
         fig.tight_layout(rect=rect)
@@ -591,15 +580,17 @@ def plot_speed_on_track(session: Session, log: Logger):
 
         ax.plot(lap.telemetry['X'], lap.telemetry['Y'], color='black', linestyle='-', linewidth=16, zorder=0)
 
+        x = lap.telemetry['X']
+        y = lap.telemetry['Y']
+        points = np.array([x, y]).T.reshape(-1, 1, 2)
+        segments = np.concatenate([points[:-1], points[1:]], axis=1)
         colormap = cm.get_cmap("plasma")
+        color = lap.telemetry['Speed']
         norm = plt.Normalize(color.min(), color.max())
         lc = LineCollection(segments, cmap=colormap, norm=norm, linestyle='-', linewidth=5)
-
         lc.set_array(color)
-
         ax.add_collection(lc)
         axes = 0.25, 0.05, 0.5, 0.05
-
         color_bar_axes = fig.add_axes(axes)
         normal_legend = mpl.colors.Normalize(vmin=color.min(), vmax=color.max())
         mpl.colorbar.ColorbarBase(color_bar_axes, norm=normal_legend, cmap=colormap, orientation="horizontal")
