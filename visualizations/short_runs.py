@@ -518,6 +518,8 @@ def plot_speed_distance_comparison(session: Session, log: Logger):
         driver_group = driver_numbers[start:] if group_index == num_groups - 1 else driver_numbers[
             start:start + drivers_per_fig]
         fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
+        minimum_list = []
+        maximum_list = []
         for driver_number in driver_group:
             laps = session.laps.pick_drivers(driver_number).pick_fastest()
             if laps is None:
@@ -531,22 +533,16 @@ def plot_speed_distance_comparison(session: Session, log: Logger):
             car_data = laps.get_car_data().add_distance()
             ax.plot(car_data.Distance, car_data.Speed, color=team_color, label=laps.Driver, linestyle=style,
                     linewidth=1, alpha=0.5)
-        v_min, v_max = float('inf'), float('-inf')
-        for driver_number in driver_group:
-            laps = session.laps.pick_drivers(driver_number).pick_fastest()
-            if laps is None:
-                continue
-            car_data = laps.get_car_data().add_distance()
-            minimum: float = car_data.Speed.min()
-            maximum: float = car_data.Speed.max()
-            v_min, v_max = min(v_min, minimum), max(v_max, maximum)
-        if v_min == float('inf') or v_max == float('-inf'):
+            minimum_list.append(car_data.Speed.min())
+            maximum_list.append(car_data.Speed.max())
+        if len(minimum_list) == 0 or len(maximum_list) == 0:
             continue
-        ax.vlines(x=circuit_info.corners.Distance, ymin=v_min - 20, ymax=v_max + 20, linestyles='dotted', colors='grey')
+        ax.vlines(x=circuit_info.corners.Distance, ymin=min(minimum_list) - 20, ymax=max(maximum_list) + 20,
+                  linestyles='dotted', colors='grey')
         for _, corner in circuit_info.corners.iterrows():
             txt = f"{corner.Number}{corner.Letter}"
-            ax.text(corner.Distance, v_min - 30, txt, va='center_baseline', ha='center', size='small')
-        ax.set_ylim(v_min - 40, v_max + 20)
+            ax.text(corner.Distance, min(minimum_list) - 30, txt, va='center_baseline', ha='center', size='small')
+        ax.set_ylim(min(minimum_list) - 40, max(maximum_list) + 20)
         ax.legend(fontsize='small')
         ax.grid(True)
         output_path = (
@@ -644,8 +640,8 @@ def plot_time_distance_comparison(session: Session, log: Logger):
         common_distance = np.arange(0.0, max_distance, resample_step)
         ref_time = np.interp(common_distance, fastest_dist, fastest_time)
         fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout="tight")
-        v_min = 0.0
-        v_max = 0.0
+        minimum_list = []
+        maximum_list = []
         for driver_number, lap in lap_map.items():
             car_data = lap.get_car_data().add_distance()
             dist = car_data["Distance"].to_numpy()
@@ -676,19 +672,17 @@ def plot_time_distance_comparison(session: Session, log: Logger):
                 linestyle=style,
                 label=label
             )
-            v_min = min(v_min, float(delta.min()))
-            v_max = max(v_max, float(delta.max()))
+            minimum_list.append(float(delta.min()))
+            maximum_list.append(float(delta.max()))
         valid_corners = circuit_info.corners[
             circuit_info.corners.Distance <= max_distance
             ]
-        if v_max > 3:
-            v_max = 3
-        if v_min < -3:
-            v_min = -3
+        v_min = min(minimum_list) if min(minimum_list) > -3 else -3
+        v_max = max(maximum_list) if max(maximum_list) < 3 else 3
         ax.vlines(
             x=valid_corners.Distance,
-            ymin=v_min,
-            ymax=v_max,
+            ymin=v_max,
+            ymax=v_min,
             linestyles="dotted",
             colors="grey"
         )
