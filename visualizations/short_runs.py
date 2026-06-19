@@ -89,22 +89,11 @@ def compute_and_save_segment_tables_plotly(
         filtered = corners_df[
             (corners_df['Distance'] >= segment_boundaries[i - 1]) & (corners_df['Distance'] <= segment_boundaries[i])
             ]
-        row = [name, dist, filtered['Number'].tolist()]
-        for driver_number in session.drivers:
-            t = driver_times.get(driver_number)
-            if t is None:
-                row.append(0)
-                continue
-            c = t[i]
-            b = t[i - 1]
-            if c is None:
-                row.append(0)
-                continue
-            if b is None:
-                row.append(0)
-                continue
-            row.append(round(c - b, 3))
-        segment_rows.append(row)
+        segment_rows.append(
+            [name, dist, filtered['Number'].tolist()] +
+            [round(t[i] - t[i - 1], 3) if (t := driver_times.get(driver_number)) is not None and i < len(t) and t[
+                i] is not None and t[i - 1] is not None else 0 for driver_number in session.drivers]
+        )
 
     abbreviations = [session.get_driver(d).Abbreviation for d in session.drivers]
 
@@ -164,29 +153,16 @@ def compute_and_save_segment_tables_plotly(
         filtered = corners_df[
             (corners_df['Distance'] >= segment_boundaries[i - 1]) & (corners_df['Distance'] <= segment_boundaries[i])
             ]
-        row = [name, dist, filtered['Number'].tolist()]
         best_time = best_deltas[i - 1]
         if best_time is None:
             continue
-        for driver_number in session.drivers:
-            t = driver_times.get(driver_number)
-            if t is None:
-                row.append(0)
-                continue
-            c = t[i]
-            b = t[i - 1]
-            if c is None:
-                row.append(0)
-                continue
-            if b is None:
-                row.append(0)
-                continue
-            row.append(round((c - b) - best_time, 3))
-        gap_rows.append(row)
-
+        gap_rows.append(
+            [name, dist, filtered['Number'].tolist()] +
+            [round((c - b) - best_time, 3) if (t := driver_times.get(driver_number)) is not None and i < len(t) and t[
+                i] is not None and t[i - 1] is not None else 0 for driver_number in session.drivers]
+        )
     gap_header = ["segment", "distance", "corners"] + abbreviations
     gap_data = list(zip(*gap_rows))
-
     fig_gap = go.Figure(data=[go.Table(
         header={'values': gap_header, 'fill_color': 'lightgrey', 'align': 'center'},
         cells={'values': gap_data, 'align': 'center'}
