@@ -84,9 +84,6 @@ def load_config() -> Config:
 @tracer.start_as_current_span("fast_f1")
 def fast_f1():
     fastf1.Cache.enable_cache('./cache')
-    fastf1.logger.LoggingManager.debug = False
-    fastf1.logger.LoggingManager.set_level(logging.WARNING)
-    fastf1.logger.set_log_level(logging.WARNING)
 
 
 @tracer.start_as_current_span("log")
@@ -94,8 +91,9 @@ def log() -> Logger:
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s - %(levelname)s - %(pathname)s:%(lineno)d --- %(message)s",  # Log format
-        handlers=[
-            logging.StreamHandler(),
-        ],
+        handlers=[logging.StreamHandler()],
     )
+    logging.getLogger('choreographer').setLevel(logging.WARNING)
+    logging.getLogger('fastf1').setLevel(logging.WARNING)
+    logging.getLogger('kaleido').setLevel(logging.WARNING)
     return logging.getLogger(__name__)
