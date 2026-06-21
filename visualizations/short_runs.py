@@ -9,7 +9,7 @@ import numpy as np
 import pandas
 import plotly.express as px
 import plotly.graph_objects as go
-from fastf1.core import Session, Lap
+from fastf1.core import Session, Lap, Telemetry
 from matplotlib import pyplot as plt
 from matplotlib.collections import LineCollection
 from matplotlib.colorbar import ColorbarBase
@@ -253,28 +253,15 @@ def plot_flat_out(session: Session, log: Logger):
         lap = session.laps.pick_drivers(driver_number).pick_fastest()
         if lap is None:
             continue
-        start_distance = 0
-        sum_distance = 0
-        start_time = 0
-        sum_time = 0
-        for i in range(0, len(lap.telemetry)):
-            e = lap.telemetry.iloc[i]
-            if e.Throttle > float(lap.telemetry.Throttle.max()) - 3:
-                if start_distance == 0:
-                    start_distance = e.Distance
-                    start_time = e.Time.total_seconds()
-            else:
-                if start_distance != 0:
-                    sum_distance += e.Distance - start_distance
-                    start_distance = 0
-                    sum_time += e.Time.total_seconds() - start_time
-                    start_time = 0
-        z = lap.telemetry.iloc[-1]
-        if z.Throttle > float(lap.telemetry.Throttle.max()) - 3 and start_time != 0:
-            sum_distance += z.Distance - start_distance
-            sum_time += z.Time.total_seconds() - start_time
+        tel: Telemetry = lap.telemetry
+        is_flat_out_prev = (tel.Throttle > float(tel.Throttle.max()) - 3).shift(1, fill_value=False)
+        sum_distance = (tel.Distance.diff() * is_flat_out_prev).sum()
+        sum_time = (tel.Time.dt.total_seconds().diff() * is_flat_out_prev).sum()
+        z = tel.iloc[-1]
         x = sum_distance / z.Distance
-        y = sum_time / (z.Time.total_seconds() - lap.telemetry.Time.iloc[0].total_seconds())
+        if x < 0.1:
+            continue
+        y = sum_time / (z.Time.total_seconds() - tel.Time.iloc[0].total_seconds())
         try:
             color = fastf1.plotting.get_team_color(lap.Team, session)
         except AttributeError:
