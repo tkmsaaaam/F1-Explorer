@@ -4,7 +4,6 @@ from logging import Logger
 
 import fastf1
 import matplotlib as mpl
-import matplotlib.cm as cm
 import numpy as np
 import pandas
 import plotly.express as px
@@ -91,8 +90,8 @@ def compute_and_save_segment_tables_plotly(
             ]
         segment_rows.append(
             [name, dist, filtered['Number'].tolist()] +
-            [round(t[i] - t[i - 1], 3) if (t := driver_times.get(driver_number)) is not None and i < len(t) and t[
-                i] is not None and t[i - 1] is not None else 0 for driver_number in session.drivers]
+            [round(c - s, 3) if (t := driver_times.get(driver_number)) is not None and i < len(t) and (
+                c := t[i]) is not None and (s := t[i - 1]) is not None else 0 for driver_number in session.drivers]
         )
 
     abbreviations = [session.get_driver(d).Abbreviation for d in session.drivers]
@@ -158,8 +157,8 @@ def compute_and_save_segment_tables_plotly(
             continue
         gap_rows.append(
             [name, dist, filtered['Number'].tolist()] +
-            [round((c - b) - best_time, 3) if (t := driver_times.get(driver_number)) is not None and i < len(t) and t[
-                i] is not None and t[i - 1] is not None else 0 for driver_number in session.drivers]
+            [round((c - b) - best_time, 3) if (t := driver_times.get(driver_number)) is not None and i < len(t) and (
+                c := t[i]) is not None and (b := t[i - 1]) is not None else 0 for driver_number in session.drivers]
         )
     gap_header = ["segment", "distance", "corners"] + abbreviations
     gap_data = list(zip(*gap_rows))
@@ -543,7 +542,7 @@ def plot_speed_on_track(session: Session, log: Logger):
         y = lap.telemetry['Y']
         points = np.array([x, y]).T.reshape(-1, 1, 2)
         segments = np.concatenate([points[:-1], points[1:]], axis=1)
-        colormap = cm.get_cmap("plasma")
+        colormap = plt.get_cmap("plasma")
         color = lap.telemetry['Speed']
         norm = plt.Normalize(color.min(), color.max())
         lc = LineCollection(segments, cmap=colormap, norm=norm, linestyle='-', linewidth=5)
