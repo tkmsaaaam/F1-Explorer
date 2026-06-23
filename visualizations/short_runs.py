@@ -36,10 +36,10 @@ def compute_competitive_drivers(session: Session, log: Logger, c: int) -> list[i
     teams = set()
     for driver_number in session.drivers:
         driver = session.get_driver(driver_number)
-        if driver['TeamName'] not in teams:
-            n.append(driver['DriverNumber'])
-            teams.add(driver['TeamName'])
-            log.info(f"{len(n)}: {driver['TeamName']}'s fastest {driver['Abbreviation']}")
+        if driver.TeamName not in teams:
+            n.append(driver.DriverNumber)
+            teams.add(driver.TeamName)
+            log.info(f"{len(n)}: {driver.TeamName}'s fastest {driver.Abbreviation}")
         if len(n) > c - 1:
             break
     return n
@@ -66,16 +66,10 @@ def compute_and_save_segment_tables_plotly(
         laps = session.laps.pick_drivers(driver_number).pick_fastest()
         if laps is None or laps.empty:
             continue
-
         car_data = laps.get_car_data().add_distance()
-        times: list[float | None] = []
-        for dist in segment_boundaries:
-            last_point = car_data[car_data['Distance'] < dist]
-            if not last_point.empty:
-                times.append(last_point.iloc[-1]['Time'].total_seconds())
-            else:
-                times.append(None)
-        driver_times[driver_number] = times
+        driver_times[driver_number] = [
+            None if (last_point := car_data[car_data.Distance < dist]).empty else
+            last_point.iloc[-1].Time.total_seconds() for dist in segment_boundaries]
 
     circuit = session.get_circuit_info()
     if circuit is None:
@@ -86,10 +80,10 @@ def compute_and_save_segment_tables_plotly(
         dist = round(segment_boundaries[i] - segment_boundaries[i - 1], 1)
         corners_df = circuit.corners
         filtered = corners_df[
-            (corners_df['Distance'] >= segment_boundaries[i - 1]) & (corners_df['Distance'] <= segment_boundaries[i])
+            (corners_df.Distance >= segment_boundaries[i - 1]) & (corners_df.Distance <= segment_boundaries[i])
             ]
         segment_rows.append(
-            [name, dist, filtered['Number'].tolist()] +
+            [name, dist, filtered.Number.tolist()] +
             [round(c - s, 3) if (t := driver_times.get(driver_number)) is not None and i < len(t) and (
                 c := t[i]) is not None and (s := t[i - 1]) is not None else 0 for driver_number in session.drivers]
         )
@@ -150,13 +144,13 @@ def compute_and_save_segment_tables_plotly(
         dist = round(segment_boundaries[i] - segment_boundaries[i - 1], 1)
         corners_df = circuit.corners
         filtered = corners_df[
-            (corners_df['Distance'] >= segment_boundaries[i - 1]) & (corners_df['Distance'] <= segment_boundaries[i])
+            (corners_df.Distance >= segment_boundaries[i - 1]) & (corners_df.Distance <= segment_boundaries[i])
             ]
         best_time = best_deltas[i - 1]
         if best_time is None:
             continue
         gap_rows.append(
-            [name, dist, filtered['Number'].tolist()] +
+            [name, dist, filtered.Number.tolist()] +
             [round((c - b) - best_time, 3) if (t := driver_times.get(driver_number)) is not None and i < len(t) and (
                 c := t[i]) is not None and (b := t[i - 1]) is not None else 0 for driver_number in session.drivers]
         )
@@ -196,7 +190,7 @@ def plot_best_laptime(session: Session, log: Logger, key: str):
         y=key,
         color="Acronym",
         text_auto=True,
-        color_discrete_map={row["Acronym"]: row["Color"] for _, row in df.iterrows()}
+        color_discrete_map={row.Acronym: row.Color for _, row in df.iterrows()}
     )
     fig.update_yaxes(range=[min([i[key] for i in data]) - 0.1, max([i[key] for i in data]) + 0.1], tickformat=".3f")
     output_path = f"./images/{session.event.year}/{session.event.RoundNumber}_{session.event.Location}/{session.name.replace(' ', '')}/{key}.png"
@@ -229,7 +223,7 @@ def plot_best_speed(session: Session, log: Logger, key: str):
         y=key,
         color="Acronym",
         text_auto=True,
-        color_discrete_map={row["Acronym"]: row["Color"] for _, row in df.iterrows()}
+        color_discrete_map={row.Acronym: row.Color for _, row in df.iterrows()}
     )
     fig.update_yaxes(range=[min([i[key] for i in data]) - 5, max([i[key] for i in data]) + 5], tickformat=".1f")
     output_path = f"./images/{session.event.year}/{session.event.RoundNumber}_{session.event.Location}/{session.name.replace(' ', '')}/{key}.png"
@@ -245,7 +239,7 @@ def plot_flat_out(session: Session, log: Logger):
         session: セッション
         log: ロガー
     """
-    driver_numbers = session.laps['DriverNumber'].unique()
+    driver_numbers = session.laps.DriverNumber.unique()
     driver_numbers.sort()
     fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
     for driver_number in driver_numbers:
@@ -360,12 +354,12 @@ def plot_gear_shift_on_track(session: Session, log: Logger):
         if lap is None:
             continue
         tel = lap.get_telemetry()
-        x = np.array(tel['X'].values)
-        y = np.array(tel['Y'].values)
+        x = np.array(tel.X.values)
+        y = np.array(tel.Y.values)
 
         points = np.array([x, y]).T.reshape(-1, 1, 2)
         segments = np.concatenate([points[:-1], points[1:]], axis=1)
-        gear = tel['nGear'].to_numpy().astype(float)
+        gear = tel.nGear.to_numpy().astype(float)
 
         cmap = colormaps['Paired']
         lc_comp = LineCollection(segments, norm=plt.Normalize(1, cmap.N + 1), cmap=cmap)
@@ -524,7 +518,6 @@ def plot_speed_on_track(session: Session, log: Logger):
         session: 分析対象のセッション
         log: ロガー
     """
-    # Uncomparable
     for driver_number in session.drivers:
         lap = session.laps.pick_drivers(driver_number).pick_fastest()
         if lap is None:
@@ -536,14 +529,14 @@ def plot_speed_on_track(session: Session, log: Logger):
         fig.subplots_adjust(left=0.1, right=0.9, top=0.9, bottom=0.12)
         ax.axis('off')
 
-        ax.plot(lap.telemetry['X'], lap.telemetry['Y'], color='black', linestyle='-', linewidth=16, zorder=0)
+        ax.plot(lap.telemetry.X, lap.telemetry.Y, color='black', linestyle='-', linewidth=16, zorder=0)
 
-        x = lap.telemetry['X']
-        y = lap.telemetry['Y']
+        x = lap.telemetry.X
+        y = lap.telemetry.Y
         points = np.array([x, y]).T.reshape(-1, 1, 2)
         segments = np.concatenate([points[:-1], points[1:]], axis=1)
         colormap = plt.get_cmap("plasma")
-        color = lap.telemetry['Speed']
+        color = lap.telemetry.Speed
         norm = plt.Normalize(color.min(), color.max())
         lc = LineCollection(segments, cmap=colormap, norm=norm, linestyle='-', linewidth=5)
         lc.set_array(color)
@@ -593,8 +586,8 @@ def plot_time_distance_comparison(session: Session, log: Logger):
         fastest_driver_number = min(lap_map.keys(), key=lambda dn: lap_map[dn].LapTime.total_seconds())
         fastest_lap = lap_map[fastest_driver_number]
         fastest_car_data = fastest_lap.get_car_data().add_distance()
-        fastest_dist = fastest_car_data["Distance"].to_numpy()
-        fastest_time = np.array([t.total_seconds() for t in fastest_car_data["Time"]], dtype=float)
+        fastest_dist = fastest_car_data.Distance.to_numpy()
+        fastest_time = np.array([t.total_seconds() for t in fastest_car_data.Time], dtype=float)
         uniq_idx = np.unique(fastest_dist, return_index=True)[1]
         fastest_dist = fastest_dist[np.sort(uniq_idx)]
         fastest_time = fastest_time[np.sort(uniq_idx)]
@@ -606,8 +599,8 @@ def plot_time_distance_comparison(session: Session, log: Logger):
         maximum_list = []
         for driver_number, lap in lap_map.items():
             car_data = lap.get_car_data().add_distance()
-            dist = car_data["Distance"].to_numpy()
-            tm = np.array([t.total_seconds() for t in car_data["Time"]], dtype=float)
+            dist = car_data.Distance.to_numpy()
+            tm = np.array([t.total_seconds() for t in car_data.Time], dtype=float)
             uniq_idx = np.unique(dist, return_index=True)[1]
             dist = dist[np.sort(uniq_idx)]
             tm = tm[np.sort(uniq_idx)]
@@ -663,7 +656,7 @@ def plot_time_distance_comparison(session: Session, log: Logger):
         ax.set_xlabel(f"Distance (m) - {fastest_lap.Driver} reference")
         ax.set_ylabel("Delta Time (s)")
         ax.set_title(
-            f"{session.event['EventName']} {session.name}\n"
+            f"{session.event.EventName} {session.name}\n"
             f"Delta to fastest in group ({fastest_lap.Driver})"
         )
         ax.set_xlim(0, max_distance)
@@ -682,8 +675,7 @@ def plot_time_distance_comparison(session: Session, log: Logger):
         plt.close(fig)
 
 
-def _plot_driver_telemetry(session: Session, log: Logger,
-                           driver_numbers: list[int], key: str, label, value_func):
+def _plot_driver_telemetry(session: Session, log: Logger, driver_numbers: list[int], key: str, label, value_func):
     group_size = 5
     circuit_info = session.get_circuit_info()
     if circuit_info is None:
@@ -763,7 +755,7 @@ def make_mini_segment(session: Session, log: Logger, corner_map: dict[str, list[
         corner = corners_df.iloc[c]
         if corner is None:
             continue
-        i = str(corner['Number'])
+        i = str(corner.Number)
         if not i in corner_map:
             continue
         diffs = corner_map[i]
@@ -790,18 +782,17 @@ def plot_mini_segment_on_circuit(session: Session, log: Logger, segment_boundari
     car_data = fastest_lap.get_telemetry().add_distance()
 
     segment_boundaries.sort()
-    # プロット
-    x = car_data['X'].values
-    y = car_data['Y'].values
+    x = car_data.X.values
+    y = car_data.Y.values
     fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150)
     ax.plot(x, y, color='lightgrey', linewidth=2)
 
     for i in range(1, len(segment_boundaries)):
         start = segment_boundaries[i - 1]
         end = segment_boundaries[i]
-        mask = (car_data['Distance'] >= start) & (car_data['Distance'] <= end)
-        seg_x = car_data[mask]['X'].values
-        seg_y = car_data[mask]['Y'].values
+        mask = (car_data.Distance >= start) & (car_data.Distance <= end)
+        seg_x = car_data[mask].X.values
+        seg_y = car_data[mask].Y.values
         color = 'black' if i % 2 == 0 else 'red'
         ax.plot(seg_x, seg_y, color=color, linewidth=3)
 
@@ -829,7 +820,7 @@ def plot_throttle(session: Session, log: Logger):
         session: 分析対象のセッション
         log: ロガー
     """
-    driver_numbers = session.laps['DriverNumber'].unique()
+    driver_numbers = session.laps.DriverNumber.unique()
     _plot_driver_telemetry(
         session, log,
         driver_numbers.tolist(),
@@ -847,7 +838,7 @@ def plot_brake(session: Session, log: Logger):
         session: 分析対象のセッション
         log: ロガー
     """
-    driver_numbers = session.laps['DriverNumber'].unique()
+    driver_numbers = session.laps.DriverNumber.unique()
     _plot_driver_telemetry(
         session, log,
         driver_numbers.tolist(),
@@ -865,7 +856,7 @@ def plot_drs(session: Session, log: Logger):
         session: 分析対象のセッション
         log: ロガー
     """
-    driver_numbers = session.laps['DriverNumber'].unique()
+    driver_numbers = session.laps.DriverNumber.unique()
     _plot_driver_telemetry(session, log,
                            driver_numbers.tolist(),
                            key='drs',
@@ -913,7 +904,6 @@ def plot_telemetry(session: Session, log: Logger,
         v_min, v_max = min(v_min, y_data.min()), max(v_max, y_data.max())
         name = name + f"{driver_name}_"
 
-    # コーナー線と番号
     for _, corner in circuit_info.corners.iterrows():
         ax.axvline(x=corner.Distance, linestyle='dotted', color='grey', linewidth=0.8)
         ax.text(corner.Distance, v_min - (v_max - v_min) * 0.05,

@@ -35,8 +35,8 @@ def plot_lap_number_by_timing(session: Session, log: Logger):
         else:
             color = fastf1.plotting.get_team_color(team, session)
         stint_laps = stint_laps.sort_values(by='LapNumber')
-        lap_numbers = stint_laps['LapNumber']
-        lap_starts = stint_laps['LapStartDate']
+        lap_numbers = stint_laps.LapNumber
+        lap_starts = stint_laps.LapStartDate
         if stint_num == 1:
             # noinspection PyTypeChecker
             ax.plot(lap_starts, lap_numbers, color=color,
@@ -64,10 +64,10 @@ def plot_laptime(session: Session, log: Logger):
         session: セッション
         log: ロガー
     """
-    header = ["Lap"] + [session.get_driver(driver_number)['Abbreviation'] for driver_number in session.drivers]
+    header = ["Lap"] + [session.get_driver(driver_number).Abbreviation for driver_number in session.drivers]
 
     laps = session.laps
-    max_laps = max(len(laps[laps['DriverNumber'] == d]) for d in session.drivers)
+    max_laps = max(len(laps[laps.DriverNumber == d]) for d in session.drivers)
     lap_numbers = list(range(1, max_laps + 1))
     data_rows = [lap_numbers]
     fill_colors = [["#f0f0f0"] * max_laps]
@@ -212,8 +212,8 @@ def plot_laptime_by_lap_number(session: Session, log: Logger):
         else:
             color = fastf1.plotting.get_team_color(team, session)
         stint_laps = stint_laps.sort_values(by='LapNumber')
-        lap_times = stint_laps['LapTime'].dt.total_seconds().tolist()
-        lap_numbers = stint_laps['LapNumber']
+        lap_times = stint_laps.LapTime.dt.total_seconds().tolist()
+        lap_numbers = stint_laps.LapNumber
         ax.plot(lap_numbers, lap_times, color=color,
                 linestyle="solid" if constants.camera[session.event.year].get(int(stint_laps.DriverNumber.iloc[0]),
                                                                               'black') == "black" else "dashed",
@@ -250,14 +250,14 @@ def plot_laptime_by_timing(session: Session, log: Logger):
         else:
             color = fastf1.plotting.get_team_color(team, session)
         stint_laps = stint_laps.sort_values(by='LapNumber')
-        lap_times = stint_laps['LapTime'].dt.total_seconds().tolist()
-        if not len(stint_laps['LapStartDate']) > 0:
+        lap_times = stint_laps.LapTime.dt.total_seconds().tolist()
+        if not len(stint_laps.LapStartDate) > 0:
             continue
-        d: datetime64 = stint_laps['LapStartDate'].values[0]
+        d: datetime64 = stint_laps.LapStartDate.values[0]
         if not pandas.isna(d):
-            lap_starts = stint_laps['LapStartDate'].values
+            lap_starts = stint_laps.LapStartDate.values
         else:
-            lap_starts = stint_laps['LapStartTime'].values
+            lap_starts = stint_laps.LapStartTime.values
         if not len(lap_times) > 0 or not len(lap_starts) > 0:
             continue
         ax.plot(lap_starts, lap_times, color=color,

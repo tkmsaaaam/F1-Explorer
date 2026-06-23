@@ -111,9 +111,9 @@ def laptime(log: Logger, filepath: str, filename: str, session: Session, r: int 
                                                                               'black') == "black" else "dashed")
     minimum: datetime.timedelta = session.laps.sort_values(by='LapTime').LapTime.min()
     maximum: datetime.timedelta = session.laps[
-        (session.laps['IsAccurate'])
-        & (session.laps['Deleted'] == False)
-        & (session.laps['TrackStatus'] == '1')
+        session.laps.IsAccurate
+        & (session.laps.Deleted == False)
+        & (session.laps.TrackStatus == '1')
     ].sort_values(by='LapTime', ascending=False).LapTime.max()
     ax.legend(fontsize='small')
     ax.set_ylim(top=minimum.total_seconds() - 0.1, bottom=maximum.total_seconds() + 0.1)
@@ -411,7 +411,7 @@ def speed_first_10s(log: Logger, filepath: str, session: Session) -> None:
         if lap is None:
             continue
         car_data = lap.get_car_data().copy()
-        car_data["TimeSeconds"] = car_data["Time"].dt.total_seconds()
+        car_data["TimeSeconds"] = car_data.Time.dt.total_seconds()
         car_data = car_data[car_data.TimeSeconds <= 10]
         driver_number = int(lap.DriverNumber)
         ax.plot(
