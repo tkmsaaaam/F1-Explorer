@@ -1,6 +1,7 @@
 import datetime
 import os
 from logging import Logger
+from typing import cast
 
 import fastf1
 import pandas
@@ -64,14 +65,12 @@ def make_driver_laps_set(laps: Laps) -> set[DriverLaps]:
         l = stint_laps.iloc[0]
         driver: Driver = Driver(int(l.DriverNumber), l.Driver, l.Team)
         laps: dict[int, Lap] = {}
-        for i in range(0, len(stint_laps)):
+        for _, l in cast(Laps, stint_laps).iterlaps():
             # noinspection PyTypeChecker
-            lap: Lap = Lap(stint_laps.LapTime.iloc[i].total_seconds(), stint_laps.Time.iloc[i],
-                           stint_laps.Position.iloc[i], pandas.isna(stint_laps.PitOutTime.iloc[i]),
-                           Tyre(stint_laps.Compound.iloc[i], stint_laps.FreshTyre.iloc[i]))
+            lap: Lap = Lap(l.LapTime.total_seconds(), l.Time, l.Position, pandas.isna(l.PitOutTime),
+                           Tyre(l.Compound, l.FreshTyre))
             # convert lap number to native int to avoid numpy float/int issues later
-            lap_num = int(stint_laps.LapNumber.iloc[i])
-            laps[lap_num] = lap
+            laps[int(l.LapNumber)] = lap
         result.add(DriverLaps(driver, laps))
     return result
 
@@ -114,7 +113,7 @@ def laptime(log: Logger, filepath: str, filename: str, session: Session, r: int 
         session.laps.IsAccurate
         & (session.laps.Deleted == False)
         & (session.laps.TrackStatus == '1')
-    ].sort_values(by='LapTime', ascending=False).LapTime.max()
+        ].sort_values(by='LapTime', ascending=False).LapTime.max()
     ax.legend(fontsize='small')
     ax.set_ylim(top=minimum.total_seconds() - 0.1, bottom=maximum.total_seconds() + 0.1)
     ax.grid(True)
@@ -461,10 +460,8 @@ def speed_until_turn1(log: Logger, filepath: str, session: Session) -> None:
             linestyle="solid" if constants.camera[session.event.year].get(driver_number,
                                                                           'black') == "black" else "dashed"
         )
-        # noinspection PyCallingNonCallable
-        v_min = min(v_min, int(car_data.Speed.min()) + 50)
-        # noinspection PyCallingNonCallable
-        v_max = max(v_max, int(car_data.Speed.max()) + 10)
+        v_min = min(v_min, int(cast(pandas.Series, car_data.Speed).min()) + 50)
+        v_max = max(v_max, int(cast(pandas.Series, car_data.Speed).max()) + 10)
     ax.set_xlabel("Distance (m)")
     ax.set_ylabel("Speed (km/h)")
     ax.set_title("Speed until Turn 1")

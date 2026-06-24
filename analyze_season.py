@@ -3,7 +3,7 @@ import os
 import zoneinfo
 from itertools import accumulate
 from logging import Logger
-from typing import Final
+from typing import Final, cast
 
 import fastf1.plotting
 import numpy
@@ -113,33 +113,23 @@ def __main():
         if now < event.EventDate:
             break
         if event.RoundNumber not in results:
-            # noinspection PyTypeChecker
-            results[event.RoundNumber] = Weekend(event.EventName)
+            results[cast(int, event.RoundNumber)] = Weekend(cast(str, event.EventName))
 
-        # noinspection PyTypeChecker
-        gp: Weekend = results[event.RoundNumber]
+        gp: Weekend = results[cast(int, event.RoundNumber)]
         if event.EventFormat == "sprint_qualifying":
-            # noinspection PyTypeChecker
-            sprint = fastf1.get_session(config.get_year(), event.EventName, "S")
+            sprint = fastf1.get_session(config.get_year(), cast(str, event.EventName), "S")
             sprint.load(laps=False, telemetry=False, weather=False, messages=False)
             for driver_row in sprint.results.itertuples(index=False):
-                # noinspection PyTypeChecker
-                gp.set_sprint_point(driver_row.Abbreviation, driver_row.Points)
-
-        # noinspection PyTypeChecker
+                gp.set_sprint_point(cast(str, driver_row.Abbreviation), cast(int, driver_row.Points))
         race = fastf1.get_session(config.get_year(), event.EventName, "R")
         race.load(laps=False, telemetry=False, weather=False, messages=False)
         for driver_row in race.results.itertuples(index=False):
-            abbreviation = driver_row.Abbreviation
-            # noinspection PyTypeChecker
-            gp.set_grid_position(abbreviation, driver_row.GridPosition)
-            # noinspection PyTypeChecker
-            gp.set_position(abbreviation, driver_row.Position)
-            # noinspection PyTypeChecker
-            gp.set_point(abbreviation, driver_row.Points)
+            abbreviation: str = cast(str, driver_row.Abbreviation)
+            gp.set_grid_position(abbreviation, cast(int, driver_row.GridPosition))
+            gp.set_position(abbreviation, cast(int, driver_row.Position))
+            gp.set_point(abbreviation, cast(int, driver_row.Points))
             if driver_row.DriverNumber not in drivers:
-                # noinspection PyTypeChecker
-                drivers[int(driver_row.DriverNumber)] = race.get_driver(abbreviation)
+                drivers[int(cast(str, driver_row.DriverNumber))] = race.get_driver(abbreviation)
 
     base_dir: Final = f"./images/{config.get_year()}"
     if len(results) == 0:

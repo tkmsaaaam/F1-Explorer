@@ -1,5 +1,6 @@
 import os
 from logging import Logger
+from typing import cast
 
 import fastf1.plotting
 import numpy
@@ -38,15 +39,13 @@ def plot_lap_number_by_timing(session: Session, log: Logger):
         lap_numbers = stint_laps.LapNumber
         lap_starts = stint_laps.LapStartDate
         if stint_num == 1:
-            # noinspection PyTypeChecker
             ax.plot(lap_starts, lap_numbers, color=color,
-                    linestyle="solid" if constants.camera[session.event.year].get(int(driver_number),
+                    linestyle="solid" if constants.camera[session.event.year].get(int(cast(str, driver_number)),
                                                                                   'black') == "black" else "dashed",
                     label=stint_laps.Driver.iloc[0])
         else:
-            # noinspection PyTypeChecker
             ax.plot(lap_starts, lap_numbers, color=color,
-                    linestyle="solid" if constants.camera[session.event.year].get(int(driver_number),
+                    linestyle="solid" if constants.camera[session.event.year].get(int(cast(str, driver_number)),
                                                                                   'black') == "black" else "dashed")
     ax.legend(fontsize='small')
     ax.grid(True)
