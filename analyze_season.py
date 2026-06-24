@@ -70,6 +70,13 @@ def get_color(v: DriverResult) -> str:
     return v.TeamColor
 
 
+def determine_linestyle(year: int, driver: int) -> str:
+    if constants.camera.get(year, {}).get(driver, 'black') == "black":
+        return "solid"
+    else:
+        return "dashed"
+
+
 def __save_events(base_dir: str, log: Logger, schedule: EventSchedule):
     output_path = f"{base_dir}/events.png"
     if os.path.exists(output_path):
@@ -146,8 +153,7 @@ def __main():
              range(1, latest)]
         ax.plot([i for i in range(1, latest)], [sum(y[:i + 1]) for i in range(len(y))], label=v.Abbreviation,
                 color='#' + get_color(v), linewidth=1,
-                linestyle="solid" if constants.camera.get(config.get_year(), {}).get(k,
-                                                                                     'black') == "black" else "dashed")
+                linestyle=determine_linestyle(config.get_year(), k))
     ax.legend(fontsize='small')
     ax.grid(True)
     output_path = f"{base_dir}/standings.png"
@@ -161,8 +167,7 @@ def __main():
         y = [results[i].get_point(v.Abbreviation) + results[i].get_sprint_point(v.Abbreviation) for i in
              range(1, latest)]
         ax.plot([i for i in range(1, latest)], y, label=v.Abbreviation, color='#' + get_color(v), linewidth=1,
-                linestyle="solid" if constants.camera.get(config.get_year(), {}).get(k,
-                                                                                     'black') == "black" else "dashed")
+                linestyle=determine_linestyle(config.get_year(), k))
     ax.legend(fontsize='small')
     ax.grid(True)
     output_path = f"{base_dir}/results.png"
@@ -185,8 +190,7 @@ def __main():
              range(1, latest)]
         diff = [a - b for a, b in zip(accumulate(y), accumulate(champion_points))]
         ax.plot([i for i in range(1, latest)], diff, label=v.Abbreviation, color="#" + get_color(v), linewidth=1,
-                linestyle="solid" if constants.camera.get(config.get_year(), {}).get(k,
-                                                                                     'black') == "black" else "dashed")
+                linestyle=determine_linestyle(config.get_year(), k))
     ax.legend(fontsize='small')
     ax.grid(True)
     output_path = f"{base_dir}/diffs.png"
@@ -200,8 +204,7 @@ def __main():
     for k, v in drivers.items():
         y = [results[i].get_grid_position(v.Abbreviation) for i in range(1, latest)]
         ax.plot(x, y, label=v.Abbreviation, color='#' + get_color(v), linewidth=1,
-                linestyle="solid" if constants.camera.get(config.get_year(), {}).get(k,
-                                                                                     'black') == "black" else "dashed")
+                linestyle=determine_linestyle(config.get_year(), k))
     ax.legend(fontsize='small')
     ax.grid(True)
     ax.invert_yaxis()

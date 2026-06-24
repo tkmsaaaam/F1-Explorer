@@ -21,6 +21,13 @@ import constants
 tracer = trace.get_tracer(__name__)
 
 
+def determine_linestyle(year: int, driver: int) -> str:
+    if constants.camera.get(year, {}).get(driver, 'black') == "black":
+        return "solid"
+    else:
+        return "dashed"
+
+
 @tracer.start_as_current_span("compute_competitive_drivers")
 def compute_competitive_drivers(session: Session, log: Logger, c: int) -> list[int]:
     """トップcチームの早い方のドライバーの車番を算出する
@@ -437,8 +444,7 @@ def plot_speed_distance(session: Session, log: Logger):
             team_color = fastf1.plotting.get_team_color(laps.Team, session)
         except AttributeError:
             team_color = 'gray'
-        style = "solid" if constants.camera[session.event.year].get(int(driver_number),
-                                                                    'black') == "black" else "dashed"
+        style = determine_linestyle(session.event.year, int(driver_number))
         car_data = laps.get_car_data().add_distance()
         ax.plot(car_data.Distance, car_data.Speed, color=team_color, label=laps.Driver, linestyle=style)
         v_min: float = car_data.Speed.min()
@@ -484,8 +490,7 @@ def plot_speed_distance_comparison(session: Session, log: Logger):
                 team_color = fastf1.plotting.get_team_color(laps.Team, session)
             except AttributeError:
                 team_color = 'gray'
-            style = "solid" if constants.camera[session.event.year].get(int(driver_number),
-                                                                        'black') == "black" else "dashed"
+            style = determine_linestyle(session.event.year, int(driver_number))
             car_data = laps.get_car_data().add_distance()
             ax.plot(car_data.Distance, car_data.Speed, color=team_color, label=laps.Driver, linestyle=style,
                     linewidth=1, alpha=0.5)
@@ -610,13 +615,6 @@ def plot_time_distance_comparison(session: Session, log: Logger):
                 team_color = fastf1.plotting.get_team_color(lap.Team, session)
             except AttributeError:
                 team_color = 'gray'
-            style = (
-                "solid"
-                if constants.camera[session.event.year].get(
-                    int(driver_number), "black"
-                ) == "black"
-                else "dashed"
-            )
             label = lap.Driver
             if driver_number == fastest_driver_number:
                 label += " (FASTEST)"
@@ -624,7 +622,7 @@ def plot_time_distance_comparison(session: Session, log: Logger):
                 common_distance,
                 delta,
                 color=team_color,
-                linestyle=style,
+                linestyle=determine_linestyle(session.event.year, int(driver_number)),
                 label=label
             )
             minimum_list.append(float(delta.min()))

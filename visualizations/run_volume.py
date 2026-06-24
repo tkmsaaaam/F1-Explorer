@@ -17,6 +17,13 @@ import constants
 tracer = trace.get_tracer(__name__)
 
 
+def determine_linestyle(year: int, driver: int) -> str:
+    if constants.camera.get(year, {}).get(driver, 'black') == "black":
+        return "solid"
+    else:
+        return "dashed"
+
+
 @tracer.start_as_current_span("plot_lap_number_by_timing")
 def plot_lap_number_by_timing(session: Session, log: Logger):
     """y = ラップ番号
@@ -40,13 +47,11 @@ def plot_lap_number_by_timing(session: Session, log: Logger):
         lap_starts = stint_laps.LapStartDate
         if stint_num == 1:
             ax.plot(lap_starts, lap_numbers, color=color,
-                    linestyle="solid" if constants.camera[session.event.year].get(int(cast(str, driver_number)),
-                                                                                  'black') == "black" else "dashed",
+                    linestyle=determine_linestyle(session.event.year, int(cast(str, driver_number))),
                     label=stint_laps.Driver.iloc[0])
         else:
             ax.plot(lap_starts, lap_numbers, color=color,
-                    linestyle="solid" if constants.camera[session.event.year].get(int(cast(str, driver_number)),
-                                                                                  'black') == "black" else "dashed")
+                    linestyle=determine_linestyle(session.event.year, int(cast(str, driver_number))))
     ax.legend(fontsize='small')
     ax.grid(True)
     output_path = f"./images/{session.event.year}/{session.event.RoundNumber}_{session.event.Location}/{session.name.replace(' ', '')}/lap_number_by_timing.png"
@@ -214,8 +219,7 @@ def plot_laptime_by_lap_number(session: Session, log: Logger):
         lap_times = stint_laps.LapTime.dt.total_seconds().tolist()
         lap_numbers = stint_laps.LapNumber
         ax.plot(lap_numbers, lap_times, color=color,
-                linestyle="solid" if constants.camera[session.event.year].get(int(stint_laps.DriverNumber.iloc[0]),
-                                                                              'black') == "black" else "dashed",
+                linestyle=determine_linestyle(session.event.year, int(stint_laps.DriverNumber.iloc[0])),
                 label=stint_laps.Driver.iloc[0])
     # noinspection PyUnresolvedReferences
     minimum = session.laps.LapTime.min().total_seconds()
@@ -260,8 +264,7 @@ def plot_laptime_by_timing(session: Session, log: Logger):
         if not len(lap_times) > 0 or not len(lap_starts) > 0:
             continue
         ax.plot(lap_starts, lap_times, color=color,
-                linestyle="solid" if constants.camera[session.event.year].get(stint_laps.DriverNumber.iloc[0],
-                                                                              'black') == "black" else "dashed",
+                linestyle=determine_linestyle(session.event.year, int(stint_laps.DriverNumber.iloc[0])),
                 label=stint_laps.Driver.iloc[0])
     # noinspection PyUnresolvedReferences
     minimum = session.laps.LapTime.min().seconds

@@ -20,6 +20,11 @@ from visualizations.domain.tyre import Tyre
 
 tracer = trace.get_tracer(__name__)
 
+def determine_linestyle(year: int, driver: int) -> str:
+    if constants.camera.get(year, {}).get(driver,'black') == "black":
+        return "solid"
+    else:
+        return "dashed"
 
 @tracer.start_as_current_span("execute")
 def execute(session: Session, log: Logger, images_path: str, logs_path: str, lap_time_range: int | None,
@@ -106,8 +111,7 @@ def laptime(log: Logger, filepath: str, filename: str, session: Session, r: int 
         ]
         color = fastf1.plotting.get_team_color(lap_log.get_driver().get_team_name(), session)
         ax.plot(lap_numbers, lap_times, color=color, label=lap_log.get_driver().get_name(), linewidth=0.5,
-                linestyle="solid" if constants.camera[session.event.year].get(lap_log.get_driver().get_number(),
-                                                                              'black') == "black" else "dashed")
+                linestyle=determine_linestyle(session.event.year, lap_log.get_driver().get_number()))
     minimum: datetime.timedelta = session.laps.sort_values(by='LapTime').LapTime.min()
     maximum: datetime.timedelta = session.laps[
         session.laps.IsAccurate
@@ -302,8 +306,7 @@ def gap_to_ahead_graph(log: Logger, filepath: str, filename: str, session: Sessi
              ) and (l.get_at() - p_target).total_seconds() or 0
             for i in x
         ]
-        line_style = "solid" if constants.camera[session.event.year].get(driver_laps.get_driver().get_number(),
-                                                                         'black') == "black" else "dashed"
+        line_style = determine_linestyle(session.event.year, driver_laps.get_driver().get_number())
         ax.plot(x, y, color=fastf1.plotting.get_team_color(driver_laps.get_driver().get_team_name(), session),
                 label=driver_laps.get_driver().get_name(),
                 linestyle=line_style, linewidth=0.5)
@@ -347,8 +350,7 @@ def gap_to_top_graph(log: Logger, filepath: str, filename: str, session: Session
             else 0
             for i in x
         ]
-        line_style = "solid" if constants.camera[session.event.year].get(lap_log.get_driver().get_number(),
-                                                                         'black') == "black" else "dashed"
+        line_style = determine_linestyle(session.event.year, lap_log.get_driver().get_number())
         ax.plot(x, y, linewidth=0.5, color=color, label=lap_log.get_driver().get_name(), linestyle=line_style)
     ax.legend(fontsize='small')
     ax.invert_yaxis()
@@ -386,8 +388,7 @@ def positions(log: Logger, filepath: str, session: Session, lap_logs: set[Driver
             l.get_position() if (l := lap_log.get_laps().get(i)) is not None else 0
             for i in x
         ]
-        line_style = "solid" if constants.camera[session.event.year].get(lap_log.get_driver().get_number(),
-                                                                         'black') == "black" else "dashed"
+        line_style = determine_linestyle(session.event.year, lap_log.get_driver().get_number())
         ax.plot(x, y, linewidth=1, color=color, label=lap_log.get_driver().get_name(), linestyle=line_style)
 
     ax.legend(fontsize='small')
@@ -418,8 +419,7 @@ def speed_first_10s(log: Logger, filepath: str, session: Session) -> None:
             car_data.Speed,
             label=lap.Driver, linewidth=0.5,
             color=constants.team_color[session.event.EventDate.year][driver_number],
-            linestyle="solid" if constants.camera[session.event.year].get(driver_number,
-                                                                          'black') == "black" else "dashed"
+            linestyle=determine_linestyle(session.event.year, driver_number)
         )
         v_min = min(v_min, int(car_data.Speed.min()) + 50)
         v_max = max(v_max, int(car_data.Speed.max()) + 10)
@@ -457,8 +457,7 @@ def speed_until_turn1(log: Logger, filepath: str, session: Session) -> None:
             car_data.Speed,
             label=lap.Driver, linewidth=0.5,
             color=constants.team_color[session.event.EventDate.year][driver_number],
-            linestyle="solid" if constants.camera[session.event.year].get(driver_number,
-                                                                          'black') == "black" else "dashed"
+            linestyle=determine_linestyle(session.event.year, driver_number)
         )
         v_min = min(v_min, int(cast(pandas.Series, car_data.Speed).min()) + 50)
         v_max = max(v_max, int(cast(pandas.Series, car_data.Speed).max()) + 10)
