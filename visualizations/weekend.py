@@ -61,10 +61,12 @@ def plot_tyre(year: int, race_number: int, log: Logger):
         compound_colors = [constants.compound_color.get(name, "white") for name in compounds]
         table_colors.append(list(constants.compound_color.values()) + compound_colors + ["white"] * padding_len)
 
-    fig = graph_objects.Figure(data=[graph_objects.Table(
-        header={'values': names, 'fill_color': 'lightgrey', 'align': 'center'},
-        cells={'values': table_columns, 'fill_color': table_colors, 'align': 'center'}
-    )])
+    fig = graph_objects.Figure(
+        data=[graph_objects.Table(
+            header=graph_objects.table.Header(
+                values=names, fill=graph_objects.table.header.Fill(color='lightgrey'), align='center'),
+            cells=graph_objects.table.Cells(
+                values=table_columns, fill=graph_objects.table.cells.Fill(color=table_colors), align='center'))])
 
     output_path = f"./images/{session.event.year}/{session.event.RoundNumber}_{session.event.Location}/tyres.png"
     os.makedirs(os.path.dirname(output_path), exist_ok=True)

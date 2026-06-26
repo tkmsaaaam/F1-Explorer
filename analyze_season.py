@@ -81,19 +81,20 @@ def __save_events(base_dir: str, log: Logger, schedule: EventSchedule):
     output_path = f"{base_dir}/events.png"
     if os.path.exists(output_path):
         return
-    # noinspection SpellCheckingInspection
-    fig = graph_objects.Figure(data=[graph_objects.Table(
-        header={'values': ["number", "name", "sprint", "datetime"], 'fill_color': 'lightgrey', 'align': 'center'},
-        cells={'values': [[event.RoundNumber for _, event in schedule.iterrows()],
-                          [event.EventName for _, event in schedule.iterrows()],
-                          [event.EventFormat == "sprint_qualifying" for _, event in schedule.iterrows()],
-                          [datetime.datetime.fromtimestamp(event.Session5Date.timestamp(),
-                                                           tz=zoneinfo.ZoneInfo("Asia/Tokyo")) for _, event in
-                           schedule.iterrows()]],
-               'fill_color': [
-                   ["white" if event.RoundNumber % 2 == 0 else "#f2f2f2" for _, event in schedule.iterrows()]],
-               'align': 'center'}
-    )], layout={'autosize': True, 'margin': {'autoexpand': True}})
+    fig = graph_objects.Figure(
+        data=[graph_objects.Table(
+            header=graph_objects.table.Header(
+                values=["number", "name", "sprint", "datetime"],
+                fill=graph_objects.table.header.Fill(color='lightgrey'), align="center"),
+            cells=graph_objects.table.Cells(
+                values=[[event.RoundNumber for _, event in schedule.iterrows()],
+                        [event.EventName for _, event in schedule.iterrows()],
+                        [event.EventFormat == "sprint_qualifying" for _, event in schedule.iterrows()],
+                        [datetime.datetime.fromtimestamp(event.Session5Date.timestamp(), tz=zoneinfo.ZoneInfo("Asia/Tokyo")) for _, event in schedule.iterrows()]],
+                fill=graph_objects.table.cells.Fill(
+                    color=[["white" if event.RoundNumber % 2 == 0 else "#f2f2f2" for _, event in schedule.iterrows()]]),
+                align='center'))],
+        layout=graph_objects.Layout(autosize=True, margin=graph_objects.Margin(autoexpand=True)))
 
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     fig.write_image(output_path, width=1920, height=2160)
@@ -297,13 +298,19 @@ def __main():
     ]
 
     topic_colors = [['lightgrey'] * (len(schedule) + 1)]
-    # noinspection SpellCheckingInspection
-    fig = graph_objects.Figure(data=[graph_objects.Table(
-        header={'values': headers, 'fill_color': header_colors, 'align': 'center'},
-        cells={'values': round_numbers + event_names + [values_map[k] for k in drivers_standing],
-               'fill_color': topic_colors + topic_colors + [color_map[k] for k in drivers_standing],
-               'align': 'center', 'font_color': 'darkgrey'}
-    )], layout={'autosize': True, 'margin': {'autoexpand': True}})
+    fig = graph_objects.Figure(
+        data=[graph_objects.Table(
+            header=graph_objects.table.Header(
+                values=headers,
+                fill=graph_objects.table.header.Fill(color=header_colors),
+                align='center'),
+            cells=graph_objects.table.Cells(
+                values=round_numbers + event_names + [values_map[k] for k in drivers_standing],
+                fill=graph_objects.table.cells.Fill(
+                    color=topic_colors + topic_colors + [color_map[k] for k in drivers_standing]),
+                align='center',
+                font=graph_objects.table.cells.Font(color='darkgrey')))],
+        layout=graph_objects.Layout(autosize=True, margin=graph_objects.Margin(autoexpand=True)))
 
     output_path = f"{base_dir}/points.png"
     os.makedirs(os.path.dirname(output_path), exist_ok=True)

@@ -116,11 +116,13 @@ def plot_laptime(session: Session, log: Logger):
         data_rows.append(lap_times)
         fill_colors.append(bg_colors)
 
-    # noinspection SpellCheckingInspection
-    fig = graph_objects.Figure(data=[graph_objects.Table(
-        header={'values': header, 'fill_color': 'lightgrey', 'align': 'center'},
-        cells={'values': data_rows, 'fill_color': fill_colors, 'align': 'center'}
-    )], layout={'autosize': True, 'margin': {'autoexpand': True}})
+    fig = graph_objects.Figure(
+        data=[graph_objects.Table(
+            header=graph_objects.table.Header(
+                values=header, fill=graph_objects.table.header.Fill(color='lightgrey'), align='center'),
+            cells=graph_objects.table.Cells(
+                values=data_rows, fill=graph_objects.table.cells.Fill(color=fill_colors), align='center'))],
+        layout=graph_objects.Layout(autosize=True, margin=graph_objects.Margin(autoexpand=True)))
 
     fig.update_layout(margin=dict(l=10, r=10, t=20, b=20), autosize=True)
 
@@ -184,11 +186,12 @@ def plot_pit_time(session: Session, log: Logger):
         f"<br>{"{:.3f}".format(max(pits))}"
     ])
 
-    # noinspection SpellCheckingInspection
-    fig = graph_objects.Figure(data=[graph_objects.Table(
-        header={'values': header, 'fill_color': 'lightgrey', 'align': 'center'},
-        cells={'values': data_rows, 'align': 'center'}
-    )], layout={'autosize': True, 'margin': {'autoexpand': True}})
+    fig = graph_objects.Figure(
+        data=[graph_objects.Table(
+            header=graph_objects.table.Header(
+                values=header, fill=graph_objects.table.header.Fill(color='lightgrey'), align='center'),
+            cells=graph_objects.table.Cells(values=data_rows, align='center'))],
+        layout=graph_objects.Layout(autosize=True, margin=graph_objects.Margin(autoexpand=True)))
 
     output_path = f"./images/{session.event.year}/{session.event.RoundNumber}_{session.event.Location}/{session.name.replace(' ', '')}/pittime_table.png"
     os.makedirs(os.path.dirname(output_path), exist_ok=True)

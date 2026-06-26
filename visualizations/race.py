@@ -20,11 +20,13 @@ from visualizations.domain.tyre import Tyre
 
 tracer = trace.get_tracer(__name__)
 
+
 def determine_linestyle(year: int, driver: int) -> str:
-    if constants.camera.get(year, {}).get(driver,'black') == "black":
+    if constants.camera.get(year, {}).get(driver, 'black') == "black":
         return "solid"
     else:
         return "dashed"
+
 
 @tracer.start_as_current_span("execute")
 def execute(session: Session, log: Logger, images_path: str, logs_path: str, lap_time_range: int | None,
@@ -203,13 +205,15 @@ def gap_to_ahead_table(log: Logger, filepath: str, lap_logs: set[DriverLaps],
         header.append(driver_laps.get_driver().get_name())
         all_gaps.append(gaps)
         fill_colors.append(colors)
-    # noinspection SpellCheckingInspection
-    fig = graph_objects.Figure(data=[graph_objects.Table(
-        header={'values': header, 'fill_color': 'lightgrey', 'align': 'center'},
-        cells={'values': [list(range(1, max_laps + 1))] + all_gaps,
-               'fill_color': [["#f0f0f0"] * max_laps] + fill_colors,
-               'align': 'center'}
-    )], layout={'autosize': True, 'margin': {'autoexpand': True}})
+    fig = graph_objects.Figure(
+        data=[graph_objects.Table(
+            header=graph_objects.table.Header(
+                values=header, fill=graph_objects.table.header.Fill(color='lightgrey'), align='center'),
+            cells=graph_objects.table.Cells(
+                values=[list(range(1, max_laps + 1))] + all_gaps,
+                fill=graph_objects.table.cells.Fill(color=[["#f0f0f0"] * max_laps] + fill_colors),
+                align='center'))],
+        layout=graph_objects.Layout(autosize=True, margin=graph_objects.Margin(autoexpand=True)))
 
     os.makedirs(os.path.dirname(filepath), exist_ok=True)
     fig.write_image(filepath, width=1920, height=1620)
@@ -269,13 +273,15 @@ def gap_to_top_table(log: Logger, filepath: str, lap_logs: set[DriverLaps], sess
         header.append(driver_laps.get_driver().get_name())
         all_gaps.append(gaps)
         fill_colors.append(colors)
-    # noinspection SpellCheckingInspection
-    fig = graph_objects.Figure(data=[graph_objects.Table(
-        header={'values': header, 'fill_color': 'lightgrey', 'align': 'center'},
-        cells={'values': [list(range(1, max_laps + 1))] + all_gaps,
-               'fill_color': [["#f0f0f0"] * max_laps] + fill_colors,
-               'align': 'center'}
-    )], layout={'autosize': True, 'margin': {'autoexpand': True}})
+    fig = graph_objects.Figure(
+        data=[graph_objects.Table(
+            header=graph_objects.table.Header(
+                values=header, fill=graph_objects.table.header.Fill(color='lightgrey'), align='center'),
+            cells=graph_objects.table.Cells(
+                values=[list(range(1, max_laps + 1))] + all_gaps,
+                fill=graph_objects.table.cells.Fill(
+                    color=[["#f0f0f0"] * max_laps] + fill_colors), align='center'))],
+        layout=graph_objects.Layout(autosize=True, margin=graph_objects.Margin(autoexpand=True)))
 
     os.makedirs(os.path.dirname(filepath), exist_ok=True)
     fig.write_image(filepath, width=1920, height=1620)

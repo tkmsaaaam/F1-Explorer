@@ -180,11 +180,10 @@ def __save_winners(log, start_year: int = 2000):
     color_matrix[0].insert(0, "lightgrey")  # For the "Wins" header
 
     headers = ["Round"] + [str(y) for y in years]
-    # noinspection SpellCheckingInspection
     fig = graph_objects.Figure(data=[graph_objects.Table(
         header={"values": headers, "fill_color": "lightgrey", "align": "center"},
         cells={"values": cell_values, "fill_color": color_matrix, "align": "center"}
-    )], layout={"autosize": True, "margin": {"autoexpand": True}})
+    )], layout=graph_objects.Layout(autosize=True, margin=graph_objects.Margin(autoexpand=True)))
 
     base_dir = f"./images/winners-{start_year}-{end_year}"
     output_path = f"{base_dir}/winners.png"

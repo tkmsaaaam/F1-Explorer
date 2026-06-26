@@ -395,11 +395,18 @@ def summary(log: Logger, comparison: Comparison):
     c_colors.append("white")
     p_colors.append("white")
 
-    fig = graph_objects.Figure(data=[graph_objects.Table(
-        header={'values': ["", comparison.get_previous_year(), comparison.get_year()],
-                'fill_color': 'lightgrey', 'align': 'center'},
-        cells={'values': [titles, p, c], 'fill_color': [title_colors, c_colors, p_colors], 'align': 'center'}
-    )])
+    fig = graph_objects.Figure(
+        data=[graph_objects.Table(
+            header=graph_objects.table.Header(
+                values=["", comparison.get_previous_year(), comparison.get_year()],
+                fill=graph_objects.table.header.Fill(color='lightgrey'), align='center'),
+            cells=graph_objects.table.Cells(
+                values=[titles, p, c],
+                fill=graph_objects.table.cells.Fill(color=[title_colors, c_colors, p_colors]),
+                align='center'
+            )
+        )]
+    )
 
     output_path = f"./images/comparison/{comparison.get_gp()}/{comparison.get_session()}/summary.png"
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
