@@ -4,13 +4,13 @@ from logging import Logger
 from typing import Any
 
 import fastf1
+import matplotlib.pyplot as plt
+import plotly.graph_objects as go
 from fastf1.core import Lap, Session
 from fastf1.mvapi import CircuitInfo
-from matplotlib import pyplot as plt
 # noinspection PyPackageRequirements
 from opentelemetry import trace
 from pandas.core.interchange.dataframe_protocol import DataFrame
-from plotly import graph_objects
 
 import constants
 import setup
@@ -395,14 +395,14 @@ def summary(log: Logger, comparison: Comparison):
     c_colors.append("white")
     p_colors.append("white")
 
-    fig = graph_objects.Figure(
-        data=[graph_objects.Table(
-            header=graph_objects.table.Header(
+    fig = go.Figure(
+        data=[go.Table(
+            header=go.table.Header(
                 values=["", comparison.get_previous_year(), comparison.get_year()],
-                fill=graph_objects.table.header.Fill(color='lightgrey'), align='center'),
-            cells=graph_objects.table.Cells(
+                fill=go.table.header.Fill(color='lightgrey'), align='center'),
+            cells=go.table.Cells(
                 values=[titles, p, c],
-                fill=graph_objects.table.cells.Fill(color=[title_colors, c_colors, p_colors]),
+                fill=go.table.cells.Fill(color=[title_colors, c_colors, p_colors]),
                 align='center'
             )
         )]

@@ -6,13 +6,13 @@ from logging import Logger
 from typing import Final, cast
 
 import fastf1.plotting
+import matplotlib.pyplot as plt
 import numpy
+import plotly.graph_objects as go
 from fastf1.core import DriverResult
 from fastf1.events import EventSchedule
-from matplotlib import pyplot as plt
 # noinspection PyPackageRequirements
 from opentelemetry import trace
-from plotly import graph_objects
 
 import constants
 import setup
@@ -81,20 +81,22 @@ def __save_events(base_dir: str, log: Logger, schedule: EventSchedule):
     output_path = f"{base_dir}/events.png"
     if os.path.exists(output_path):
         return
-    fig = graph_objects.Figure(
-        data=[graph_objects.Table(
-            header=graph_objects.table.Header(
+    fig = go.Figure(
+        data=[go.Table(
+            header=go.table.Header(
                 values=["number", "name", "sprint", "datetime"],
-                fill=graph_objects.table.header.Fill(color='lightgrey'), align="center"),
-            cells=graph_objects.table.Cells(
+                fill=go.table.header.Fill(color='lightgrey'), align="center"),
+            cells=go.table.Cells(
                 values=[[event.RoundNumber for _, event in schedule.iterrows()],
                         [event.EventName for _, event in schedule.iterrows()],
                         [event.EventFormat == "sprint_qualifying" for _, event in schedule.iterrows()],
-                        [datetime.datetime.fromtimestamp(event.Session5Date.timestamp(), tz=zoneinfo.ZoneInfo("Asia/Tokyo")) for _, event in schedule.iterrows()]],
-                fill=graph_objects.table.cells.Fill(
+                        [datetime.datetime.fromtimestamp(event.Session5Date.timestamp(),
+                                                         tz=zoneinfo.ZoneInfo("Asia/Tokyo")) for _, event in
+                         schedule.iterrows()]],
+                fill=go.table.cells.Fill(
                     color=[["white" if event.RoundNumber % 2 == 0 else "#f2f2f2" for _, event in schedule.iterrows()]]),
                 align='center'))],
-        layout=graph_objects.Layout(autosize=True, margin=graph_objects.Margin(autoexpand=True)))
+        layout=go.Layout(autosize=True, margin=go.layout.Margin(autoexpand=True)))
 
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     fig.write_image(output_path, width=1920, height=2160)
@@ -287,9 +289,6 @@ def __main():
 
     drivers_standing = [k for k, _ in sorted(sum_map.items(), key=lambda kk: kk[1], reverse=True)]
 
-    headers: Final = ["No", "name"] + [drivers[k].Abbreviation for k in drivers_standing]
-    header_colors: Final = (['lightgrey', 'lightgrey'] + ['#' + get_color(drivers[k]) for k in drivers_standing])
-
     round_numbers = [sorted(results.keys()) + summaries + [f"{i}" for i in one_to_ten]]
     event_names = [
         [r.get_gp_name() if (r := results.get(i)) is not None else "---" for i in sorted(results.keys())]
@@ -298,19 +297,20 @@ def __main():
     ]
 
     topic_colors = [['lightgrey'] * (len(schedule) + 1)]
-    fig = graph_objects.Figure(
-        data=[graph_objects.Table(
-            header=graph_objects.table.Header(
-                values=headers,
-                fill=graph_objects.table.header.Fill(color=header_colors),
+    fig = go.Figure(
+        data=[go.Table(
+            header=go.table.Header(
+                values=["No", "name"] + [drivers[k].Abbreviation for k in drivers_standing],
+                fill=go.table.header.Fill(
+                    color=(['lightgrey', 'lightgrey'] + ['#' + get_color(drivers[k]) for k in drivers_standing])),
                 align='center'),
-            cells=graph_objects.table.Cells(
+            cells=go.table.Cells(
                 values=round_numbers + event_names + [values_map[k] for k in drivers_standing],
-                fill=graph_objects.table.cells.Fill(
+                fill=go.table.cells.Fill(
                     color=topic_colors + topic_colors + [color_map[k] for k in drivers_standing]),
                 align='center',
-                font=graph_objects.table.cells.Font(color='darkgrey')))],
-        layout=graph_objects.Layout(autosize=True, margin=graph_objects.Margin(autoexpand=True)))
+                font=go.table.cells.Font(color='darkgrey')))],
+        layout=go.Layout(autosize=True, margin=go.layout.Margin(autoexpand=True)))
 
     output_path = f"{base_dir}/points.png"
     os.makedirs(os.path.dirname(output_path), exist_ok=True)

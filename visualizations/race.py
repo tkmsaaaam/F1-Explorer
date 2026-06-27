@@ -4,13 +4,14 @@ from logging import Logger
 from typing import cast
 
 import fastf1
+import matplotlib.pyplot as plt
 import pandas
+import plotly.graph_objects as go
 from fastf1.core import Session, Laps
-from matplotlib import pyplot as plt
 from matplotlib.patches import Patch
 # noinspection PyPackageRequirements
 from opentelemetry import trace
-from plotly import graph_objects
+from pandas import Timedelta
 
 import constants
 import util
@@ -76,7 +77,6 @@ def make_driver_laps_set(laps: Laps) -> set[DriverLaps]:
             # noinspection PyTypeChecker
             lap: Lap = Lap(l.LapTime.total_seconds(), l.Time, l.Position, pandas.isna(l.PitOutTime),
                            Tyre(l.Compound, l.FreshTyre))
-            # convert lap number to native int to avoid numpy float/int issues later
             laps[int(l.LapNumber)] = lap
         result.add(DriverLaps(driver, laps))
     return result
@@ -205,15 +205,15 @@ def gap_to_ahead_table(log: Logger, filepath: str, lap_logs: set[DriverLaps],
         header.append(driver_laps.get_driver().get_name())
         all_gaps.append(gaps)
         fill_colors.append(colors)
-    fig = graph_objects.Figure(
-        data=[graph_objects.Table(
-            header=graph_objects.table.Header(
-                values=header, fill=graph_objects.table.header.Fill(color='lightgrey'), align='center'),
-            cells=graph_objects.table.Cells(
+    fig = go.Figure(
+        data=[go.Table(
+            header=go.table.Header(
+                values=header, fill=go.table.header.Fill(color='lightgrey'), align='center'),
+            cells=go.table.Cells(
                 values=[list(range(1, max_laps + 1))] + all_gaps,
-                fill=graph_objects.table.cells.Fill(color=[["#f0f0f0"] * max_laps] + fill_colors),
+                fill=go.table.cells.Fill(color=[["#f0f0f0"] * max_laps] + fill_colors),
                 align='center'))],
-        layout=graph_objects.Layout(autosize=True, margin=graph_objects.Margin(autoexpand=True)))
+        layout=go.Layout(autosize=True, margin=go.layout.Margin(autoexpand=True)))
 
     os.makedirs(os.path.dirname(filepath), exist_ok=True)
     fig.write_image(filepath, width=1920, height=1620)
@@ -273,15 +273,15 @@ def gap_to_top_table(log: Logger, filepath: str, lap_logs: set[DriverLaps], sess
         header.append(driver_laps.get_driver().get_name())
         all_gaps.append(gaps)
         fill_colors.append(colors)
-    fig = graph_objects.Figure(
-        data=[graph_objects.Table(
-            header=graph_objects.table.Header(
-                values=header, fill=graph_objects.table.header.Fill(color='lightgrey'), align='center'),
-            cells=graph_objects.table.Cells(
+    fig = go.Figure(
+        data=[go.Table(
+            header=go.table.Header(
+                values=header, fill=go.table.header.Fill(color='lightgrey'), align='center'),
+            cells=go.table.Cells(
                 values=[list(range(1, max_laps + 1))] + all_gaps,
-                fill=graph_objects.table.cells.Fill(
+                fill=go.table.cells.Fill(
                     color=[["#f0f0f0"] * max_laps] + fill_colors), align='center'))],
-        layout=graph_objects.Layout(autosize=True, margin=graph_objects.Margin(autoexpand=True)))
+        layout=go.Layout(autosize=True, margin=go.layout.Margin(autoexpand=True)))
 
     os.makedirs(os.path.dirname(filepath), exist_ok=True)
     fig.write_image(filepath, width=1920, height=1620)

@@ -4,15 +4,14 @@ from logging import Logger
 
 import fastf1
 import matplotlib as mpl
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas
 import plotly.express as px
 import plotly.graph_objects as go
 from fastf1.core import Session, Lap, Telemetry
-from matplotlib import pyplot as plt
 from matplotlib.collections import LineCollection
 from matplotlib.colorbar import ColorbarBase
-from matplotlib.pyplot import colormaps
 # noinspection PyPackageRequirements
 from opentelemetry import trace
 
@@ -97,13 +96,14 @@ def compute_and_save_segment_tables_plotly(
 
     abbreviations = [session.get_driver(d).Abbreviation for d in session.drivers]
 
-    segment_header = ["segment", "distance", "corners"] + abbreviations
-    segment_data = list(zip(*segment_rows))
-
-    fig_segment = go.Figure(data=[go.Table(
-        header={'values': segment_header, 'fill_color': 'lightgrey', 'align': 'center'},
-        cells={'values': segment_data, 'align': 'center'}
-    )])
+    fig_segment = go.Figure(
+        data=[go.Table(
+            header=go.table.Header(
+                values=["segment", "distance", "corners"] + abbreviations,
+                fill=go.table.header.Fill(color='lightgrey'),
+                align='center'),
+            cells=go.table.Cells(values=list(zip(*segment_rows)), align='center')
+        )])
     fig_segment.write_image(f"{filename_base}_durations.png", width=1920, height=1080)
     log.info(f"Segment table saved to {filename_base}_durations.png")
 
@@ -116,12 +116,13 @@ def compute_and_save_segment_tables_plotly(
         time_to_rank = {d: rank + 1 for rank, (_, d) in enumerate(sorted_times)}
         segment_rank_rows.append([name, dist] + [time_to_rank.get(d, None) for d in session.drivers])
 
-    rank_header = ["segment", "distance"] + abbreviations
-    rank_data = list(zip(*segment_rank_rows))
-
-    fig_ranks = go.Figure(data=[go.Table(
-        header={'values': rank_header, 'fill_color': 'lightgrey', 'align': 'center'},
-        cells={'values': rank_data, 'align': 'center'}
+    fig_ranks = go.Figure(
+        data=[go.Table(
+            header=go.table.Header(
+                values=["segment", "distance"] + abbreviations,
+                fill=go.table.header.Fill(color='lightgrey'),
+                align='center'),
+            cells=go.table.Cells(values=list(zip(*segment_rank_rows)), align='center')
     )])
     fig_ranks.write_image(f"{filename_base}_ranks.png", width=1920, height=1080)
     log.info(f"Segment rank table saved to {filename_base}_ranks.png")
@@ -161,11 +162,12 @@ def compute_and_save_segment_tables_plotly(
             [round((c - b) - best_time, 3) if (t := driver_times.get(driver_number)) is not None and i < len(t) and (
                 c := t[i]) is not None and (b := t[i - 1]) is not None else 0 for driver_number in session.drivers]
         )
-    gap_header = ["segment", "distance", "corners"] + abbreviations
-    gap_data = list(zip(*gap_rows))
     fig_gap = go.Figure(data=[go.Table(
-        header={'values': gap_header, 'fill_color': 'lightgrey', 'align': 'center'},
-        cells={'values': gap_data, 'align': 'center'}
+        header=go.table.Header(
+            values=["segment", "distance", "corners"] + abbreviations,
+            fill=go.table.header.Fill(color='lightgrey'),
+            align='center'),
+        cells=go.table.Cells(values=list(zip(*gap_rows)), align='center')
     )])
     fig_gap.write_image(f"{filename_base}_gaps_to_best.png", width=1920, height=1080)
     log.info(f"Gap table saved to {filename_base}_gaps_to_best.png")
@@ -368,7 +370,7 @@ def plot_gear_shift_on_track(session: Session, log: Logger):
         segments = np.concatenate([points[:-1], points[1:]], axis=1)
         gear = tel.nGear.to_numpy().astype(float)
 
-        cmap = colormaps['Paired']
+        cmap = plt.colormaps['Paired']
         lc_comp = LineCollection(segments, norm=plt.Normalize(1, cmap.N + 1), cmap=cmap)
         lc_comp.set_array(gear)
         lc_comp.set_linewidth(4)

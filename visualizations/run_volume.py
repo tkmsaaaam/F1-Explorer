@@ -3,14 +3,14 @@ from logging import Logger
 from typing import cast
 
 import fastf1.plotting
+import matplotlib.pyplot as plt
 import numpy
 import pandas
+import plotly.graph_objects as go
 from fastf1.core import Session
-from matplotlib import pyplot as plt
 from numpy import datetime64
 # noinspection PyPackageRequirements
 from opentelemetry import trace
-from plotly import graph_objects
 
 import constants
 
@@ -116,15 +116,13 @@ def plot_laptime(session: Session, log: Logger):
         data_rows.append(lap_times)
         fill_colors.append(bg_colors)
 
-    fig = graph_objects.Figure(
-        data=[graph_objects.Table(
-            header=graph_objects.table.Header(
-                values=header, fill=graph_objects.table.header.Fill(color='lightgrey'), align='center'),
-            cells=graph_objects.table.Cells(
-                values=data_rows, fill=graph_objects.table.cells.Fill(color=fill_colors), align='center'))],
-        layout=graph_objects.Layout(autosize=True, margin=graph_objects.Margin(autoexpand=True)))
-
-    fig.update_layout(margin=dict(l=10, r=10, t=20, b=20), autosize=True)
+    fig = go.Figure(
+        data=[go.Table(
+            header=go.table.Header(
+                values=header, fill=go.table.header.Fill(color='lightgrey'), align='center'),
+            cells=go.table.Cells(
+                values=data_rows, fill=go.table.cells.Fill(color=fill_colors), align='center'))],
+        layout=go.Layout(autosize=True, margin=go.layout.Margin(l=10, r=10, t=20, b=20, autoexpand=True)))
 
     header_height = 40
     margin_top_bottom = 40
@@ -186,12 +184,12 @@ def plot_pit_time(session: Session, log: Logger):
         f"<br>{"{:.3f}".format(max(pits))}"
     ])
 
-    fig = graph_objects.Figure(
-        data=[graph_objects.Table(
-            header=graph_objects.table.Header(
-                values=header, fill=graph_objects.table.header.Fill(color='lightgrey'), align='center'),
-            cells=graph_objects.table.Cells(values=data_rows, align='center'))],
-        layout=graph_objects.Layout(autosize=True, margin=graph_objects.Margin(autoexpand=True)))
+    fig = go.Figure(
+        data=[go.Table(
+            header=go.table.Header(
+                values=header, fill=go.table.header.Fill(color='lightgrey'), align='center'),
+            cells=go.table.Cells(values=data_rows, align='center'))],
+        layout=go.Layout(autosize=True, margin=go.layout.Margin(autoexpand=True)))
 
     output_path = f"./images/{session.event.year}/{session.event.RoundNumber}_{session.event.Location}/{session.name.replace(' ', '')}/pittime_table.png"
     os.makedirs(os.path.dirname(output_path), exist_ok=True)

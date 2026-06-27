@@ -1,8 +1,8 @@
 import os
 from logging import Logger
 
+import matplotlib.pyplot as plt
 from fastf1.core import Session
-from matplotlib import pyplot as plt
 # noinspection PyPackageRequirements
 from opentelemetry import trace
 

@@ -3,9 +3,9 @@ from logging import Logger
 from typing import cast
 
 import fastf1
+import matplotlib.pyplot as plt
 import pandas
-from fastf1.core import Session, Laps, Lap
-from matplotlib import pyplot as plt
+from fastf1.core import Session, Laps
 # noinspection PyPackageRequirements
 from opentelemetry import trace
 

@@ -1,4 +1,4 @@
-import fastf1.plotting
+import fastf1
 # noinspection PyPackageRequirements
 from opentelemetry import trace
 
