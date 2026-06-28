@@ -11,7 +11,6 @@ from fastf1.core import Session, Laps
 from matplotlib.patches import Patch
 # noinspection PyPackageRequirements
 from opentelemetry import trace
-from pandas import Timedelta
 
 import constants
 import util

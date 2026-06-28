@@ -52,7 +52,7 @@ def plot_by_tyre_age_and_tyre(session: Session, log: Logger):
         legends = set()
         for stint in stint_set:
             team = stint.get_driver().get_team_name()
-            color = fastf1.plotting.get_team_color(team, session) if team == '' else 'white'
+            color = fastf1.plotting.get_team_color(team, session) if team != '' else 'white'
             x = sorted(stint.get_laps().keys())
             y = [stint.get_laps().get(i) for i in x]
             line_style = "solid" if constants.camera[session.event.year].get(stint.get_driver().get_number(),
@@ -61,7 +61,7 @@ def plot_by_tyre_age_and_tyre(session: Session, log: Logger):
                 ax.plot(x, y, linewidth=0.5, color=color, linestyle=line_style)
             else:
                 ax.plot(x, y, linewidth=0.5, color=color, linestyle=line_style, label=stint.get_driver().get_number())
-                legends.add(stint.get_driver().get_number())
+                legends.add(stint.get_driver().get_name())
         ax.legend(fontsize='small')
         ax.invert_yaxis()
         ax.grid(True)

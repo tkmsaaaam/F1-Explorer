@@ -81,6 +81,7 @@ def compute_and_save_segment_tables_plotly(
     if circuit is None:
         return
     segment_rows = []
+    drivers = session.laps.pick_quicklaps().sort_values(by="LapTime").DriverNumber.unique().tolist()
     for i in range(1, len(segment_boundaries)):
         name = f"{i}"
         dist = round(segment_boundaries[i] - segment_boundaries[i - 1], 1)
@@ -91,10 +92,10 @@ def compute_and_save_segment_tables_plotly(
         segment_rows.append(
             [name, dist, filtered.Number.tolist()] +
             [round(c - s, 3) if (t := driver_times.get(driver_number)) is not None and i < len(t) and (
-                c := t[i]) is not None and (s := t[i - 1]) is not None else 0 for driver_number in session.drivers]
+                c := t[i]) is not None and (s := t[i - 1]) is not None else 0 for driver_number in drivers]
         )
 
-    abbreviations = [session.get_driver(d).Abbreviation for d in session.drivers]
+    abbreviations = [session.get_driver(d).Abbreviation for d in drivers]
 
     fig_segment = go.Figure(
         data=[go.Table(
@@ -111,10 +112,10 @@ def compute_and_save_segment_tables_plotly(
     for row in segment_rows:
         name, dist = row[0], row[1]
         times = row[3:]
-        time_with_driver = [(t, d) for t, d in zip(times, session.drivers) if t is not None]
+        time_with_driver = [(t, d) for t, d in zip(times, drivers) if t is not None]
         sorted_times = sorted(time_with_driver)
         time_to_rank = {d: rank + 1 for rank, (_, d) in enumerate(sorted_times)}
-        segment_rank_rows.append([name, dist] + [time_to_rank.get(d, None) for d in session.drivers])
+        segment_rank_rows.append([name, dist] + [time_to_rank.get(d, None) for d in drivers])
 
     fig_ranks = go.Figure(
         data=[go.Table(
@@ -122,8 +123,7 @@ def compute_and_save_segment_tables_plotly(
                 values=["segment", "distance"] + abbreviations,
                 fill=go.table.header.Fill(color='lightgrey'),
                 align='center'),
-            cells=go.table.Cells(values=list(zip(*segment_rank_rows)), align='center')
-    )])
+            cells=go.table.Cells(values=list(zip(*segment_rank_rows)), align='center'))])
     fig_ranks.write_image(f"{filename_base}_ranks.png", width=1920, height=1080)
     log.info(f"Segment rank table saved to {filename_base}_ranks.png")
 
@@ -160,7 +160,7 @@ def compute_and_save_segment_tables_plotly(
         gap_rows.append(
             [name, dist, filtered.Number.tolist()] +
             [round((c - b) - best_time, 3) if (t := driver_times.get(driver_number)) is not None and i < len(t) and (
-                c := t[i]) is not None and (b := t[i - 1]) is not None else 0 for driver_number in session.drivers]
+                c := t[i]) is not None and (b := t[i - 1]) is not None else 0 for driver_number in drivers]
         )
     fig_gap = go.Figure(data=[go.Table(
         header=go.table.Header(
@@ -472,7 +472,7 @@ def plot_speed_distance_comparison(session: Session, log: Logger):
         log: ロガー
     """
     drivers_per_fig = 5
-    driver_numbers = session.drivers
+    driver_numbers = session.laps.pick_quicklaps().sort_values(by="LapTime").DriverNumber.unique().tolist()
     num_groups = math.ceil(len(driver_numbers) / drivers_per_fig)
     circuit_info = session.get_circuit_info()
     if circuit_info is None:
@@ -573,7 +573,7 @@ def plot_time_distance_comparison(session: Session, log: Logger):
     drivers_per_fig = 5
     resample_step = 5.0  # 1 / 5 / 10 など変更可
 
-    driver_numbers = session.drivers
+    driver_numbers = session.laps.pick_quicklaps().sort_values(by="LapTime").DriverNumber.unique().tolist()
     num_groups = math.ceil(len(driver_numbers) / drivers_per_fig)
     circuit_info = session.get_circuit_info()
     if circuit_info is None:
@@ -820,10 +820,9 @@ def plot_throttle(session: Session, log: Logger):
         session: 分析対象のセッション
         log: ロガー
     """
-    driver_numbers = session.laps.DriverNumber.unique()
     _plot_driver_telemetry(
         session, log,
-        driver_numbers.tolist(),
+        session.laps.pick_quicklaps().sort_values(by="LapTime").DriverNumber.unique().tolist(),
         key='throttle',
         label='Throttle [%]',
         value_func=lambda data: data.Throttle
@@ -838,10 +837,9 @@ def plot_brake(session: Session, log: Logger):
         session: 分析対象のセッション
         log: ロガー
     """
-    driver_numbers = session.laps.DriverNumber.unique()
     _plot_driver_telemetry(
         session, log,
-        driver_numbers.tolist(),
+        session.laps.pick_quicklaps().sort_values(by="LapTime").DriverNumber.unique().tolist(),
         key='brake',
         label='Brake',
         value_func=lambda data: data.Brake.astype(float)
@@ -856,9 +854,8 @@ def plot_drs(session: Session, log: Logger):
         session: 分析対象のセッション
         log: ロガー
     """
-    driver_numbers = session.laps.DriverNumber.unique()
     _plot_driver_telemetry(session, log,
-                           driver_numbers.tolist(),
+                           session.laps.pick_quicklaps().sort_values(by="LapTime").DriverNumber.unique().tolist(),
                            key='drs',
                            label='DRS',
                            value_func=lambda data: data.DRS.astype(float)
