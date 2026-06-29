@@ -3,7 +3,7 @@ import fastf1
 from opentelemetry import trace
 
 import setup
-from visualizations import run_volume, short_runs, weather, weekend
+from visualizations import run_volume, short_runs, weather, weekend, comparison
 
 tracer = trace.get_tracer(__name__)
 
@@ -31,6 +31,7 @@ def __main():
 
     log.info(f"{config.get_year()} Race {config.get_round()} {session.event.EventName} {config.get_session()}")
 
+    comparison.execute(session, log, config.get_comparison())
     run_volume.plot_lap_number_by_timing(session, log)
     run_volume.plot_laptime(session, log)
     run_volume.plot_laptime_by_timing(session, log)

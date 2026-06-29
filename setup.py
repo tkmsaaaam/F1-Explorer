@@ -19,12 +19,13 @@ class SessionCategory(Enum):
 
 class Config:
     def __init__(self, year: int, race_number: int, session: str, corners: dict[str, list[float]],
-                 separator: list[int]):
+                 separator: list[int], comparison: list[list[dict[str, Any]]]):
         self.year = year
         self.round = race_number
         self.session = session
         self.corners = corners
         self.separator = separator
+        self.comparison = comparison
         if session in {'FP1', 'FP2', 'FP3'}:
             self.session_category = SessionCategory.FreePractice
         elif session in {'SQ', 'Q'}:
@@ -52,6 +53,9 @@ class Config:
     def get_separator(self):
         return self.separator
 
+    def get_comparison(self):
+        return self.comparison
+
     def set_attribute_to_span(self):
         trace.get_current_span().set_attributes(
             {"year": self.get_year(), "round": self.get_round(), "session": self.get_session()})
@@ -78,7 +82,8 @@ def load_config() -> Config:
     validate_config(config)
     separator = config['Separator'] if 'Separator' in config else []
     corners = config['Corners'] if 'Corners' in config else {}
-    return Config(config['Year'], config['Round'], config['Session'], corners, separator)
+    comparison = config['Comparison'] if 'Comparison' in config else []
+    return Config(config['Year'], config['Round'], config['Session'], corners, separator, comparison)
 
 
 @tracer.start_as_current_span("fast_f1")

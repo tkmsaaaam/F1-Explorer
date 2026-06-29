@@ -60,8 +60,8 @@ def plot_by_tyre_age_and_tyre(session: Session, log: Logger):
             if stint.get_driver().get_number() in legends:
                 ax.plot(x, y, linewidth=0.5, color=color, linestyle=line_style)
             else:
-                ax.plot(x, y, linewidth=0.5, color=color, linestyle=line_style, label=stint.get_driver().get_number())
-                legends.add(stint.get_driver().get_name())
+                ax.plot(x, y, linewidth=0.5, color=color, linestyle=line_style, label=stint.get_driver().get_name())
+                legends.add(stint.get_driver().get_number())
         ax.legend(fontsize='small')
         ax.invert_yaxis()
         ax.grid(True)
