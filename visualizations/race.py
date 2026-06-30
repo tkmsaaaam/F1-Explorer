@@ -488,8 +488,15 @@ def tyres(log: Logger, filepath: str, lap_logs: set[DriverLaps]):
         lap_logs: ドライバーごとのラップ
     """
     fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
+    sorted_lap_logs = sorted(
+        lap_logs,
+        key=lambda dl: (
+            -len(dl.get_laps()),
+            min([lap.get_position() for lap in dl.get_laps().values()] if dl.get_laps() else [float('inf')])
+        )
+    )
     y = 0
-    for lap_log in lap_logs:
+    for lap_log in sorted_lap_logs:
         x = sorted(lap_log.get_laps().keys())
         start = 0
         for i in x:
@@ -508,12 +515,12 @@ def tyres(log: Logger, filepath: str, lap_logs: set[DriverLaps]):
                     width=j - start,
                     left=start,
                     color=constants.compound_color.get(previous.get_tyre().get_compound(), 'gray'),
-                    edgecolor='black' if previous.get_tyre().get_new() else 'gray'
+                    edgecolor='orange' if previous.get_tyre().get_new() else 'gray'
                     )
             start = j
         y += 1
-    ax.set_yticks([i for i in range(0, len(lap_logs))])
-    ax.set_yticklabels([str(driver.get_driver().get_number()) for driver in lap_logs])
+    ax.set_yticks([i for i in range(0, len(sorted_lap_logs))])
+    ax.set_yticklabels([str(driver.get_driver().get_number()) for driver in sorted_lap_logs])
     legend_elements = [Patch(facecolor=color, edgecolor='black', label=compound)
                        for compound, color in constants.compound_color.items()]
     ax.legend(handles=legend_elements, title='Compound', loc='upper right', fontsize='small')
