@@ -598,7 +598,7 @@ def plot_time_distance_comparison(session: Session, log: Logger):
         uniq_idx = np.unique(fastest_dist, return_index=True)[1]
         fastest_dist = fastest_dist[np.sort(uniq_idx)]
         fastest_time = fastest_time[np.sort(uniq_idx)]
-        max_distance = fastest_dist.max()
+        max_distance: float = fastest_dist.max()
         common_distance = np.arange(0.0, max_distance, resample_step)
         ref_time = np.interp(common_distance, fastest_dist, fastest_time)
         fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout="tight")
@@ -629,36 +629,17 @@ def plot_time_distance_comparison(session: Session, log: Logger):
             )
             minimum_list.append(float(delta.min()))
             maximum_list.append(float(delta.max()))
-        valid_corners = circuit_info.corners[
-            circuit_info.corners.Distance <= max_distance
-            ]
+        valid_corners = circuit_info.corners[circuit_info.corners.Distance <= max_distance]
         v_min = min(minimum_list) if min(minimum_list) > -3 else -3
         v_max = max(maximum_list) if max(maximum_list) < 3 else 3
-        ax.vlines(
-            x=valid_corners.Distance,
-            ymin=v_max,
-            ymax=v_min,
-            linestyles="dotted",
-            colors="grey"
-        )
-
+        ax.vlines(x=valid_corners.Distance, ymin=v_max, ymax=v_min, linestyles="dotted", colors="grey")
         for _, corner in valid_corners.iterrows():
             txt = f"{corner.Number}{corner.Letter}"
-            ax.text(
-                corner.Distance,
-                v_min,
-                txt,
-                va="bottom",
-                ha="center",
-                size="small"
-            )
+            ax.text(corner.Distance, v_min, txt, va="bottom", ha="center", size="small")
         ax.axhline(0, linestyle="--", linewidth=1)
         ax.set_xlabel(f"Distance (m) - {fastest_lap.Driver} reference")
         ax.set_ylabel("Delta Time (s)")
-        ax.set_title(
-            f"{session.event.EventName} {session.name}\n"
-            f"Delta to fastest in group ({fastest_lap.Driver})"
-        )
+        ax.set_title(f"{session.event.EventName} {session.name}\nDelta to fastest in group ({fastest_lap.Driver})")
         ax.set_xlim(0, max_distance)
         ax.set_ylim(v_min, v_max)
         ax.grid(True)
