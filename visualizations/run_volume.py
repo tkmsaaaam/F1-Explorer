@@ -18,10 +18,7 @@ tracer = trace.get_tracer(__name__)
 
 
 def determine_linestyle(year: int, driver: int) -> str:
-    if constants.camera.get(year, {}).get(driver, 'black') == "black":
-        return "solid"
-    else:
-        return "dashed"
+    return "solid" if constants.camera.get(year, {}).get(driver, 'black') == "black" else "dashed"
 
 
 @tracer.start_as_current_span("plot_lap_number_by_timing")
@@ -38,10 +35,7 @@ def plot_lap_number_by_timing(session: Session, log: Logger):
         if stint_laps.empty:
             continue
         team = stint_laps.Team.iloc[0]
-        if team == '':
-            color = 'white'
-        else:
-            color = fastf1.plotting.get_team_color(team, session)
+        color = 'white' if team == '' else fastf1.plotting.get_team_color(team, session)
         stint_laps = stint_laps.sort_values(by='LapNumber')
         lap_numbers = stint_laps.LapNumber
         lap_starts = stint_laps.LapStartDate
@@ -83,7 +77,7 @@ def plot_laptime(session: Session, log: Logger):
         driver_laps = session.laps.pick_drivers(driver).sort_values(by='LapNumber')
         lap_times = []
         bg_colors = []
-        for i in range(0, len(driver_laps)):
+        for i in range(len(driver_laps)):
             if i not in heights:
                 heights[i] = 26
             lap = driver_laps.iloc[i]
@@ -110,7 +104,7 @@ def plot_laptime(session: Session, log: Logger):
             compound = lap.Compound
             bg_colors.append(constants.compound_color.get(compound, "#dddddd"))
         if len(driver_laps) < max_laps:
-            for i in range(0, max_laps - len(driver_laps)):
+            for i in range(max_laps - len(driver_laps)):
                 lap_times.append("")
                 bg_colors.append("#f0f0f0")
         data_rows.append(lap_times)
@@ -150,7 +144,7 @@ def plot_pit_time(session: Session, log: Logger):
         if driver_laps is None:
             continue
         lap_times = []
-        for i in range(0, len(driver_laps)):
+        for i in range(len(driver_laps)):
             outLap = driver_laps.iloc[i]
             if pandas.isna(outLap.PitOutTime):
                 continue
@@ -171,7 +165,7 @@ def plot_pit_time(session: Session, log: Logger):
                 f"<br>{(inLap.LapTime + outLap.LapTime).total_seconds()}"
             )
             pits.append(pit)
-        if len(lap_times) < 1:
+        if not lap_times:
             continue
         header.append(session.get_driver(n).Abbreviation)
         data_rows.append(lap_times)
@@ -212,10 +206,7 @@ def plot_laptime_by_lap_number(session: Session, log: Logger):
         if stint_laps.empty:
             continue
         team = stint_laps.Team.iloc[0]
-        if team == '':
-            color = 'white'
-        else:
-            color = fastf1.plotting.get_team_color(team, session)
+        color = 'white' if team == '' else fastf1.plotting.get_team_color(team, session)
         stint_laps = stint_laps.sort_values(by='LapNumber')
         lap_times = stint_laps.LapTime.dt.total_seconds().tolist()
         lap_numbers = stint_laps.LapNumber
@@ -249,20 +240,17 @@ def plot_laptime_by_timing(session: Session, log: Logger):
         if stint_laps.empty:
             continue
         team = stint_laps.Team.iloc[0]
-        if team == '':
-            color = 'white'
-        else:
-            color = fastf1.plotting.get_team_color(team, session)
+        color = 'white' if team == '' else fastf1.plotting.get_team_color(team, session)
         stint_laps = stint_laps.sort_values(by='LapNumber')
         lap_times = stint_laps.LapTime.dt.total_seconds().tolist()
-        if not len(stint_laps.LapStartDate) > 0:
+        if not stint_laps.LapStartDate.values.size:
             continue
         d: datetime64 = stint_laps.LapStartDate.values[0]
         if not pandas.isna(d):
             lap_starts = stint_laps.LapStartDate.values
         else:
             lap_starts = stint_laps.LapStartTime.values
-        if not len(lap_times) > 0 or not len(lap_starts) > 0:
+        if not lap_times or not lap_starts.size:
             continue
         ax.plot(lap_starts, lap_times, color=color,
                 linestyle=determine_linestyle(session.event.year, int(stint_laps.DriverNumber.iloc[0])),

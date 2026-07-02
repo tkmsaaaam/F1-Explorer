@@ -21,10 +21,7 @@ tracer = trace.get_tracer(__name__)
 
 
 def determine_linestyle(year: int, driver: int) -> str:
-    if constants.camera.get(year, {}).get(driver, 'black') == "black":
-        return "solid"
-    else:
-        return "dashed"
+    return "solid" if constants.camera.get(year, {}).get(driver, 'black') == "black" else "dashed"
 
 
 @tracer.start_as_current_span("compute_competitive_drivers")
@@ -137,11 +134,10 @@ def compute_and_save_segment_tables_plotly(
         log.warning("Fastest lap driver has insufficient segment data.")
         return
 
-    best_deltas = []
-    for i in range(1, len(best_times)):
-        c = best_times[i]
-        b = best_times[i - 1]
-        best_deltas.append(b - c if b is not None and c is not None else None)
+    best_deltas = [
+        b - c if b is not None and c is not None else None
+        for b, c in zip(best_times[:-1], best_times[1:])
+    ]
 
     circuit = session.get_circuit_info()
     if circuit is None:
@@ -190,7 +186,7 @@ def plot_best_laptime(session: Session, log: Logger, key: str):
         color = 'white' if team == '' else fastf1.plotting.get_team_color(team, session)
         l = [laps.iloc[i][key].total_seconds() for i in range(0, len(laps))]
         data.append({'Acronym': laps.Driver.iloc[0], key: min(l), 'Color': color})
-    if len(data) == 0:
+    if not data:
         return
     df = pandas.DataFrame(data).sort_values(key)
     fig = px.bar(
@@ -498,7 +494,7 @@ def plot_speed_distance_comparison(session: Session, log: Logger):
                     linewidth=1, alpha=0.5)
             minimum_list.append(car_data.Speed.min())
             maximum_list.append(car_data.Speed.max())
-        if len(minimum_list) == 0 or len(maximum_list) == 0:
+        if not minimum_list or not maximum_list:
             continue
         ax.vlines(x=circuit_info.corners.Distance, ymin=min(minimum_list) - 20, ymax=max(maximum_list) + 20,
                   linestyles='dotted', colors='grey')
@@ -677,17 +673,14 @@ def _plot_driver_telemetry(session: Session, log: Logger, driver_numbers: list[i
                 team_color = fastf1.plotting.get_team_color(laps.Team, session)
             except AttributeError:
                 team_color = 'gray'
-            camera_color = constants.camera[session.event.year].get(int(driver_number), 'black')
-            line_style = 'solid' if camera_color == 'black' else 'dashed'
+            line_style = determine_linestyle(session.event.year, int(driver_number))
 
             y_data = value_func(car_data)
             ax.plot(car_data.Distance, y_data, label=driver_name, linewidth=1, color=team_color, linestyle=line_style,
                     alpha=0.5)
             v_min, v_max = min(v_min, y_data.min()), max(v_max, y_data.max())
 
-        if v_min == float('inf') or v_max == float('-inf'):
-            continue
-        if v_min == 0.0 and v_max == 0.0:
+        if v_min == float('inf') or v_max == float('-inf') or (v_min == 0.0 and v_max == 0.0):
             continue
 
         for _, corner in circuit_info.corners.iterrows():
@@ -727,7 +720,7 @@ def make_mini_segment(session: Session, log: Logger, corner_map: dict[str, list[
     if fastest_lap is None:
         return []
     car_data = fastest_lap.get_telemetry().add_distance()
-    segment_boundaries = [0] + [car_data.iloc[-1].Distance] if car_data.iloc[-1] is not None else []
+    segment_boundaries = [0, car_data.iloc[-1].Distance]
     circuit_info = session.get_circuit_info()
     if circuit_info is None:
         return segment_boundaries
@@ -737,7 +730,7 @@ def make_mini_segment(session: Session, log: Logger, corner_map: dict[str, list[
         if corner is None:
             continue
         i = str(corner.Number)
-        if not i in corner_map:
+        if i not in corner_map:
             continue
         diffs = corner_map[i]
         for d in diffs:
@@ -872,24 +865,23 @@ def plot_telemetry(session: Session, log: Logger,
         car_data = laps.get_car_data().add_distance()
         driver_name = laps.Driver
         team_color = fastf1.plotting.get_team_color(laps.Team, session)
-        camera_color = constants.camera[session.event.year].get(int(driver_number), 'black')
-        line_style = 'solid' if camera_color == 'black' else 'dashed'
+        line_style = determine_linestyle(session.event.year, int(driver_number))
 
         y_data = value_func(car_data)
         ax.plot(car_data.Distance, y_data, label=driver_name,
                 color=team_color, linestyle=line_style)
 
         v_min, v_max = min(v_min, y_data.min()), max(v_max, y_data.max())
-        name = name + f"{driver_name}_"
+        name += f"{driver_name}_"
+
+    if v_min == 0.0 and v_max == 0.0:
+        return
 
     for _, corner in circuit_info.corners.iterrows():
         ax.axvline(x=corner.Distance, linestyle='dotted', color='grey', linewidth=0.8)
         ax.text(corner.Distance, v_min - (v_max - v_min) * 0.05,
                 f"{corner.Number}{corner.Letter}",
                 va='center_baseline', ha='center', size='small')
-
-    if v_min == 0.0 and v_max == 0.0:
-        return
 
     ax.set_ylim(v_min - 0.1 * (v_max - v_min), v_max + 0.1 * (v_max - v_min))
     ax.set_ylabel(label)

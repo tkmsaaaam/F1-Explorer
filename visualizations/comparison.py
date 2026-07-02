@@ -75,15 +75,13 @@ def _plot_driver_lap_telemetry(session: Session, log: Logger, comparison: list[l
             if lap.DriverNumber not in z:
                 z[lap.DriverNumber] = 0
             else:
-                z[lap.DriverNumber] = z[lap.DriverNumber] + 1
+                z[lap.DriverNumber] += 1
             y_data = value_func(car_data)
             ax.plot(car_data.Distance, y_data, label=label, linewidth=1, color=team_color, linestyle=line_style,
                     alpha=0.5)
             v_min, v_max = min(v_min, y_data.min()), max(v_max, y_data.max())
 
-        if v_min == float('inf') or v_max == float('-inf'):
-            continue
-        if v_min == 0.0 and v_max == 0.0:
+        if v_min == float('inf') or v_max == float('-inf') or (v_min == 0.0 and v_max == 0.0):
             continue
 
         for _, corner in circuit_info.corners.iterrows():

@@ -33,7 +33,7 @@ def plot_tyre(year: int, race_number: int, log: Logger):
         for driver in session.drivers:
             driver_laps = session.laps.pick_drivers(driver)
             laps = driver_laps[driver_laps.FreshTyre].drop_duplicates(subset=['Stint'], keep='first')
-            if len(laps) <= 0:
+            if laps.empty:
                 continue
             d = session.get_driver(driver).Abbreviation
             if d not in drivers:

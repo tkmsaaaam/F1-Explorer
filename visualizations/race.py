@@ -22,10 +22,7 @@ tracer = trace.get_tracer(__name__)
 
 
 def determine_linestyle(year: int, driver: int) -> str:
-    if constants.camera.get(year, {}).get(driver, 'black') == "black":
-        return "solid"
-    else:
-        return "dashed"
+    return "solid" if constants.camera.get(year, {}).get(driver, 'black') == "black" else "dashed"
 
 
 @tracer.start_as_current_span("execute")
@@ -138,12 +135,11 @@ def laptime(log: Logger, filepath: str, filename: str, session: Session, r: int 
 
 
 def make_top_time_map(all_laps: Laps) -> dict[int, datetime.datetime]:
-    fastest = {}
-    for i in range(0, len(all_laps)):
-        if all_laps.Position.iloc[i] != 1:
-            continue
-        fastest[all_laps.LapNumber.iloc[i]] = all_laps.Time.iloc[i]
-    return fastest
+    return {
+        all_laps.LapNumber.iloc[i]: all_laps.Time.iloc[i]
+        for i in range(len(all_laps))
+        if all_laps.Position.iloc[i] == 1
+    }
 
 
 @tracer.start_as_current_span("gap_to_ahead_table")
@@ -519,7 +515,7 @@ def tyres(log: Logger, filepath: str, lap_logs: set[DriverLaps]):
                     )
             start = j
         y += 1
-    ax.set_yticks([i for i in range(0, len(sorted_lap_logs))])
+    ax.set_yticks(range(len(sorted_lap_logs)))
     ax.set_yticklabels([str(driver.get_driver().get_number()) for driver in sorted_lap_logs])
     legend_elements = [Patch(facecolor=color, edgecolor='black', label=compound)
                        for compound, color in constants.compound_color.items()]
