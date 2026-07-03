@@ -10,8 +10,6 @@ import pandas
 import plotly.express as px
 import plotly.graph_objects as go
 from fastf1.core import Session, Lap, Telemetry
-from matplotlib.collections import LineCollection
-from matplotlib.colorbar import ColorbarBase
 # noinspection PyPackageRequirements
 from opentelemetry import trace
 
@@ -367,7 +365,7 @@ def plot_gear_shift_on_track(session: Session, log: Logger):
         gear = tel.nGear.to_numpy().astype(float)
 
         cmap = plt.colormaps['Paired']
-        lc_comp = LineCollection(segments, norm=plt.Normalize(1, cmap.N + 1), cmap=cmap)
+        lc_comp = mpl.colors.LineCollection(segments, norm=plt.Normalize(1, cmap.N + 1), cmap=cmap)
         lc_comp.set_array(gear)
         lc_comp.set_linewidth(4)
 
@@ -541,7 +539,7 @@ def plot_speed_on_track(session: Session, log: Logger):
         colormap = plt.get_cmap("plasma")
         color = lap.telemetry.Speed
         norm = plt.Normalize(color.min(), color.max())
-        lc = LineCollection(segments, cmap=colormap, norm=norm, linestyle='-', linewidth=5)
+        lc = mpl.collections.LineCollection(segments, cmap=colormap, norm=norm, linestyle='-', linewidth=5)
         lc.set_array(color)
         ax.add_collection(lc)
         axes = 0.25, 0.05, 0.5, 0.05

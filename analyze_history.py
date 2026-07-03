@@ -4,9 +4,9 @@ import os
 import time
 
 import fastf1
+import plotly.graph_objects as go
 # noinspection PyPackageRequirements
 from opentelemetry import trace
-from plotly import graph_objects
 
 import setup
 
@@ -90,7 +90,7 @@ def __save_winners(log, start_year: int = 2000):
         color_map[yr] = {}
         for _, event in sched.iterrows():
             rnd = event.RoundNumber
-            max_round = max(max_round, rnd)
+            max_round: int = max(max_round, rnd)
             # Check if data exists in JSON cache
             if str(yr) in gp_data and str(rnd) in gp_data[str(yr)]:
                 log.info(f"Loading winner from cache for {yr} Round {rnd} {event.EventName}")
@@ -180,10 +180,10 @@ def __save_winners(log, start_year: int = 2000):
     color_matrix[0].insert(0, "lightgrey")  # For the "Wins" header
 
     headers = ["Round"] + [str(y) for y in years]
-    fig = graph_objects.Figure(data=[graph_objects.Table(
+    fig = go.Figure(data=[go.Table(
         header={"values": headers, "fill_color": "lightgrey", "align": "center"},
         cells={"values": cell_values, "fill_color": color_matrix, "align": "center"}
-    )], layout=graph_objects.Layout(autosize=True, margin=graph_objects.Margin(autoexpand=True)))
+    )], layout=go.Layout(autosize=True, margin=go.Margin(autoexpand=True)))
 
     base_dir = f"./images/winners-{start_year}-{end_year}"
     output_path = f"{base_dir}/winners.png"

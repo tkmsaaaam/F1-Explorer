@@ -4,11 +4,11 @@ from logging import Logger
 from typing import cast
 
 import fastf1
+import matplotlib as mpl
 import matplotlib.pyplot as plt
 import pandas
 import plotly.graph_objects as go
 from fastf1.core import Session, Laps
-from matplotlib.patches import Patch
 # noinspection PyPackageRequirements
 from opentelemetry import trace
 
@@ -488,7 +488,7 @@ def tyres(log: Logger, filepath: str, lap_logs: set[DriverLaps]):
         lap_logs,
         key=lambda dl: (
             -len(dl.get_laps()),
-            min([lap.get_position() for lap in dl.get_laps().values()] if dl.get_laps() else [float('inf')])
+            min([l.get_position() for l in dl.get_laps().values()] if dl.get_laps() else [float('inf')])
         )
     )
     y = 0
@@ -517,7 +517,7 @@ def tyres(log: Logger, filepath: str, lap_logs: set[DriverLaps]):
         y += 1
     ax.set_yticks(range(len(sorted_lap_logs)))
     ax.set_yticklabels([str(driver.get_driver().get_number()) for driver in sorted_lap_logs])
-    legend_elements = [Patch(facecolor=color, edgecolor='black', label=compound)
+    legend_elements = [mpl.patches.Patch(facecolor=color, edgecolor='black', label=compound)
                        for compound, color in constants.compound_color.items()]
     ax.legend(handles=legend_elements, title='Compound', loc='upper right', fontsize='small')
     ax.grid(True)
