@@ -365,7 +365,7 @@ def plot_gear_shift_on_track(session: Session, log: Logger):
         gear = tel.nGear.to_numpy().astype(float)
 
         cmap = plt.colormaps['Paired']
-        lc_comp = mpl.colors.LineCollection(segments, norm=plt.Normalize(1, cmap.N + 1), cmap=cmap)
+        lc_comp = mpl.collections.LineCollection(segments, norm=plt.Normalize(1, cmap.N + 1), cmap=cmap)
         lc_comp.set_array(gear)
         lc_comp.set_linewidth(4)
 
