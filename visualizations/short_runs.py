@@ -363,12 +363,9 @@ def plot_gear_shift_on_track(session: Session, log: Logger):
         points = np.array([x, y]).T.reshape(-1, 1, 2)
         segments = np.concatenate([points[:-1], points[1:]], axis=1)
         gear = tel.nGear.to_numpy().astype(float)
-
-        cmap = plt.colormaps['Paired']
-        lc_comp = mpl.collections.LineCollection(segments, norm=plt.Normalize(1, cmap.N + 1), cmap=cmap)
-        lc_comp.set_array(gear)
-        lc_comp.set_linewidth(4)
-
+        cmap = mpl.cm.Paired
+        lc_comp = mpl.collections.LineCollection(segments,
+                                                 norm=plt.Normalize(1, cmap.N + 1), cmap=cmap, linewidth=4, array=gear)
         fig.gca().add_collection(lc_comp)
         ax.axis('equal')
         ax.tick_params(labelleft=False, left=False, labelbottom=False, bottom=False)
