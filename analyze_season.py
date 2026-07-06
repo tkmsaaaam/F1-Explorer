@@ -300,7 +300,7 @@ def __main():
     fig = go.Figure(
         data=[go.Table(
             header=go.table.Header(
-                values=["No", "name"] + [drivers[k].Abbreviation for k in drivers_standing],
+                values=["No", "name"] + [f"{i} {drivers[k].Abbreviation}" for i, k in enumerate(drivers_standing, 1)],
                 fill=go.table.header.Fill(
                     color=(['lightgrey', 'lightgrey'] + ['#' + get_color(drivers[k]) for k in drivers_standing])),
                 align='center'),
