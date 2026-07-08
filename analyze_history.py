@@ -33,15 +33,18 @@ def save_gp_data(gp_data: dict) -> None:
     except Exception as e:
         print(f"Error saving gp_data.json: {e}")
 
-def get_name(v: fastf1.core.DriverResult)-> str:
+
+def get_name(v: fastf1.core.DriverResult) -> str:
     if getattr(v, 'FullName', 'nan') == 'nan':
         return ''
     return v.FullName
 
-def get_team(v: fastf1.core.DriverResult)-> str:
+
+def get_team(v: fastf1.core.DriverResult) -> str:
     if getattr(v, 'TeamName', 'nan') == 'nan':
         return ''
     return v.TeamName
+
 
 def get_color(v: fastf1.core.DriverResult) -> str:
     if getattr(v, 'TeamColor', 'nan') == 'nan':
@@ -103,77 +106,66 @@ def __save_cache(log, force_reload: bool = False, start_year: int = 2000,
 
 
 def __save_winners(log, start_year: int = 2000, end_year: int = datetime.datetime.now().year - 1):
-    winners: dict[int, dict[int, str]] = {}  # {year: {round: driver}}
-    gp_names: dict[int, dict[int, str]] = {}  # {year: {round: GP}}
-    color_map: dict[int, dict[int, str]] = {}  # {year: {round: team_color}}
-    max_round = 0
     gp_data = load_gp_data()
-
+    season_data: dict[int, dict[int, dict[str, str]]] = {}
+    max_round = 0
     for yr in range(start_year, end_year + 1):
         try:
             sched = fastf1.get_event_schedule(yr, include_testing=False).sort_values(by='RoundNumber')
         except Exception:
             continue
-        winners[yr] = {}
-        gp_names[yr] = {}
-        color_map[yr] = {}
+        season_data[yr] = {}
+        yr_str = str(yr)
         for _, event in sched.iterrows():
             rnd = event.RoundNumber
-            max_round: int = max(max_round, rnd)
-            if str(yr) not in gp_data or str(rnd) not in gp_data[str(yr)]:
+            rnd_str = str(rnd)
+            if yr_str not in gp_data or rnd_str not in gp_data[yr_str]:
                 continue
+            max_round = max(max_round, rnd)
             log.info(f"Loading winner from cache for {yr} Round {rnd} {event.EventName}")
-            cached_data = gp_data[str(yr)][str(rnd)]
-            winners[yr][rnd] = cached_data.get("abbreviation", "")
-            gp_names[yr][rnd] = cached_data.get("gp_name", "")
-            color_map[yr][rnd] = cached_data.get("color", "white")
-
-    if not winners:
-        log.warning("no winner data was collected")
-        return
-
-    years = sorted(winners.keys())
-    rounds = list(range(1, max_round + 1))
-    cell_values = [rounds]
-    color_matrix = [["lightgrey"] * (len(years) + 1)]
-
-    for yr in years:
-        winner_counts = {}
-        for rnd in winners[yr]:
-            abbr = winners[yr][rnd]
-            if abbr:
-                winner_counts[abbr] = winner_counts.get(abbr, 0) + 1
-        sorted_winners = sorted(winner_counts.items(), key=lambda x: x[1], reverse=True)
-        win_list = [f"{abbr}: {count}" for abbr, count in sorted_winners]
-        win_list_str = "<br>".join(win_list)
-
-        cols = []
-        colors = []
-        for r in rounds:
-            winner = winners[yr].get(r, "")
-            gp_name = gp_names[yr].get(r, "").replace('Grand Prix', '').strip()
-            color = color_map.get(yr, {}).get(r, "white")
+            cached = gp_data[yr_str][rnd_str]
+            color = cached.get("color", "white")
             if color == '#':
                 color = 'lightgrey'
-            cell_text = f"{winner} {gp_name}".strip()
-            cols.append(cell_text)
-            colors.append(color)
-        cols.insert(0, win_list_str)
-        colors.insert(0, 'lightgrey')
+            season_data[yr][rnd] = {
+                "winner": cached.get("abbreviation", ""),
+                "gp_name": cached.get("gp_name", "").replace('Grand Prix', '').strip(),
+                "color": color
+            }
+    if not season_data or all(not rounds for rounds in season_data.values()):
+        log.warning("no winner data was collected")
+        return
+    years = sorted(season_data.keys())
+    rounds = list(range(1, max_round + 1))
+    headers = ["Round"] + [str(y) for y in years]
+    cell_values = [["Wins"] + rounds]
+    color_matrix = [["lightgrey"] * (max_round + 1)]
+    for yr in years:
+        counts = {}
+        for rnd_data in season_data[yr].values():
+            if abbr := rnd_data["winner"]:
+                counts[abbr] = counts.get(abbr, 0) + 1
+        win_list_str = "<br>".join(
+            f"{abbr}: {count}" for abbr, count in sorted(counts.items(), key=lambda x: x[1], reverse=True))
+        cols = [win_list_str]
+        colors = ['lightgrey']
+
+        for r in rounds:
+            data = season_data[yr].get(r, {})
+            winner = data.get("winner", "")
+            gp_name = data.get("gp_name", "")
+            cols.append(f"{winner} {gp_name}".strip())
+            colors.append(data.get("color", "white"))
+
         cell_values.append(cols)
         color_matrix.append(colors)
 
-    cell_values[0].insert(0, "Wins")
-    color_matrix[0].insert(0, "lightgrey")
-
-    headers = ["Round"] + [str(y) for y in years]
     fig = go.Figure(data=[go.Table(
         header={"values": headers, "fill_color": "lightgrey", "align": "center"},
         cells={"values": cell_values, "fill_color": color_matrix, "align": "center"}
     )], layout=go.Layout(autosize=True, margin=go.layout.Margin(autoexpand=True)))
 
-    base_dir = f"./images/winners-{start_year}-{end_year}"
-    output_path = f"{base_dir}/winners.png"
+    output_path = f"./images/winners-{start_year}-{end_year}/winners.png"
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     fig.write_image(output_path, width=1920, height=2160)
     log.info(f"Saved winners table to {output_path}")
