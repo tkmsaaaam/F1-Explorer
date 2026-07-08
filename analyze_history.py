@@ -26,20 +26,24 @@ def load_gp_data() -> dict:
 
 def save_gp_data(gp_data: dict) -> None:
     """Save GP data to JSON cache file."""
-    gp_data_path = "./gp_data.json"
+    gp_data_path = "./cache/gp_data.json"
     try:
         with open(gp_data_path, 'w') as f:
             json.dump(gp_data, f, indent=2)
     except Exception as e:
         print(f"Error saving gp_data.json: {e}")
 
+def get_name(v: fastf1.core.DriverResult)-> str:
+    if getattr(v, 'FullName', 'nan') == 'nan':
+        return ''
+    return v.FullName
+
+def get_team(v: fastf1.core.DriverResult)-> str:
+    if getattr(v, 'TeamName', 'nan') == 'nan':
+        return ''
+    return v.TeamName
 
 def get_color(v: fastf1.core.DriverResult) -> str:
-    """Return hex color string for a driver result.
-
-    Copied from :mod:`analyze_season` so that the winners table cells can be
-    shaded by team color.
-    """
     if getattr(v, 'TeamColor', 'nan') == 'nan':
         return '808080'
     return v.TeamColor
@@ -52,18 +56,57 @@ tracer = trace.get_tracer(__name__)
 def __main():
     log = setup.log()
     setup.fast_f1()
-    __save_winners(log)
-
-
-def __save_winners(log, start_year: int = 2000):
     end_year = datetime.datetime.now().year - 1
+    __save_cache(log, False, end_year=end_year, interval=1)
+    __save_winners(log, end_year=end_year)
+    __save_count(log, end_year=end_year)
+
+
+def __save_cache(log, force_reload: bool = False, start_year: int = 2000,
+                 end_year: int = datetime.datetime.now().year - 1, interval: int = 1):
+    max_round = 0
+    gp_data = load_gp_data()
+    for yr in range(start_year, end_year + 1):
+        try:
+            sched = fastf1.get_event_schedule(yr, include_testing=False).sort_values(by='RoundNumber')
+        except Exception:
+            continue
+        for _, event in sched.iterrows():
+            rnd = event.RoundNumber
+            max_round: int = max(max_round, rnd)
+            if not force_reload and str(yr) in gp_data and str(rnd) in gp_data[str(yr)]:
+                log.info(f"Loading winner from cache for {yr} Round {rnd} {event.EventName}")
+                continue
+            try:
+                log.info(f"collecting winners for {yr} {event.EventName}")
+                race = fastf1.get_session(yr, event.EventName, "R")
+                race.load(laps=False, telemetry=False, weather=False, messages=False)
+                if len(race.results) <= 0:
+                    continue
+                winner_row = race.results.iloc[0]
+                if str(yr) not in gp_data:
+                    gp_data[str(yr)] = {}
+                data = {
+                    "gp_name": event.EventName,
+                    "abbreviation": winner_row.Abbreviation,
+                    "winner": get_name(winner_row),
+                    "team": get_team(winner_row),
+                    "color": '#' + get_color(winner_row)
+                }
+                gp_data[str(yr)][str(rnd)] = data
+                log.info(data)
+                save_gp_data(gp_data)
+                time.sleep(interval)
+            except Exception as exc:
+                log.warning(f"could not load winner for {yr} {event.EventName}: {exc}")
+                continue
+
+
+def __save_winners(log, start_year: int = 2000, end_year: int = datetime.datetime.now().year - 1):
     winners: dict[int, dict[int, str]] = {}  # {year: {round: driver}}
     gp_names: dict[int, dict[int, str]] = {}  # {year: {round: GP}}
     color_map: dict[int, dict[int, str]] = {}  # {year: {round: team_color}}
     max_round = 0
-
-    interval = 1
-
     gp_data = load_gp_data()
 
     for yr in range(start_year, end_year + 1):
@@ -77,43 +120,13 @@ def __save_winners(log, start_year: int = 2000):
         for _, event in sched.iterrows():
             rnd = event.RoundNumber
             max_round: int = max(max_round, rnd)
-            if str(yr) in gp_data and str(rnd) in gp_data[str(yr)]:
-                log.info(f"Loading winner from cache for {yr} Round {rnd} {event.EventName}")
-                cached_data = gp_data[str(yr)][str(rnd)]
-                winners[yr][rnd] = cached_data.get("winner", "")
-                gp_names[yr][rnd] = cached_data.get("gp_name", "")
-                color_map[yr][rnd] = cached_data.get("color", "white")
+            if str(yr) not in gp_data or str(rnd) not in gp_data[str(yr)]:
                 continue
-            try:
-                log.info(f"collecting winners for {yr} {event.EventName}")
-                race = fastf1.get_session(yr, event.EventName, "R", backend="ergast")
-                race.load(laps=False, telemetry=False, weather=False, messages=False)
-                if len(race.results) > 0:
-                    winner_row = race.results.iloc[0]
-                    winner_abbr = winner_row.Abbreviation
-                    color_hex = '#' + get_color(winner_row)
-                    winners[yr][rnd] = winner_abbr
-                    gp_names[yr][rnd] = event.EventName
-                    color_map[yr][rnd] = color_hex
-
-                    if str(yr) not in gp_data:
-                        gp_data[str(yr)] = {}
-                    gp_data[str(yr)][str(rnd)] = {
-                        "gp_name": event.EventName,
-                        "winner": winner_abbr,
-                        "color": color_hex
-                    }
-                    save_gp_data(gp_data)
-                else:
-                    winners[yr][rnd] = ""
-                    gp_names[yr][rnd] = ""
-                    color_map[yr][rnd] = "white"
-                time.sleep(interval)
-            except Exception as exc:
-                log.warning(f"could not load winner for {yr} {event.EventName}: {exc}")
-                winners[yr][rnd] = ""
-                color_map[yr][rnd] = "white"
-                return
+            log.info(f"Loading winner from cache for {yr} Round {rnd} {event.EventName}")
+            cached_data = gp_data[str(yr)][str(rnd)]
+            winners[yr][rnd] = cached_data.get("abbreviation", "")
+            gp_names[yr][rnd] = cached_data.get("gp_name", "")
+            color_map[yr][rnd] = cached_data.get("color", "white")
 
     if not winners:
         log.warning("no winner data was collected")
@@ -166,8 +179,7 @@ def __save_winners(log, start_year: int = 2000):
     log.info(f"Saved winners table to {output_path}")
 
 
-def __save_count(log, start_year: int = 2000):
-    end_year = datetime.datetime.now().year - 1
+def __save_count(log, start_year: int = 2000, end_year: int = datetime.datetime.now().year - 1):
     gp_data = load_gp_data()
     w: dict[str, dict[int, int]] = {}  # {winner: {year: count}}
     for year, season_winners in gp_data.items():
