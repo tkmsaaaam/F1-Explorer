@@ -63,6 +63,7 @@ def __main():
     __save_cache(log, False, end_year=end_year, interval=1)
     __save_winners(log, end_year=end_year)
     __save_count(log, end_year=end_year)
+    __save_team_count(log, end_year=end_year)
 
 
 def __save_cache(log, force_reload: bool = False, start_year: int = 2000,
@@ -209,6 +210,46 @@ def __save_count(log, start_year: int = 2000, end_year: int = datetime.datetime.
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     fig.write_image(output_path, width=1920, height=2160)
     log.info(f"Saved winners table to {output_path}")
+
+
+def __save_team_count(log, start_year: int = 2000, end_year: int = datetime.datetime.now().year - 1):
+    gp_data = load_gp_data()
+    w: dict[str, dict[int, int]] = {}  # {winner: {year: count}}
+    for year, season_winners in gp_data.items():
+        y = int(year)
+        for gp in season_winners.values():
+            winner = gp.get("team")
+            w.setdefault(winner, {}).setdefault(y, 0)
+            w[winner][y] += 1
+
+    all_years = sorted({y for yd in w.values() for y in yd})
+    driver_totals = sorted(
+        [(driver, sum(yd.values()), yd) for driver, yd in w.items()],
+        key=lambda x: x[1],
+        reverse=True,
+    )
+    drivers_col = [d for d, _, _ in driver_totals]
+    totals_col = [t for _, t, _ in driver_totals]
+    years_cols = [[yd.get(y, 0) for _, _, yd in driver_totals] for y in all_years]
+    cell_values = [drivers_col, totals_col] + years_cols
+    headers = ["Team", "Total"] + [str(y) for y in all_years]
+    num_rows = len(drivers_col)
+    row_colors = ["#ffffff" if i % 2 == 0 else "#f9f9f9" for i in range(num_rows)]
+    color_matrix = [row_colors for _ in range(len(headers))]
+    fig = go.Figure(
+        data=[
+            go.Table(
+                header={"values": headers, "fill_color": "lightgrey", "align": "center"},
+                cells={"values": cell_values, "fill_color": color_matrix, "align": "center"},
+            )
+        ],
+        layout=go.Layout(autosize=True, margin=go.layout.Margin(autoexpand=True)),
+    )
+    base_dir = f"./images/winners-{start_year}-{end_year}"
+    output_path = f"{base_dir}/team_count.png"
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+    fig.write_image(output_path, width=1920, height=2160)
+    log.info(f"Saved constructors table to {output_path}")
 
 
 if __name__ == "__main__":
