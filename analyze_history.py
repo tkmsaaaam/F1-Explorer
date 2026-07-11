@@ -209,7 +209,7 @@ def __save_count(log, start_year: int = 2000, end_year: int = datetime.datetime.
     output_path = f"{base_dir}/count.png"
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     fig.write_image(output_path, width=1920, height=2160)
-    log.info(f"Saved winners table to {output_path}")
+    log.info(f"Saved count table to {output_path}")
 
 
 def __save_team_count(log, start_year: int = 2000, end_year: int = datetime.datetime.now().year - 1):
