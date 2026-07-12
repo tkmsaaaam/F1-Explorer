@@ -160,11 +160,15 @@ def __save_winners(log, start_year: int = 2000, end_year: int = datetime.datetim
 
         cell_values.append(cols)
         color_matrix.append(colors)
-
-    fig = go.Figure(data=[go.Table(
-        header={"values": headers, "fill_color": "lightgrey", "align": "center"},
-        cells={"values": cell_values, "fill_color": color_matrix, "align": "center"}
-    )], layout=go.Layout(autosize=True, margin=go.layout.Margin(autoexpand=True)))
+    fig = go.Figure(
+        data=[
+            go.Table(
+                header=go.table.Header(
+                    values=headers, fill=go.table.header.Fill(color='lightgrey'), align='center'),
+                cells=go.table.Cells(
+                    values=cell_values, fill=go.table.cells.Fill(color=color_matrix), align='center'),)],
+        layout=go.Layout(autosize=True, margin=go.layout.Margin(autoexpand=True)),
+    )
 
     output_path = f"./images/winners-{start_year}-{end_year}/winners.png"
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
@@ -199,10 +203,10 @@ def __save_count(log, start_year: int = 2000, end_year: int = datetime.datetime.
     fig = go.Figure(
         data=[
             go.Table(
-                header={"values": headers, "fill_color": "lightgrey", "align": "center"},
-                cells={"values": cell_values, "fill_color": color_matrix, "align": "center"},
-            )
-        ],
+                header=go.table.Header(
+                    values=headers, fill=go.table.header.Fill(color='lightgrey'), align='center'),
+                cells=go.table.Cells(
+                    values=cell_values, fill=go.table.cells.Fill(color=color_matrix), align='center'),)],
         layout=go.Layout(autosize=True, margin=go.layout.Margin(autoexpand=True)),
     )
     base_dir = f"./images/winners-{start_year}-{end_year}"
@@ -239,10 +243,10 @@ def __save_team_count(log, start_year: int = 2000, end_year: int = datetime.date
     fig = go.Figure(
         data=[
             go.Table(
-                header={"values": headers, "fill_color": "lightgrey", "align": "center"},
-                cells={"values": cell_values, "fill_color": color_matrix, "align": "center"},
-            )
-        ],
+                header=go.table.Header(
+                    values=headers, fill=go.table.header.Fill(color='lightgrey'), align='center'),
+                cells=go.table.Cells(
+                    values=cell_values, fill=go.table.cells.Fill(color=color_matrix), align='center'),)],
         layout=go.Layout(autosize=True, margin=go.layout.Margin(autoexpand=True)),
     )
     base_dir = f"./images/winners-{start_year}-{end_year}"
