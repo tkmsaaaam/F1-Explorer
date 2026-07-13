@@ -73,7 +73,8 @@ def __save_cache(log, force_reload: bool = False, start_year: int = 2000,
     for yr in range(start_year, end_year + 1):
         try:
             sched = fastf1.get_event_schedule(yr, include_testing=False).sort_values(by='RoundNumber')
-        except Exception:
+        except Exception as exception:
+            log.warning(exception.args)
             continue
         for _, event in sched.iterrows():
             rnd = event.RoundNumber
@@ -113,12 +114,13 @@ def __save_winners(log, start_year: int = 2000, end_year: int = datetime.datetim
     for yr in range(start_year, end_year + 1):
         try:
             sched = fastf1.get_event_schedule(yr, include_testing=False).sort_values(by='RoundNumber')
-        except Exception:
+        except Exception as exception:
+            log.warning(exception.args)
             continue
         season_data[yr] = {}
         yr_str = str(yr)
         for _, event in sched.iterrows():
-            rnd = event.RoundNumber
+            rnd: int = event.RoundNumber
             rnd_str = str(rnd)
             if yr_str not in gp_data or rnd_str not in gp_data[yr_str]:
                 continue
