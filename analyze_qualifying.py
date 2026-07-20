@@ -1,3 +1,5 @@
+import datetime
+
 import fastf1
 # noinspection PyPackageRequirements
 from opentelemetry import trace
@@ -7,6 +9,14 @@ from visualizations import run_volume, short_runs, weather, weekend, comparison
 
 tracer = trace.get_tracer(__name__)
 
+
+@tracer.start_as_current_span("start_at")
+def start_at(session: fastf1.core.Session) -> None | datetime.datetime:
+    if session.name == 'Sprint Qualifying':
+        return session.event.Session2Date
+    elif session.name == 'Qualifying':
+        return session.event.Session4Date
+    return None
 
 @tracer.start_as_current_span("main")
 def __main():
@@ -28,6 +38,13 @@ def __main():
         log.warning(exception.args)
         return
     session.load(messages=False)
+
+    start = start_at(session)
+    now = datetime.datetime.now().astimezone()
+    if start is not None and now < start:
+        log.info(
+            f"{session.event.year} Race {session.event.RoundNumber} {session.event.EventName} Qualifying is not started.")
+        return
 
     log.info(f"{config.get_year()} Race {config.get_round()} {session.event.EventName} {config.get_session()}")
 

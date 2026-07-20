@@ -1,3 +1,5 @@
+import datetime
+
 import fastf1
 # noinspection PyPackageRequirements
 from opentelemetry import trace
@@ -6,6 +8,16 @@ import setup
 from visualizations import run_volume, long_runs, short_runs, weather, weekend
 
 tracer = trace.get_tracer(__name__)
+
+@tracer.start_as_current_span("start_at")
+def start_at(session: fastf1.core.Session) -> None | datetime.datetime:
+    if session.name == 'Practice 1':
+        return session.event.Sessio13Date
+    elif session.name == 'Practice 2':
+        return session.event.Session2Date
+    elif session.name == 'Practice 3':
+        return session.event.Session3Date
+    return None
 
 
 @tracer.start_as_current_span("main")
@@ -28,6 +40,13 @@ def __main():
         log.warning(exception.args)
         return
     session.load(messages=False)
+
+    start = start_at(session)
+    now = datetime.datetime.now().astimezone()
+    if start is not None and now < start:
+        log.info(
+            f"{session.event.year} Race {session.event.RoundNumber} {session.event.EventName} Practice is not started.")
+        return
 
     log.info(
         f"{session.event.year} Race {session.event['RoundNumber']} {session.event.EventName} {config.get_session()}")

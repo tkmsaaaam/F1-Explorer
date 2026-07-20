@@ -9,7 +9,7 @@ from visualizations import weekend, run_volume, weather, race
 
 tracer = trace.get_tracer(__name__)
 
-@tracer.start_as_current_span("main")
+@tracer.start_as_current_span("start_at")
 def start_at(session: fastf1.core.Session) -> None | datetime.datetime:
     if session.name == 'Sprint':
         return session.event.Session3Date
