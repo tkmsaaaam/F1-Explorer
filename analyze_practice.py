@@ -42,9 +42,11 @@ def __main():
     session.load(messages=False)
 
     start = start_at(session)
-    now = datetime.datetime.now().astimezone()
-    if start is not None and now < start:
-        log.info(
+    if start is None:
+        log.warning(f"{session.name} is not Practice 1 or Practice 2 or Practice 3.")
+        return
+    if datetime.datetime.now().astimezone() < start:
+        log.warning(
             f"{session.event.year} Race {session.event.RoundNumber} {session.event.EventName} Practice is not started.")
         return
 

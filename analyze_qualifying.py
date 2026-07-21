@@ -40,9 +40,11 @@ def __main():
     session.load(messages=False)
 
     start = start_at(session)
-    now = datetime.datetime.now().astimezone()
-    if start is not None and now < start:
-        log.info(
+    if start is None:
+        log.warning(f"{session.name} is not Sprint Qualifying or Qualifying.")
+        return
+    if datetime.datetime.now().astimezone() < start:
+        log.warning(
             f"{session.event.year} Race {session.event.RoundNumber} {session.event.EventName} Qualifying is not started.")
         return
 
