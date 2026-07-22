@@ -99,6 +99,7 @@ def log() -> Logger:
         handlers=[logging.StreamHandler()],
     )
     logging.getLogger('choreographer').setLevel(logging.WARNING)
+    # noinspection SpellCheckingInspection
     logging.getLogger('fastf1').setLevel(logging.WARNING)
     logging.getLogger('kaleido').setLevel(logging.WARNING)
     return logging.getLogger(__name__)

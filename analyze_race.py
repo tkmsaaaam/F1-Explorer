@@ -30,7 +30,6 @@ def main():
     if config.get_session_category() != setup.SessionCategory.Race:
         log.warning(f"{config.get_session()} is not R or S. \"Session\" needs to be set to R or S.")
         return
-    config.set_attribute_to_span()
     setup.fast_f1()
     try:
         session = fastf1.get_session(config.get_year(), config.get_round(), config.get_session())
@@ -47,7 +46,7 @@ def main():
         log.warning(
             f"{session.event.year} Race {session.event.RoundNumber} {session.event.EventName} Race is not started.")
         return
-
+    config.set_attribute_to_span()
     log.info(f"{session.event.year} Race {session.event.RoundNumber} {session.event.EventName} Race")
 
     weekend.plot_tyre(config.get_year(), config.get_round(), log)

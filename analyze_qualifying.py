@@ -30,7 +30,6 @@ def __main():
     if config.get_session_category() != setup.SessionCategory.Qualifying:
         log.warning(f"{config.get_session()} is not Q or SQ.  \"Session\" needs to be set to Q or SQ.")
         return
-    config.set_attribute_to_span()
     setup.fast_f1()
     try:
         session = fastf1.get_session(config.get_year(), config.get_round(), config.get_session())
@@ -48,6 +47,7 @@ def __main():
             f"{session.event.year} Race {session.event.RoundNumber} {session.event.EventName} Qualifying is not started.")
         return
 
+    config.set_attribute_to_span()
     log.info(f"{config.get_year()} Race {config.get_round()} {session.event.EventName} {config.get_session()}")
 
     comparison.execute(session, log, config.get_comparison())
