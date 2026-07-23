@@ -9,6 +9,7 @@ import fastf1.plotting
 import matplotlib.pyplot as plt
 import numpy
 import plotly.graph_objects as go
+import structlog.stdlib
 from fastf1.core import DriverResult
 from fastf1.events import EventSchedule
 # noinspection PyPackageRequirements
@@ -77,7 +78,7 @@ def determine_linestyle(year: int, driver: int) -> str:
         return "dashed"
 
 
-def __save_events(base_dir: str, log: Logger, schedule: EventSchedule):
+def __save_events(base_dir: str, log: structlog.stdlib.BoundLogger, schedule: EventSchedule):
     output_path = f"{base_dir}/events.png"
     if os.path.exists(output_path):
         return
@@ -109,7 +110,7 @@ def __main():
     try:
         config = setup.load_config()
     except Exception as exception:
-        log.warning(exception.args)
+        log.warning('setup is failed', args=exception.args)
         return
     config.set_attribute_to_span()
     setup.fast_f1()
@@ -163,7 +164,7 @@ def __main():
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     fig.savefig(output_path, bbox_inches='tight')
     plt.close(fig)
-    log.info(f"Saved plot to {output_path}")
+    log.info(f"Saved plot", path=output_path)
 
     fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
     for k, v in drivers.items():
@@ -177,7 +178,7 @@ def __main():
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     fig.savefig(output_path, bbox_inches='tight')
     plt.close(fig)
-    log.info(f"Saved plot to {output_path}")
+    log.info(f"Saved plot", path=output_path)
 
     champion_points = max(
         (
@@ -200,7 +201,7 @@ def __main():
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     fig.savefig(output_path, bbox_inches='tight')
     plt.close(fig)
-    log.info(f"Saved plot to {output_path}")
+    log.info(f"Saved plot", path=output_path)
 
     fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
     x = [i for i in range(1, latest)]
@@ -215,7 +216,7 @@ def __main():
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     fig.savefig(output_path, bbox_inches='tight')
     plt.close(fig)
-    log.info(f"Saved plot to {output_path}")
+    log.info(f"Saved plot", path=output_path)
 
     fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
     for k, v in drivers.items():
@@ -244,7 +245,7 @@ def __main():
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     fig.savefig(output_path, bbox_inches='tight')
     plt.close(fig)
-    log.info(f"Saved plot to {output_path}")
+    log.info(f"Saved plot", path=output_path)
 
     values_map = {}
     sum_map = {}
@@ -315,7 +316,7 @@ def __main():
     output_path = f"{base_dir}/points.png"
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     fig.write_image(output_path, width=1920, height=2160)
-    log.info(f"Saved plot to {output_path}")
+    log.info(f"Saved plot", path=output_path)
 
     if config.get_year() > now.year:
         return

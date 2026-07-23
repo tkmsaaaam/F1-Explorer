@@ -5,6 +5,7 @@ from logging import Logger
 from typing import Any
 
 import fastf1
+import structlog
 # noinspection PyPackageRequirements
 from opentelemetry import trace
 
@@ -92,14 +93,16 @@ def fast_f1():
 
 
 @tracer.start_as_current_span("log")
-def log() -> Logger:
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s - %(levelname)s - %(pathname)s:%(lineno)d --- %(message)s",  # Log format
-        handlers=[logging.StreamHandler()],
+def log() -> structlog.stdlib.BoundLogger:
+    structlog.configure(
+        processors=[
+            structlog.processors.TimeStamper(fmt="iso"),
+            structlog.processors.dict_tracebacks,
+            structlog.processors.JSONRenderer(),
+        ]
     )
     logging.getLogger('choreographer').setLevel(logging.WARNING)
     # noinspection SpellCheckingInspection
     logging.getLogger('fastf1').setLevel(logging.WARNING)
     logging.getLogger('kaleido').setLevel(logging.WARNING)
-    return logging.getLogger(__name__)
+    return structlog.get_logger(__name__)
