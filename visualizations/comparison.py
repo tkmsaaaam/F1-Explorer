@@ -1,9 +1,9 @@
 import os
-from logging import Logger
 from typing import Any
 
 import fastf1
 import matplotlib.pyplot as plt
+import structlog
 from fastf1.core import Session
 # noinspection PyPackageRequirements
 from opentelemetry import trace
@@ -14,7 +14,7 @@ tracer = trace.get_tracer(__name__)
 
 
 @tracer.start_as_current_span("execute")
-def execute(session: Session, log: Logger, comparison: list[list[dict[str, Any]]]):
+def execute(session: Session, log: structlog.stdlib.BoundLogger, comparison: list[list[dict[str, Any]]]):
     _plot_driver_lap_telemetry(session, log, comparison,
                                key='throttle',
                                label='Throttle [%]',
@@ -38,7 +38,7 @@ def execute(session: Session, log: Logger, comparison: list[list[dict[str, Any]]
 
 
 @tracer.start_as_current_span("_plot_driver_lap_telemetry")
-def _plot_driver_lap_telemetry(session: Session, log: Logger, comparison: list[list[dict[str, Any]]], key: str, label,
+def _plot_driver_lap_telemetry(session: Session, log: structlog.stdlib.BoundLogger, comparison: list[list[dict[str, Any]]], key: str, label,
                                value_func):
     circuit_info = session.get_circuit_info()
     if circuit_info is None:

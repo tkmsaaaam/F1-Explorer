@@ -1,10 +1,10 @@
 import os
-from logging import Logger
 from typing import cast
 
 import fastf1
 import matplotlib.pyplot as plt
 import pandas
+import structlog
 from fastf1.core import Session, Laps
 # noinspection PyPackageRequirements
 from opentelemetry import trace
@@ -37,7 +37,7 @@ def make_stint_set(min_consecutive_laps: int, all_laps: Laps, compound: str) -> 
 
 
 @tracer.start_as_current_span("plot_by_tyre_age_and_tyre")
-def plot_by_tyre_age_and_tyre(session: Session, log: Logger):
+def plot_by_tyre_age_and_tyre(session: Session, log: structlog.stdlib.BoundLogger):
     """タイヤ別のファイルにロングランのラップタイム(y)推移をタイヤエイジ(x)でプロットする
     Args:
         session: プロットするセッション

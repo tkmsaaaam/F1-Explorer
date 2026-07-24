@@ -1,6 +1,5 @@
 import math
 import os
-from logging import Logger
 
 import fastf1
 import matplotlib as mpl
@@ -9,6 +8,7 @@ import numpy as np
 import pandas
 import plotly.express as px
 import plotly.graph_objects as go
+import structlog
 from fastf1.core import Session, Lap, Telemetry
 # noinspection PyPackageRequirements
 from opentelemetry import trace
@@ -23,7 +23,7 @@ def determine_linestyle(year: int, driver: int) -> str:
 
 
 @tracer.start_as_current_span("compute_competitive_drivers")
-def compute_competitive_drivers(session: Session, log: Logger, c: int) -> list[int]:
+def compute_competitive_drivers(session: Session, log: structlog.stdlib.BoundLogger, c: int) -> list[int]:
     """トップcチームの早い方のドライバーの車番を算出する
     Args:
         session: セッション
@@ -51,7 +51,7 @@ def compute_and_save_segment_tables_plotly(
         session: Session,
         filename_base: str,
         segment_boundaries: list[float],
-        log: Logger
+        log: structlog.stdlib.BoundLogger
 ):
     """mini segmentごとのタイムをプロットする
     Args:
@@ -168,7 +168,7 @@ def compute_and_save_segment_tables_plotly(
 
 
 @tracer.start_as_current_span("plot_best_laptime")
-def plot_best_laptime(session: Session, log: Logger, key: str):
+def plot_best_laptime(session: Session, log: structlog.stdlib.BoundLogger, key: str):
     """keyを順位で並べる
     Args:
         session: セッション
@@ -203,7 +203,7 @@ def plot_best_laptime(session: Session, log: Logger, key: str):
 
 
 @tracer.start_as_current_span("plot_best_speed")
-def plot_best_speed(session: Session, log: Logger, key: str):
+def plot_best_speed(session: Session, log: structlog.stdlib.BoundLogger, key: str):
     """key（セクター）ごとの最高速をプロットする
     Args:
         session: セッション
@@ -236,7 +236,7 @@ def plot_best_speed(session: Session, log: Logger, key: str):
 
 
 @tracer.start_as_current_span("plot_flat_out")
-def plot_flat_out(session: Session, log: Logger):
+def plot_flat_out(session: Session, log: structlog.stdlib.BoundLogger):
     """全開率をプロットする
     Args:
         session: セッション
@@ -273,7 +273,7 @@ def plot_flat_out(session: Session, log: Logger):
 
 
 @tracer.start_as_current_span("plot_ideal_best")
-def plot_ideal_best(session: Session, log: Logger):
+def plot_ideal_best(session: Session, log: structlog.stdlib.BoundLogger):
     """y = 理論値
     x = ラップタイム
     Args:
@@ -309,7 +309,7 @@ def plot_ideal_best(session: Session, log: Logger):
 
 
 @tracer.start_as_current_span("plot_ideal_best_diff")
-def plot_ideal_best_diff(session: Session, log: Logger):
+def plot_ideal_best_diff(session: Session, log: structlog.stdlib.BoundLogger):
     """y = ラップタイム - 理論値
     x = ラップタイム
     Args:
@@ -345,7 +345,7 @@ def plot_ideal_best_diff(session: Session, log: Logger):
 
 
 @tracer.start_as_current_span("plot_gear_shift_on_track")
-def plot_gear_shift_on_track(session: Session, log: Logger):
+def plot_gear_shift_on_track(session: Session, log: structlog.stdlib.BoundLogger):
     """ドライバーごとに最速ラップのシフト変化をコースマップにプロットする
     Args:
         session: 分析対象のセッション
@@ -381,7 +381,7 @@ def plot_gear_shift_on_track(session: Session, log: Logger):
 
 
 @tracer.start_as_current_span("plot_speed_and_laptime")
-def plot_speed_and_laptime(session: Session, log: Logger):
+def plot_speed_and_laptime(session: Session, log: structlog.stdlib.BoundLogger):
     """y = ラップタイム
     x = 最高速
     Args:
@@ -417,7 +417,7 @@ def plot_speed_and_laptime(session: Session, log: Logger):
 
 
 @tracer.start_as_current_span("plot_speed_distance")
-def plot_speed_distance(session: Session, log: Logger):
+def plot_speed_distance(session: Session, log: structlog.stdlib.BoundLogger):
     """y = スピード
     x = 距離
     Args:
@@ -456,7 +456,7 @@ def plot_speed_distance(session: Session, log: Logger):
 
 
 @tracer.start_as_current_span("plot_speed_distance_comparison")
-def plot_speed_distance_comparison(session: Session, log: Logger):
+def plot_speed_distance_comparison(session: Session, log: structlog.stdlib.BoundLogger):
     """スピードを比較
     Args:
         session: セッション
@@ -510,7 +510,7 @@ def plot_speed_distance_comparison(session: Session, log: Logger):
 
 
 @tracer.start_as_current_span("plot_speed_on_track")
-def plot_speed_on_track(session: Session, log: Logger):
+def plot_speed_on_track(session: Session, log: structlog.stdlib.BoundLogger):
     """ドライバーごとに最速ラップのスピードをグラフにする
     Args:
         session: 分析対象のセッション
@@ -552,7 +552,7 @@ def plot_speed_on_track(session: Session, log: Logger):
 
 
 @tracer.start_as_current_span("plot_time_distance_comparison")
-def plot_time_distance_comparison(session: Session, log: Logger):
+def plot_time_distance_comparison(session: Session, log: structlog.stdlib.BoundLogger):
     """driver_group 内最速との差分を表示する
 
     x = 距離（group内最速ドライバー基準）
@@ -647,7 +647,7 @@ def plot_time_distance_comparison(session: Session, log: Logger):
         plt.close(fig)
 
 
-def _plot_driver_telemetry(session: Session, log: Logger, driver_numbers: list[int], key: str, label, value_func):
+def _plot_driver_telemetry(session: Session, log: structlog.stdlib.BoundLogger, driver_numbers: list[int], key: str, label, value_func):
     group_size = 5
     circuit_info = session.get_circuit_info()
     if circuit_info is None:
@@ -702,7 +702,7 @@ def _plot_driver_telemetry(session: Session, log: Logger, driver_numbers: list[i
 
 
 @tracer.start_as_current_span("make_mini_segment")
-def make_mini_segment(session: Session, log: Logger, corner_map: dict[str, list[int]], separators: list[int]) -> list[
+def make_mini_segment(session: Session, log: structlog.stdlib.BoundLogger, corner_map: dict[str, list[int]], separators: list[int]) -> list[
     int]:
     """ミニセグメント作成する
     Args:
@@ -735,7 +735,7 @@ def make_mini_segment(session: Session, log: Logger, corner_map: dict[str, list[
 
 
 @tracer.start_as_current_span("plot_mini_segment_on_circuit")
-def plot_mini_segment_on_circuit(session: Session, log: Logger, segment_boundaries: list[int], image_name: str):
+def plot_mini_segment_on_circuit(session: Session, log: structlog.stdlib.BoundLogger, segment_boundaries: list[int], image_name: str):
     """ミニセグメントをプロットする
     Args:
         session: 分析対象のセッション
@@ -782,7 +782,7 @@ def plot_mini_segment_on_circuit(session: Session, log: Logger, segment_boundari
 
 
 @tracer.start_as_current_span("plot_throttle")
-def plot_throttle(session: Session, log: Logger):
+def plot_throttle(session: Session, log: structlog.stdlib.BoundLogger):
     """y = スロットル
     x = 距離
     Args:
@@ -799,7 +799,7 @@ def plot_throttle(session: Session, log: Logger):
 
 
 @tracer.start_as_current_span("plot_brake")
-def plot_brake(session: Session, log: Logger):
+def plot_brake(session: Session, log: structlog.stdlib.BoundLogger):
     """y = ブレーキ
     x = 距離
     Args:
@@ -816,7 +816,7 @@ def plot_brake(session: Session, log: Logger):
 
 
 @tracer.start_as_current_span("plot_drs")
-def plot_drs(session: Session, log: Logger):
+def plot_drs(session: Session, log: structlog.stdlib.BoundLogger):
     """y = DRS
     x = 距離
     Args:
@@ -832,7 +832,7 @@ def plot_drs(session: Session, log: Logger):
 
 
 @tracer.start_as_current_span("plot_telemetry")
-def plot_telemetry(session: Session, log: Logger,
+def plot_telemetry(session: Session, log: structlog.stdlib.BoundLogger,
                    driver_numbers: list[int], key: str, label, value_func):
     """y = key
     x = 距離
@@ -897,7 +897,7 @@ def plot_telemetry(session: Session, log: Logger,
 
 
 @tracer.start_as_current_span("plot_tyre_age_and_laptime")
-def plot_tyre_age_and_laptime(session: Session, log: Logger):
+def plot_tyre_age_and_laptime(session: Session, log: structlog.stdlib.BoundLogger):
     """y = ラップタイム
     x = タイヤ使用歴
     Args:

@@ -1,6 +1,5 @@
 import datetime
 import os
-from logging import Logger
 from typing import cast
 
 import fastf1
@@ -8,6 +7,7 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 import pandas
 import plotly.graph_objects as go
+import structlog
 from fastf1.core import Session, Laps
 # noinspection PyPackageRequirements
 from opentelemetry import trace
@@ -26,7 +26,7 @@ def determine_linestyle(year: int, driver: int) -> str:
 
 
 @tracer.start_as_current_span("execute")
-def execute(session: Session, log: Logger, images_path: str, logs_path: str, lap_time_range: int | None,
+def execute(session: Session, log: structlog.stdlib.BoundLogger, images_path: str, logs_path: str, lap_time_range: int | None,
             gap_top_range: int | None,
             gap_ahead_range: int | None):
     driver_laps_set = make_driver_laps_set(session.laps)
@@ -90,7 +90,7 @@ def make_lap_start_by_position_by_number(laps: Laps) -> dict[int, dict[int, date
 
 
 @tracer.start_as_current_span("laptime")
-def laptime(log: Logger, filepath: str, filename: str, session: Session, r: int | None, lap_logs: set[DriverLaps]):
+def laptime(log: structlog.stdlib.BoundLogger, filepath: str, filename: str, session: Session, r: int | None, lap_logs: set[DriverLaps]):
     """x = ラップ番号, y = ラップタイムのドライバーごとの推移
     Args:
         log: ロガー
@@ -143,7 +143,7 @@ def make_top_time_map(all_laps: Laps) -> dict[int, datetime.datetime]:
 
 
 @tracer.start_as_current_span("gap_to_ahead_table")
-def gap_to_ahead_table(log: Logger, filepath: str, lap_logs: set[DriverLaps],
+def gap_to_ahead_table(log: structlog.stdlib.BoundLogger, filepath: str, lap_logs: set[DriverLaps],
                        position_logs: dict[int, dict[int, datetime.datetime]]):
     """ラップごとのギャップの一覧を作成する
     Args:
@@ -216,7 +216,7 @@ def gap_to_ahead_table(log: Logger, filepath: str, lap_logs: set[DriverLaps],
 
 
 @tracer.start_as_current_span("gap_to_top_table")
-def gap_to_top_table(log: Logger, filepath: str, lap_logs: set[DriverLaps], session: Session):
+def gap_to_top_table(log: structlog.stdlib.BoundLogger, filepath: str, lap_logs: set[DriverLaps], session: Session):
     """ラップごとのTopへのギャップの一覧を作成する
     Args:
         log: ロガー
@@ -284,7 +284,7 @@ def gap_to_top_table(log: Logger, filepath: str, lap_logs: set[DriverLaps], sess
 
 
 @tracer.start_as_current_span("gap_to_ahead")
-def gap_to_ahead_graph(log: Logger, filepath: str, filename: str, session: Session, r: int | None,
+def gap_to_ahead_graph(log: structlog.stdlib.BoundLogger, filepath: str, filename: str, session: Session, r: int | None,
                        lap_logs: set[DriverLaps],
                        position_logs: dict[int, dict[int, datetime.datetime]]):
     """x = ラップ番号, y = 前走とのギャップのドライバーごとの推移
@@ -329,7 +329,7 @@ def gap_to_ahead_graph(log: Logger, filepath: str, filename: str, session: Sessi
 
 
 @tracer.start_as_current_span("gap_to_top")
-def gap_to_top_graph(log: Logger, filepath: str, filename: str, session: Session, r: int | None,
+def gap_to_top_graph(log: structlog.stdlib.BoundLogger, filepath: str, filename: str, session: Session, r: int | None,
                      lap_logs: set[DriverLaps]):
     """x = ラップ番号, y = トップとのギャップのドライバーごとの推移
     Args:
@@ -373,7 +373,7 @@ def gap_to_top_graph(log: Logger, filepath: str, filename: str, session: Session
 
 
 @tracer.start_as_current_span("positions")
-def positions(log: Logger, filepath: str, session: Session, lap_logs: set[DriverLaps]):
+def positions(log: structlog.stdlib.BoundLogger, filepath: str, session: Session, lap_logs: set[DriverLaps]):
     """x = ラップ番号, y = ポジションのドライバーごとの推移
     Args:
         log: ロガー
@@ -402,7 +402,7 @@ def positions(log: Logger, filepath: str, session: Session, lap_logs: set[Driver
 
 
 @tracer.start_as_current_span("speed_first_10s")
-def speed_first_10s(log: Logger, filepath: str, session: Session) -> None:
+def speed_first_10s(log: structlog.stdlib.BoundLogger, filepath: str, session: Session) -> None:
     fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
     v_min = float('inf')
     v_max = float('-inf')
@@ -437,7 +437,7 @@ def speed_first_10s(log: Logger, filepath: str, session: Session) -> None:
 
 
 @tracer.start_as_current_span("speed_until_turn1")
-def speed_until_turn1(log: Logger, filepath: str, session: Session) -> None:
+def speed_until_turn1(log: structlog.stdlib.BoundLogger, filepath: str, session: Session) -> None:
     fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
     circuit_info = session.get_circuit_info()
     if circuit_info is None:
@@ -476,7 +476,7 @@ def speed_until_turn1(log: Logger, filepath: str, session: Session) -> None:
 
 
 @tracer.start_as_current_span("tyres")
-def tyres(log: Logger, filepath: str, lap_logs: set[DriverLaps]):
+def tyres(log: structlog.stdlib.BoundLogger, filepath: str, lap_logs: set[DriverLaps]):
     """x = ラップ番号, y = 使用タイヤのドライバーごとの推移
     Args:
         log: ロガー

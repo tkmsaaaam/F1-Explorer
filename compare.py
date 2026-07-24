@@ -71,7 +71,7 @@ class Comparison:
 
 
 @tracer.start_as_current_span("plot_brake_distance")
-def plot_brake_distance(log: Logger, comparison: Comparison):
+def plot_brake_distance(log: structlog.stdlib.BoundLogger, comparison: Comparison):
     """brakeを比較
     Args:
         comparison: Comparison
@@ -104,7 +104,7 @@ def plot_brake_distance(log: Logger, comparison: Comparison):
 
 
 @tracer.start_as_current_span("plot_n_gear_distance")
-def plot_n_gear_distance(log: Logger, comparison: Comparison):
+def plot_n_gear_distance(log: structlog.stdlib.BoundLogger, comparison: Comparison):
     """nGearを比較
     Args:
         comparison: Comparison
@@ -137,7 +137,7 @@ def plot_n_gear_distance(log: Logger, comparison: Comparison):
 
 
 @tracer.start_as_current_span("plot_rpm_distance")
-def plot_rpm_distance(log: Logger, comparison: Comparison):
+def plot_rpm_distance(log: structlog.stdlib.BoundLogger, comparison: Comparison):
     """RPMを比較
     Args:
         comparison: Comparison
@@ -170,7 +170,7 @@ def plot_rpm_distance(log: Logger, comparison: Comparison):
 
 
 @tracer.start_as_current_span("plot_speed_distance")
-def plot_speed_distance(log: Logger, comparison: Comparison):
+def plot_speed_distance(log: structlog.stdlib.BoundLogger, comparison: Comparison):
     """スピードを比較
     Args:
         comparison: Comparison
@@ -203,7 +203,7 @@ def plot_speed_distance(log: Logger, comparison: Comparison):
 
 
 @tracer.start_as_current_span("plot_throttle_distance")
-def plot_throttle_distance(log: Logger, comparison: Comparison):
+def plot_throttle_distance(log: structlog.stdlib.BoundLogger, comparison: Comparison):
     """throttleを比較
     Args:
         comparison: Comparison
@@ -236,7 +236,7 @@ def plot_throttle_distance(log: Logger, comparison: Comparison):
 
 
 @tracer.start_as_current_span("summary")
-def summary(log: Logger, comparison: Comparison):
+def summary(log: structlog.stdlib.BoundLogger, comparison: Comparison):
     fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
     current_car_data = comparison.get_current().get_lap().get_car_data().add_distance()
     ax.plot(current_car_data.Distance, current_car_data.Throttle, linestyle='solid',
@@ -431,28 +431,28 @@ def __main():
     try:
         current = fastf1.get_session(year, race, session)
     except Exception as exception:
-        log.warning(exception.args)
+        log.warning('setup is failed', args=exception.args)
         return
     current.load(messages=False)
     try:
         current_summary = new(current)
     except Exception as exception:
-        log.warning(exception.args)
+        log.warning('setup is failed', args=exception.args)
         return
 
     try:
         previous = fastf1.get_session(year - 1, race, session)
     except Exception as exception:
-        log.warning(exception.args)
+        log.warning('setup is failed', args=exception.args)
         return
     previous.load(messages=False)
     try:
         previous_summary = new(previous)
     except Exception as exception:
-        log.warning(exception.args)
+        log.warning('setup is failed', args=exception.args)
         return
 
-    log.info(f"{race} {session}")
+    log.info(race=race, session=session)
 
     circuit = current.get_circuit_info()
     if circuit is None:

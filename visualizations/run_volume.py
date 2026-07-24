@@ -1,5 +1,4 @@
 import os
-from logging import Logger
 from typing import cast
 
 import fastf1.plotting
@@ -7,6 +6,7 @@ import matplotlib.pyplot as plt
 import numpy
 import pandas
 import plotly.graph_objects as go
+import structlog
 from fastf1.core import Session
 from numpy import datetime64
 # noinspection PyPackageRequirements
@@ -22,7 +22,7 @@ def determine_linestyle(year: int, driver: int) -> str:
 
 
 @tracer.start_as_current_span("plot_lap_number_by_timing")
-def plot_lap_number_by_timing(session: Session, log: Logger):
+def plot_lap_number_by_timing(session: Session, log: structlog.stdlib.BoundLogger):
     """y = ラップ番号
     x = 時間
     Args:
@@ -56,7 +56,7 @@ def plot_lap_number_by_timing(session: Session, log: Logger):
 
 
 @tracer.start_as_current_span("plot_laptime")
-def plot_laptime(session: Session, log: Logger):
+def plot_laptime(session: Session, log: structlog.stdlib.BoundLogger):
     """ラップごとのタイムの一覧を作成する
     Args:
         session: セッション
@@ -130,7 +130,7 @@ def plot_laptime(session: Session, log: Logger):
 
 
 @tracer.start_as_current_span("plot_pit_time")
-def plot_pit_time(session: Session, log: Logger):
+def plot_pit_time(session: Session, log: structlog.stdlib.BoundLogger):
     """pitのタイムの一覧を作成する
     Args:
         session: セッション
@@ -192,7 +192,7 @@ def plot_pit_time(session: Session, log: Logger):
 
 
 @tracer.start_as_current_span("plot_laptime_by_lap_number")
-def plot_laptime_by_lap_number(session: Session, log: Logger):
+def plot_laptime_by_lap_number(session: Session, log: structlog.stdlib.BoundLogger):
     """
     y = ラップタイム
     x = ラップ番号
@@ -226,7 +226,7 @@ def plot_laptime_by_lap_number(session: Session, log: Logger):
 
 
 @tracer.start_as_current_span("plot_laptime_by_timing")
-def plot_laptime_by_timing(session: Session, log: Logger):
+def plot_laptime_by_timing(session: Session, log: structlog.stdlib.BoundLogger):
     """
     y = ラップタイム
     x = 時間

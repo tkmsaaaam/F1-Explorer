@@ -1,10 +1,10 @@
 import datetime
 import os
-from logging import Logger
 from typing import Final
 
 import fastf1
 import plotly.graph_objects as go
+import structlog
 # noinspection PyPackageRequirements
 from opentelemetry import trace
 
@@ -14,7 +14,7 @@ tracer = trace.get_tracer(__name__)
 
 
 @tracer.start_as_current_span("plot_tyre")
-def plot_tyre(year: int, race_number: int, log: Logger):
+def plot_tyre(year: int, race_number: int, log: structlog.stdlib.BoundLogger):
     drivers = {}
     sessions: Final[list[str]] = ['FP1', 'FP2', 'FP3', 'SQ', 'S', 'Q', 'R']
     session = None
