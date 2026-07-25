@@ -24,7 +24,7 @@ def __main():
     try:
         config = setup.load_config()
     except Exception as exception:
-        log.warning(exception.args)
+        log.warning('setup is failed', args=exception.args)
         return
 
     if config.get_session_category() != setup.SessionCategory.Qualifying:
@@ -34,7 +34,7 @@ def __main():
     try:
         session = fastf1.get_session(config.get_year(), config.get_round(), config.get_session())
     except Exception as exception:
-        log.warning(exception.args)
+        log.warning('setup is failed', args=exception.args)
         return
     session.load(messages=False)
 

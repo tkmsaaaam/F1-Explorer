@@ -74,7 +74,7 @@ def __save_cache(log, force_reload: bool = False, start_year: int = 2000,
         try:
             sched = fastf1.get_event_schedule(yr, include_testing=False).sort_values(by='RoundNumber')
         except Exception as exception:
-            log.warning(exception.args)
+            log.warning('setup is failed', args=exception.args)
             continue
         for _, event in sched.iterrows():
             rnd = event.RoundNumber
@@ -115,7 +115,7 @@ def __save_winners(log, start_year: int = 2000, end_year: int = datetime.datetim
         try:
             sched = fastf1.get_event_schedule(yr, include_testing=False).sort_values(by='RoundNumber')
         except Exception as exception:
-            log.warning(exception.args)
+            log.warning('setup is failed', args=exception.args)
             continue
         season_data[yr] = {}
         yr_str = str(yr)

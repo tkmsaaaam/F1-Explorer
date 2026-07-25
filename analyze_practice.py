@@ -12,7 +12,7 @@ tracer = trace.get_tracer(__name__)
 @tracer.start_as_current_span("start_at")
 def start_at(session: fastf1.core.Session) -> None | datetime.datetime:
     if session.name == 'Practice 1':
-        return session.event.Sessio13Date
+        return session.event.Session1Date
     elif session.name == 'Practice 2':
         return session.event.Session2Date
     elif session.name == 'Practice 3':
@@ -26,7 +26,7 @@ def __main():
     try:
         config = setup.load_config()
     except Exception as exception:
-        log.warning(exception.args)
+        log.warning('setup is failed', args=exception.args)
         return
 
     if config.get_session_category() != setup.SessionCategory.FreePractice:
@@ -36,7 +36,7 @@ def __main():
     try:
         session = fastf1.get_session(config.get_year(), config.get_round(), config.get_session())
     except Exception as exception:
-        log.warning(exception.args)
+        log.warning('setup is failed', args=exception.args)
         return
     session.load(messages=False)
 
