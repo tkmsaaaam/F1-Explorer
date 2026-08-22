@@ -66,62 +66,57 @@ def plot_laptime(session: Session, log: structlog.stdlib.BoundLogger):
 
     laps = session.laps
     max_laps = max(len(laps[laps.DriverNumber == d]) for d in session.drivers)
-    lap_numbers = list(range(1, max_laps + 1))
-    data_rows = [lap_numbers]
-    fill_colors = [["#f0f0f0"] * max_laps]
-    heights = {}
+    lap_numbers = [str(i) for i in range(1, max_laps + 1)]
+    cells: list[list[str]] = [lap_numbers]
+    colors = [["#f0f0f0"] * max_laps]
 
     for driver in header:
         if driver == 'Lap':
             continue
         driver_laps = session.laps.pick_drivers(driver).sort_values(by='LapNumber')
-        lap_times = []
-        bg_colors = []
+        values = []
+        lap_colors = []
         for i in range(len(driver_laps)):
-            if i not in heights:
-                heights[i] = 26
             lap = driver_laps.iloc[i]
+            lap_colors.append(constants.compound_color.get(lap.Compound, "#dddddd"))
             if pandas.isna(lap.PitInTime) and pandas.isna(lap.PitOutTime):
-                lap_times.append(lap.LapTime.total_seconds())
+                values.append(str(lap.LapTime.total_seconds()))
             elif pandas.isna(lap.PitOutTime):
-                if heights[i] < 65:
-                    heights[i] = 65
                 i = lap.LapStartTime.total_seconds() + lap.LapTime.total_seconds() - lap.PitInTime.total_seconds()
-                lap_times.append(
+                values.append(
                     f"{lap.LapTime.total_seconds()}<br>({"{:.3f}".format(i)}<br>{"{:.3f}".format(lap.LapTime.total_seconds() - i)})")
             elif pandas.isna(lap.PitInTime):
-                if heights[i] < 65:
-                    heights[i] = 65
                 o = lap.PitOutTime.total_seconds() - lap.LapStartTime.total_seconds()
-                lap_times.append(
+                values.append(
                     f"{lap.LapTime.total_seconds()}<br>({"{:.3f}".format(o)}<br>{"{:.3f}".format(lap.LapTime.total_seconds() - o)})")
             else:
-                if heights[i] < 65:
-                    heights[i] = 65
                 i = lap.LapStartTime.total_seconds() + lap.LapTime.total_seconds() - lap.PitInTime.total_seconds()
                 o = lap.PitOutTime.total_seconds() - lap.LapStartTime.total_seconds()
-                lap_times.append(f"{lap.LapTime.total_seconds()}<br>({"{:.3f}".format(i)}<br>/{"{:.3f}".format(o)})")
-            compound = lap.Compound
-            bg_colors.append(constants.compound_color.get(compound, "#dddddd"))
-        if len(driver_laps) < max_laps:
-            for i in range(max_laps - len(driver_laps)):
-                lap_times.append("")
-                bg_colors.append("#f0f0f0")
-        data_rows.append(lap_times)
-        fill_colors.append(bg_colors)
+                values.append(f"{lap.LapTime.total_seconds()}<br>({"{:.3f}".format(i)}<br>/{"{:.3f}".format(o)})")
+        cells.append(values)
+        colors.append(lap_colors)
+
+    for i in range(len(cells)):
+        if len(cells[i]) < max_laps:
+            cells[i].extend([""] * (max_laps - len(cells[i])))
+        if len(colors[i]) < max_laps:
+            colors[i].extend(["#f0f0f0"] * (max_laps - len(colors[i])))
+
+    heights = [26] * max_laps
+    for rows in cells:
+        for i, row in enumerate(rows):
+            if '<br>' in row:
+                heights[i] = 65
 
     fig = go.Figure(
         data=[go.Table(
             header=go.table.Header(
                 values=header, fill=go.table.header.Fill(color='lightgrey'), align='center'),
             cells=go.table.Cells(
-                values=data_rows, fill=go.table.cells.Fill(color=fill_colors), align='center'))],
+                values=cells, fill=go.table.cells.Fill(color=colors), align='center'))],
         layout=go.Layout(autosize=True, margin=go.layout.Margin(l=10, r=10, t=20, b=20, autoexpand=True)))
 
-    header_height = 40
-    margin_top_bottom = 40
-    calculated_height = sum(heights.values()) + header_height + margin_top_bottom
-    image_height = max(1200, calculated_height)
+    image_height = max(1200, sum(heights) + 40 + 40)  # header & bottom = 40
 
     output_path = f"./images/{session.event.year}/{session.event.RoundNumber}_{session.event.Location}/{session.name.replace(' ', '')}/laptime_table.png"
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
