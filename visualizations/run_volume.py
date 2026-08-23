@@ -1,4 +1,4 @@
-import os
+from pathlib import Path
 from typing import cast
 
 import fastf1.plotting
@@ -13,16 +13,14 @@ from numpy import datetime64
 from opentelemetry import trace
 
 import constants
+from visualizations.output import resolve_output_dir, save_matplotlib, save_plotly
+from visualizations.style import driver_linestyle
 
 tracer = trace.get_tracer(__name__)
 
 
-def determine_linestyle(year: int, driver: int) -> str:
-    return "solid" if constants.camera.get(year, {}).get(driver, 'black') == "black" else "dashed"
-
-
 @tracer.start_as_current_span("plot_lap_number_by_timing")
-def plot_lap_number_by_timing(session: Session, log: structlog.stdlib.BoundLogger):
+def plot_lap_number_by_timing(session: Session, log: structlog.stdlib.BoundLogger, *, output_dir: str | Path | None = None):
     """y = ラップ番号
     x = 時間
     Args:
@@ -41,22 +39,19 @@ def plot_lap_number_by_timing(session: Session, log: structlog.stdlib.BoundLogge
         lap_starts = stint_laps.LapStartDate
         if stint_num == 1:
             ax.plot(lap_starts, lap_numbers, color=color,
-                    linestyle=determine_linestyle(session.event.year, int(cast(str, driver_number))),
+                    linestyle=driver_linestyle(session.event.year, int(cast(str, driver_number))),
                     label=stint_laps.Driver.iloc[0])
         else:
             ax.plot(lap_starts, lap_numbers, color=color,
-                    linestyle=determine_linestyle(session.event.year, int(cast(str, driver_number))))
+                    linestyle=driver_linestyle(session.event.year, int(cast(str, driver_number))))
     ax.legend(fontsize='small')
     ax.grid(True)
-    output_path = f"./images/{session.event.year}/{session.event.RoundNumber}_{session.event.Location}/{session.name.replace(' ', '')}/lap_number_by_timing.png"
-    os.makedirs(os.path.dirname(output_path), exist_ok=True)
-    fig.savefig(output_path, bbox_inches='tight')
-    log.info(f"Saved plot to {output_path}")
-    plt.close(fig)
+    output_path = resolve_output_dir(session, output_dir) / "lap_number_by_timing.png"
+    save_matplotlib(fig, output_path, log)
 
 
 @tracer.start_as_current_span("plot_laptime")
-def plot_laptime(session: Session, log: structlog.stdlib.BoundLogger):
+def plot_laptime(session: Session, log: structlog.stdlib.BoundLogger, *, output_dir: str | Path | None = None):
     """ラップごとのタイムの一覧を作成する
     Args:
         session: セッション
@@ -118,14 +113,12 @@ def plot_laptime(session: Session, log: structlog.stdlib.BoundLogger):
 
     image_height = max(1200, sum(heights) + 40 + 40)  # header & bottom = 40
 
-    output_path = f"./images/{session.event.year}/{session.event.RoundNumber}_{session.event.Location}/{session.name.replace(' ', '')}/laptime_table.png"
-    os.makedirs(os.path.dirname(output_path), exist_ok=True)
-    fig.write_image(output_path, width=1920, height=image_height)
-    log.info(f"Saved plot to {output_path}")
+    output_path = resolve_output_dir(session, output_dir) / "laptime_table.png"
+    save_plotly(fig, output_path, log, width=1920, height=image_height)
 
 
 @tracer.start_as_current_span("plot_pit_time")
-def plot_pit_time(session: Session, log: structlog.stdlib.BoundLogger):
+def plot_pit_time(session: Session, log: structlog.stdlib.BoundLogger, *, output_dir: str | Path | None = None):
     """pitのタイムの一覧を作成する
     Args:
         session: セッション
@@ -180,14 +173,12 @@ def plot_pit_time(session: Session, log: structlog.stdlib.BoundLogger):
             cells=go.table.Cells(values=data_rows, align='center'))],
         layout=go.Layout(autosize=True, margin=go.layout.Margin(autoexpand=True)))
 
-    output_path = f"./images/{session.event.year}/{session.event.RoundNumber}_{session.event.Location}/{session.name.replace(' ', '')}/pittime_table.png"
-    os.makedirs(os.path.dirname(output_path), exist_ok=True)
-    fig.write_image(output_path, width=1920, height=2160)
-    log.info(f"Saved plot to {output_path}")
+    output_path = resolve_output_dir(session, output_dir) / "pittime_table.png"
+    save_plotly(fig, output_path, log, width=1920, height=2160)
 
 
 @tracer.start_as_current_span("plot_laptime_by_lap_number")
-def plot_laptime_by_lap_number(session: Session, log: structlog.stdlib.BoundLogger):
+def plot_laptime_by_lap_number(session: Session, log: structlog.stdlib.BoundLogger, *, output_dir: str | Path | None = None):
     """
     y = ラップタイム
     x = ラップ番号
@@ -206,22 +197,19 @@ def plot_laptime_by_lap_number(session: Session, log: structlog.stdlib.BoundLogg
         lap_times = stint_laps.LapTime.dt.total_seconds().tolist()
         lap_numbers = stint_laps.LapNumber
         ax.plot(lap_numbers, lap_times, color=color,
-                linestyle=determine_linestyle(session.event.year, int(stint_laps.DriverNumber.iloc[0])),
+                linestyle=driver_linestyle(session.event.year, int(stint_laps.DriverNumber.iloc[0])),
                 label=stint_laps.Driver.iloc[0])
     # noinspection PyUnresolvedReferences
     minimum = session.laps.LapTime.min().total_seconds()
     ax.set_ylim(top=minimum, bottom=minimum * 1.25)
     ax.legend(fontsize='small')
     ax.grid(True)
-    output_path = f"./images/{session.event.year}/{session.event.RoundNumber}_{session.event.Location}/{session.name.replace(' ', '')}/laptime_by_lap_number.png"
-    os.makedirs(os.path.dirname(output_path), exist_ok=True)
-    fig.savefig(output_path, bbox_inches='tight')
-    log.info(f"Saved plot to {output_path}")
-    plt.close(fig)
+    output_path = resolve_output_dir(session, output_dir) / "laptime_by_lap_number.png"
+    save_matplotlib(fig, output_path, log)
 
 
 @tracer.start_as_current_span("plot_laptime_by_timing")
-def plot_laptime_by_timing(session: Session, log: structlog.stdlib.BoundLogger):
+def plot_laptime_by_timing(session: Session, log: structlog.stdlib.BoundLogger, *, output_dir: str | Path | None = None):
     """
     y = ラップタイム
     x = 時間
@@ -248,15 +236,12 @@ def plot_laptime_by_timing(session: Session, log: structlog.stdlib.BoundLogger):
         if not lap_times or not lap_starts.size:
             continue
         ax.plot(lap_starts, lap_times, color=color,
-                linestyle=determine_linestyle(session.event.year, int(stint_laps.DriverNumber.iloc[0])),
+                linestyle=driver_linestyle(session.event.year, int(stint_laps.DriverNumber.iloc[0])),
                 label=stint_laps.Driver.iloc[0])
     # noinspection PyUnresolvedReferences
     minimum = session.laps.LapTime.min().seconds
     ax.set_ylim(top=minimum, bottom=minimum * 1.25)
-    output_path = f"./images/{session.event.year}/{session.event.RoundNumber}_{session.event.Location}/{session.name.replace(' ', '')}/laptime_by_timing.png"
+    output_path = resolve_output_dir(session, output_dir) / "laptime_by_timing.png"
     ax.legend(fontsize='small')
     ax.grid(True)
-    os.makedirs(os.path.dirname(output_path), exist_ok=True)
-    fig.savefig(output_path, bbox_inches='tight')
-    log.info(f"Saved plot to {output_path}")
-    plt.close(fig)
+    save_matplotlib(fig, output_path, log)

@@ -1,7 +1,8 @@
-import os
-from typing import Any
+from pathlib import Path
+from typing import Any, Callable, NotRequired, TypedDict
 
 import fastf1
+import fastf1.plotting
 import matplotlib.pyplot as plt
 import structlog
 from fastf1.core import Session
@@ -9,42 +10,60 @@ from fastf1.core import Session
 from opentelemetry import trace
 
 import constants
+from visualizations.output import resolve_output_dir, save_matplotlib
 
 tracer = trace.get_tracer(__name__)
 
 
+class ComparisonTarget(TypedDict):
+    Driver: str
+    Fastest: NotRequired[bool]
+    LapNumber: NotRequired[int]
+
+
 @tracer.start_as_current_span("execute")
-def execute(session: Session, log: structlog.stdlib.BoundLogger, comparison: list[list[dict[str, Any]]]):
+def execute(
+        session: Session,
+        log: structlog.stdlib.BoundLogger,
+        comparison: list[list[ComparisonTarget]],
+        *,
+        output_dir: str | Path | None = None,
+):
     _plot_driver_lap_telemetry(session, log, comparison,
                                key='throttle',
                                label='Throttle [%]',
-                               value_func=lambda data: data.Throttle
+                               value_func=lambda data: data.Throttle,
+                               output_dir=output_dir,
                                )
     _plot_driver_lap_telemetry(session, log, comparison,
                                key='brake',
                                label='Brake',
-                               value_func=lambda data: data.Brake.astype(float)
+                               value_func=lambda data: data.Brake.astype(float),
+                               output_dir=output_dir,
                                )
     _plot_driver_lap_telemetry(session, log, comparison,
                                key='drs',
                                label='DRS',
-                               value_func=lambda data: data.DRS.astype(float)
+                               value_func=lambda data: data.DRS.astype(float),
+                               output_dir=output_dir,
                                )
     _plot_driver_lap_telemetry(session, log, comparison,
                                key='speed',
                                label='Speed',
-                               value_func=lambda data: data.Speed.astype(float)
+                               value_func=lambda data: data.Speed.astype(float),
+                               output_dir=output_dir,
                                )
 
 
 @tracer.start_as_current_span("_plot_driver_lap_telemetry")
-def _plot_driver_lap_telemetry(session: Session, log: structlog.stdlib.BoundLogger, comparison: list[list[dict[str, Any]]], key: str, label,
-                               value_func):
+def _plot_driver_lap_telemetry(session: Session, log: structlog.stdlib.BoundLogger,
+                               comparison: list[list[ComparisonTarget]], key: str, label: str,
+                               value_func: Callable[[Any], Any], *, output_dir: str | Path | None = None):
     circuit_info = session.get_circuit_info()
     if circuit_info is None:
         return
-    z = {}
     for targets in comparison:
+        z = {}
         fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
         v_min, v_max = float('inf'), float('-inf')
         for c in targets:
@@ -60,7 +79,7 @@ def _plot_driver_lap_telemetry(session: Session, log: structlog.stdlib.BoundLogg
             if lap is None or lap.empty:
                 continue
             car_data = lap.get_car_data().add_distance()
-            label = f"{lap.Driver} {lap.LapNumber} {lap.LapTime.total_seconds()}"
+            series_label = f"{lap.Driver} {lap.LapNumber} {lap.LapTime.total_seconds()}"
             try:
                 team_color = fastf1.plotting.get_team_color(lap.Team, session)
             except AttributeError:
@@ -77,11 +96,12 @@ def _plot_driver_lap_telemetry(session: Session, log: structlog.stdlib.BoundLogg
             else:
                 z[lap.DriverNumber] += 1
             y_data = value_func(car_data)
-            ax.plot(car_data.Distance, y_data, label=label, linewidth=1, color=team_color, linestyle=line_style,
+            ax.plot(car_data.Distance, y_data, label=series_label, linewidth=1, color=team_color, linestyle=line_style,
                     alpha=0.5)
             v_min, v_max = min(v_min, y_data.min()), max(v_max, y_data.max())
 
         if v_min == float('inf') or v_max == float('-inf') or (v_min == 0.0 and v_max == 0.0):
+            plt.close(fig)
             continue
 
         for _, corner in circuit_info.corners.iterrows():
@@ -96,12 +116,6 @@ def _plot_driver_lap_telemetry(session: Session, log: structlog.stdlib.BoundLogg
         ax.legend(loc='upper right', fontsize='small')
         plt.tight_layout()
 
-        output_path = (
-            f"./images/{session.event.year}/{session.event.RoundNumber}_{session.event.Location}/"
-            f"{session.name.replace(' ', '')}/{key}/comparison/{'_'.join([c['Driver'] for c in targets])}.png"
-        )
+        output_path = resolve_output_dir(session, output_dir) / key / "comparison" / f"{'_'.join([c['Driver'] for c in targets])}.png"
         ax.grid(True)
-        os.makedirs(os.path.dirname(output_path), exist_ok=True)
-        fig.savefig(output_path, bbox_inches='tight')
-        log.info(f"Saved plot to {output_path}")
-        plt.close(fig)
+        save_matplotlib(fig, output_path, log)

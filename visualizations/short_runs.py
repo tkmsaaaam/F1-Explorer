@@ -1,7 +1,8 @@
 import math
-import os
+from pathlib import Path
 
 import fastf1
+import fastf1.plotting
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
@@ -14,12 +15,11 @@ from fastf1.core import Session, Lap, Telemetry
 from opentelemetry import trace
 
 import constants
+from visualizations.output import resolve_output_dir, save_matplotlib, save_plotly
+from visualizations.segment_metrics import deltas_to_reference, rank_segment_durations, segment_durations
+from visualizations.style import driver_linestyle
 
 tracer = trace.get_tracer(__name__)
-
-
-def determine_linestyle(year: int, driver: int) -> str:
-    return "solid" if constants.camera.get(year, {}).get(driver, 'black') == "black" else "dashed"
 
 
 @tracer.start_as_current_span("compute_competitive_drivers")
@@ -75,8 +75,9 @@ def compute_and_save_segment_tables_plotly(
     circuit = session.get_circuit_info()
     if circuit is None:
         return
-    segment_rows = []
     drivers = session.laps.pick_quicklaps().sort_values(by="LapTime").DriverNumber.unique().tolist()
+    durations_by_driver = segment_durations(driver_times)
+    segment_rows = []
     for i in range(1, len(segment_boundaries)):
         name = f"{i}"
         dist = round(segment_boundaries[i] - segment_boundaries[i - 1], 1)
@@ -85,9 +86,11 @@ def compute_and_save_segment_tables_plotly(
             (corners_df.Distance >= segment_boundaries[i - 1]) & (corners_df.Distance <= segment_boundaries[i])
             ]
         segment_rows.append(
-            [name, dist, filtered.Number.tolist()] +
-            [round(c - s, 3) if (t := driver_times.get(driver_number)) is not None and i < len(t) and (
-                c := t[i]) is not None and (s := t[i - 1]) is not None else 0 for driver_number in drivers]
+            [name, dist, filtered.Number.tolist()] + [
+                round(duration, 3) if duration is not None else None
+                for driver_number in drivers
+                for duration in [durations_by_driver.get(driver_number, [None] * (len(segment_boundaries) - 1))[i - 1]]
+            ]
         )
 
     abbreviations = [session.get_driver(d).Abbreviation for d in drivers]
@@ -100,17 +103,18 @@ def compute_and_save_segment_tables_plotly(
                 align='center'),
             cells=go.table.Cells(values=list(zip(*segment_rows)), align='center')
         )])
-    fig_segment.write_image(f"{filename_base}_durations.png", width=1920, height=1080)
-    log.info(f"Segment table saved to {filename_base}_durations.png")
+    save_plotly(fig_segment, f"{filename_base}_durations.png", log, width=1920, height=1080)
 
+    ranks_by_driver = rank_segment_durations(durations_by_driver)
     segment_rank_rows = []
-    for row in segment_rows:
-        name, dist = row[0], row[1]
-        times = row[3:]
-        time_with_driver = [(t, d) for t, d in zip(times, drivers) if t is not None]
-        sorted_times = sorted(time_with_driver)
-        time_to_rank = {d: rank + 1 for rank, (_, d) in enumerate(sorted_times)}
-        segment_rank_rows.append([name, dist] + [time_to_rank.get(d, None) for d in drivers])
+    for i, row in enumerate(segment_rows):
+        segment_rank_rows.append([
+            row[0], row[1],
+            *[
+                ranks[i] if (ranks := ranks_by_driver.get(driver_number)) is not None and i < len(ranks) else None
+                for driver_number in drivers
+            ],
+        ])
 
     fig_ranks = go.Figure(
         data=[go.Table(
@@ -119,27 +123,17 @@ def compute_and_save_segment_tables_plotly(
                 fill=go.table.header.Fill(color='lightgrey'),
                 align='center'),
             cells=go.table.Cells(values=list(zip(*segment_rank_rows)), align='center'))])
-    fig_ranks.write_image(f"{filename_base}_ranks.png", width=1920, height=1080)
-    log.info(f"Segment rank table saved to {filename_base}_ranks.png")
+    save_plotly(fig_ranks, f"{filename_base}_ranks.png", log, width=1920, height=1080)
 
     best = session.laps.pick_fastest()
     if best is None:
         return
     best_driver_number = best.DriverNumber
-    best_times = driver_times.get(best_driver_number)
-
-    if not best_times or len(best_times) < 2:
+    best_durations = durations_by_driver.get(best_driver_number)
+    if not best_durations:
         log.warning("Fastest lap driver has insufficient segment data.")
         return
-
-    best_deltas = [
-        b - c if b is not None and c is not None else None
-        for b, c in zip(best_times[:-1], best_times[1:])
-    ]
-
-    circuit = session.get_circuit_info()
-    if circuit is None:
-        return
+    deltas_by_driver = deltas_to_reference(durations_by_driver, best_driver_number)
     gap_rows = []
     for i in range(1, len(segment_boundaries)):
         name = f"{i}"
@@ -148,13 +142,13 @@ def compute_and_save_segment_tables_plotly(
         filtered = corners_df[
             (corners_df.Distance >= segment_boundaries[i - 1]) & (corners_df.Distance <= segment_boundaries[i])
             ]
-        best_time = best_deltas[i - 1]
-        if best_time is None:
-            continue
         gap_rows.append(
             [name, dist, filtered.Number.tolist()] +
-            [round((c - b) - best_time, 3) if (t := driver_times.get(driver_number)) is not None and i < len(t) and (
-                c := t[i]) is not None and (b := t[i - 1]) is not None else 0 for driver_number in drivers]
+            [
+                round(delta, 3) if delta is not None else None
+                for driver_number in drivers
+                for delta in [deltas_by_driver.get(driver_number, [None] * len(best_durations))[i - 1]]
+            ]
         )
     fig_gap = go.Figure(data=[go.Table(
         header=go.table.Header(
@@ -163,12 +157,11 @@ def compute_and_save_segment_tables_plotly(
             align='center'),
         cells=go.table.Cells(values=list(zip(*gap_rows)), align='center')
     )])
-    fig_gap.write_image(f"{filename_base}_gaps_to_best.png", width=1920, height=1080)
-    log.info(f"Gap table saved to {filename_base}_gaps_to_best.png")
+    save_plotly(fig_gap, f"{filename_base}_gaps_to_best.png", log, width=1920, height=1080)
 
 
 @tracer.start_as_current_span("plot_best_laptime")
-def plot_best_laptime(session: Session, log: structlog.stdlib.BoundLogger, key: str):
+def plot_best_laptime(session: Session, log: structlog.stdlib.BoundLogger, key: str, *, output_dir: str | Path | None = None):
     """keyを順位で並べる
     Args:
         session: セッション
@@ -196,14 +189,11 @@ def plot_best_laptime(session: Session, log: structlog.stdlib.BoundLogger, key: 
         color_discrete_map={row.Acronym: row.Color for _, row in df.iterrows()}
     )
     fig.update_yaxes(range=[min([i[key] for i in data]) - 0.1, max([i[key] for i in data]) + 0.1], tickformat=".3f")
-    output_path = f"./images/{session.event.year}/{session.event.RoundNumber}_{session.event.Location}/{session.name.replace(' ', '')}/{key}.png"
-    os.makedirs(os.path.dirname(output_path), exist_ok=True)
-    fig.write_image(output_path, width=1920, height=1080)
-    log.info(f"Saved plot to {output_path}")
+    save_plotly(fig, resolve_output_dir(session, output_dir) / f"{key}.png", log, width=1920, height=1080)
 
 
 @tracer.start_as_current_span("plot_best_speed")
-def plot_best_speed(session: Session, log: structlog.stdlib.BoundLogger, key: str):
+def plot_best_speed(session: Session, log: structlog.stdlib.BoundLogger, key: str, *, output_dir: str | Path | None = None):
     """key（セクター）ごとの最高速をプロットする
     Args:
         session: セッション
@@ -229,14 +219,11 @@ def plot_best_speed(session: Session, log: structlog.stdlib.BoundLogger, key: st
         color_discrete_map={row.Acronym: row.Color for _, row in df.iterrows()}
     )
     fig.update_yaxes(range=[min([i[key] for i in data]) - 5, max([i[key] for i in data]) + 5], tickformat=".1f")
-    output_path = f"./images/{session.event.year}/{session.event.RoundNumber}_{session.event.Location}/{session.name.replace(' ', '')}/{key}.png"
-    os.makedirs(os.path.dirname(output_path), exist_ok=True)
-    fig.write_image(output_path, width=1920, height=1080)
-    log.info(f"Saved plot to {output_path}")
+    save_plotly(fig, resolve_output_dir(session, output_dir) / f"{key}.png", log, width=1920, height=1080)
 
 
 @tracer.start_as_current_span("plot_flat_out")
-def plot_flat_out(session: Session, log: structlog.stdlib.BoundLogger):
+def plot_flat_out(session: Session, log: structlog.stdlib.BoundLogger, *, output_dir: str | Path | None = None):
     """全開率をプロットする
     Args:
         session: セッション
@@ -265,15 +252,11 @@ def plot_flat_out(session: Session, log: structlog.stdlib.BoundLogger):
         ax.scatter(x, y, c=color)
         ax.annotate(lap.Driver, (x, y), fontsize=9, ha='right')
     ax.grid(True)
-    output_path = f"./images/{session.event.year}/{session.event.RoundNumber}_{session.event.Location}/{session.name.replace(' ', '')}/flat_out.png"
-    os.makedirs(os.path.dirname(output_path), exist_ok=True)
-    fig.savefig(output_path, bbox_inches='tight')
-    log.info(f"Saved plot to {output_path}")
-    plt.close(fig)
+    save_matplotlib(fig, resolve_output_dir(session, output_dir) / "flat_out.png", log)
 
 
 @tracer.start_as_current_span("plot_ideal_best")
-def plot_ideal_best(session: Session, log: structlog.stdlib.BoundLogger):
+def plot_ideal_best(session: Session, log: structlog.stdlib.BoundLogger, *, output_dir: str | Path | None = None):
     """y = 理論値
     x = ラップタイム
     Args:
@@ -301,15 +284,11 @@ def plot_ideal_best(session: Session, log: structlog.stdlib.BoundLogger):
         ax.scatter(x, y, c=color)
         ax.annotate(acronym, (x, y), fontsize=9, ha='right')
     ax.grid(True)
-    output_path = f"./images/{session.event.year}/{session.event.RoundNumber}_{session.event.Location}/{session.name.replace(' ', '')}/ideal_best.png"
-    os.makedirs(os.path.dirname(output_path), exist_ok=True)
-    fig.savefig(output_path, bbox_inches='tight')
-    log.info(f"Saved plot to {output_path}")
-    plt.close(fig)
+    save_matplotlib(fig, resolve_output_dir(session, output_dir) / "ideal_best.png", log)
 
 
 @tracer.start_as_current_span("plot_ideal_best_diff")
-def plot_ideal_best_diff(session: Session, log: structlog.stdlib.BoundLogger):
+def plot_ideal_best_diff(session: Session, log: structlog.stdlib.BoundLogger, *, output_dir: str | Path | None = None):
     """y = ラップタイム - 理論値
     x = ラップタイム
     Args:
@@ -337,25 +316,21 @@ def plot_ideal_best_diff(session: Session, log: structlog.stdlib.BoundLogger):
         ax.scatter(x, y, c=color)
         ax.annotate(acronym, (x, y), fontsize=9, ha='right')
     ax.grid(True)
-    output_path = f"./images/{session.event.year}/{session.event.RoundNumber}_{session.event.Location}/{session.name.replace(' ', '')}/ideal_best_diff.png"
-    os.makedirs(os.path.dirname(output_path), exist_ok=True)
-    fig.savefig(output_path, bbox_inches='tight')
-    log.info(f"Saved plot to {output_path}")
-    plt.close(fig)
+    save_matplotlib(fig, resolve_output_dir(session, output_dir) / "ideal_best_diff.png", log)
 
 
 @tracer.start_as_current_span("plot_gear_shift_on_track")
-def plot_gear_shift_on_track(session: Session, log: structlog.stdlib.BoundLogger):
+def plot_gear_shift_on_track(session: Session, log: structlog.stdlib.BoundLogger, *, output_dir: str | Path | None = None):
     """ドライバーごとに最速ラップのシフト変化をコースマップにプロットする
     Args:
         session: 分析対象のセッション
         log: ロガー
     """
     for driver_number in session.drivers:
-        fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
         lap = session.laps.pick_drivers(driver_number).pick_fastest()
         if lap is None:
             continue
+        fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
         tel = lap.get_telemetry()
         x = np.array(tel.X.values)
         y = np.array(tel.Y.values)
@@ -373,15 +348,12 @@ def plot_gear_shift_on_track(session: Session, log: structlog.stdlib.BoundLogger
         cbar = fig.colorbar(mappable=lc_comp, label="Gear", boundaries=np.arange(1, 10))
         cbar.set_ticks(np.arange(1.5, 9.5))
         cbar.set_ticklabels(np.arange(1, 9))
-        output_path = f"./images/{session.event.year}/{session.event.RoundNumber}_{session.event.Location}/{session.name.replace(' ', '')}/shift_on_track/{driver_number}_{lap.Driver}.png"
-        os.makedirs(os.path.dirname(output_path), exist_ok=True)
-        fig.savefig(output_path, bbox_inches='tight')
-        log.info(f"Saved plot to {output_path}")
-        plt.close(fig)
+        output_path = resolve_output_dir(session, output_dir) / "shift_on_track" / f"{driver_number}_{lap.Driver}.png"
+        save_matplotlib(fig, output_path, log)
 
 
 @tracer.start_as_current_span("plot_speed_and_laptime")
-def plot_speed_and_laptime(session: Session, log: structlog.stdlib.BoundLogger):
+def plot_speed_and_laptime(session: Session, log: structlog.stdlib.BoundLogger, *, output_dir: str | Path | None = None):
     """y = ラップタイム
     x = 最高速
     Args:
@@ -409,15 +381,11 @@ def plot_speed_and_laptime(session: Session, log: structlog.stdlib.BoundLogger):
 
     ax.scatter(top_speeds, lap_times, c=driver_colors)
     ax.grid(True)
-    output_path = f"./images/{session.event.year}/{session.event.RoundNumber}_{session.event.Location}/{session.name.replace(' ', '')}/speed_and_laptime.png"
-    os.makedirs(os.path.dirname(output_path), exist_ok=True)
-    fig.savefig(output_path, bbox_inches='tight')
-    log.info(f"Saved plot to {output_path}")
-    plt.close(fig)
+    save_matplotlib(fig, resolve_output_dir(session, output_dir) / "speed_and_laptime.png", log)
 
 
 @tracer.start_as_current_span("plot_speed_distance")
-def plot_speed_distance(session: Session, log: structlog.stdlib.BoundLogger):
+def plot_speed_distance(session: Session, log: structlog.stdlib.BoundLogger, *, output_dir: str | Path | None = None):
     """y = スピード
     x = 距離
     Args:
@@ -428,16 +396,15 @@ def plot_speed_distance(session: Session, log: structlog.stdlib.BoundLogger):
     if circuit_info is None:
         return
     for driver_number in session.drivers:
-        fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
-
         laps = session.laps.pick_drivers(driver_number).pick_fastest()
         if laps is None:
             continue
+        fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
         try:
             team_color = fastf1.plotting.get_team_color(laps.Team, session)
         except AttributeError:
             team_color = 'gray'
-        style = determine_linestyle(session.event.year, int(driver_number))
+        style = driver_linestyle(session.event.year, int(driver_number))
         car_data = laps.get_car_data().add_distance()
         ax.plot(car_data.Distance, car_data.Speed, color=team_color, label=laps.Driver, linestyle=style)
         v_min: float = car_data.Speed.min()
@@ -448,15 +415,12 @@ def plot_speed_distance(session: Session, log: structlog.stdlib.BoundLogger):
             ax.text(corner.Distance, v_min - 30, txt, va='center_baseline', ha='center', size='small')
         ax.set_ylim(v_min - 40, v_max + 20)
         ax.grid(True)
-        output_path = f"./images/{session.event.year}/{session.event.RoundNumber}_{session.event.Location}/{session.name.replace(' ', '')}/speed_distance/{driver_number}_{laps.Driver}.png"
-        os.makedirs(os.path.dirname(output_path), exist_ok=True)
-        fig.savefig(output_path, bbox_inches='tight')
-        log.info(f"Saved plot to {output_path}")
-        plt.close(fig)
+        output_path = resolve_output_dir(session, output_dir) / "speed_distance" / f"{driver_number}_{laps.Driver}.png"
+        save_matplotlib(fig, output_path, log)
 
 
 @tracer.start_as_current_span("plot_speed_distance_comparison")
-def plot_speed_distance_comparison(session: Session, log: structlog.stdlib.BoundLogger):
+def plot_speed_distance_comparison(session: Session, log: structlog.stdlib.BoundLogger, *, output_dir: str | Path | None = None):
     """スピードを比較
     Args:
         session: セッション
@@ -483,7 +447,7 @@ def plot_speed_distance_comparison(session: Session, log: structlog.stdlib.Bound
                 team_color = fastf1.plotting.get_team_color(laps.Team, session)
             except AttributeError:
                 team_color = 'gray'
-            style = determine_linestyle(session.event.year, int(driver_number))
+            style = driver_linestyle(session.event.year, int(driver_number))
             car_data = laps.get_car_data().add_distance()
             ax.plot(car_data.Distance, car_data.Speed, color=team_color, label=laps.Driver, linestyle=style,
                     linewidth=1, alpha=0.5)
@@ -499,18 +463,12 @@ def plot_speed_distance_comparison(session: Session, log: structlog.stdlib.Bound
         ax.set_ylim(min(minimum_list) - 40, max(maximum_list) + 20)
         ax.legend(fontsize='small')
         ax.grid(True)
-        output_path = (
-            f"./images/{session.event.year}/{session.event.RoundNumber}_{session.event.Location}/"
-            f"{session.name.replace(' ', '')}/speed_distance/comparison/{start + 1}_.png"
-        )
-        os.makedirs(os.path.dirname(output_path), exist_ok=True)
-        fig.savefig(output_path, bbox_inches='tight')
-        log.info(f"Saved plot to {output_path}")
-        plt.close(fig)
+        output_path = resolve_output_dir(session, output_dir) / "speed_distance" / "comparison" / f"{start + 1}_.png"
+        save_matplotlib(fig, output_path, log)
 
 
 @tracer.start_as_current_span("plot_speed_on_track")
-def plot_speed_on_track(session: Session, log: structlog.stdlib.BoundLogger):
+def plot_speed_on_track(session: Session, log: structlog.stdlib.BoundLogger, *, output_dir: str | Path | None = None):
     """ドライバーごとに最速ラップのスピードをグラフにする
     Args:
         session: 分析対象のセッション
@@ -544,15 +502,12 @@ def plot_speed_on_track(session: Session, log: structlog.stdlib.BoundLogger):
         normal_legend = mpl.colors.Normalize(vmin=color.min(), vmax=color.max())
         mpl.colorbar.ColorbarBase(color_bar_axes, norm=normal_legend, cmap=colormap, orientation="horizontal")
         ax.grid(True)
-        output_path = f"./images/{session.event.year}/{session.event.RoundNumber}_{session.event.Location}/{session.name.replace(' ', '')}/speed_on_track/{driver_number}_{lap.Driver}.png"
-        os.makedirs(os.path.dirname(output_path), exist_ok=True)
-        fig.savefig(output_path, bbox_inches='tight')
-        log.info(f"Saved plot to {output_path}")
-        plt.close(fig)
+        output_path = resolve_output_dir(session, output_dir) / "speed_on_track" / f"{driver_number}_{lap.Driver}.png"
+        save_matplotlib(fig, output_path, log)
 
 
 @tracer.start_as_current_span("plot_time_distance_comparison")
-def plot_time_distance_comparison(session: Session, log: structlog.stdlib.BoundLogger):
+def plot_time_distance_comparison(session: Session, log: structlog.stdlib.BoundLogger, *, output_dir: str | Path | None = None):
     """driver_group 内最速との差分を表示する
 
     x = 距離（group内最速ドライバー基準）
@@ -615,7 +570,7 @@ def plot_time_distance_comparison(session: Session, log: structlog.stdlib.BoundL
                 common_distance,
                 delta,
                 color=team_color,
-                linestyle=determine_linestyle(session.event.year, int(driver_number)),
+                linestyle=driver_linestyle(session.event.year, int(driver_number)),
                 label=label
             )
             minimum_list.append(float(delta.min()))
@@ -635,19 +590,12 @@ def plot_time_distance_comparison(session: Session, log: structlog.stdlib.BoundL
         ax.set_ylim(v_min, v_max)
         ax.grid(True)
         ax.legend(fontsize="small")
-        output_path = (
-            f"./images/{session.event.year}/"
-            f"{session.event.RoundNumber}_{session.event.Location}/"
-            f"{session.name.replace(' ', '')}/"
-            f"time_distance_delta/{start + 1}_.png"
-        )
-        os.makedirs(os.path.dirname(output_path), exist_ok=True)
-        fig.savefig(output_path, bbox_inches="tight")
-        log.info(f"Saved plot to {output_path}")
-        plt.close(fig)
+        output_path = resolve_output_dir(session, output_dir) / "time_distance_delta" / f"{start + 1}_.png"
+        save_matplotlib(fig, output_path, log)
 
 
-def _plot_driver_telemetry(session: Session, log: structlog.stdlib.BoundLogger, driver_numbers: list[int], key: str, label, value_func):
+def _plot_driver_telemetry(session: Session, log: structlog.stdlib.BoundLogger, driver_numbers: list[int], key: str, label, value_func,
+                           *, output_dir: str | Path | None = None):
     group_size = 5
     circuit_info = session.get_circuit_info()
     if circuit_info is None:
@@ -668,7 +616,7 @@ def _plot_driver_telemetry(session: Session, log: structlog.stdlib.BoundLogger, 
                 team_color = fastf1.plotting.get_team_color(laps.Team, session)
             except AttributeError:
                 team_color = 'gray'
-            line_style = determine_linestyle(session.event.year, int(driver_number))
+            line_style = driver_linestyle(session.event.year, int(driver_number))
 
             y_data = value_func(car_data)
             ax.plot(car_data.Distance, y_data, label=driver_name, linewidth=1, color=team_color, linestyle=line_style,
@@ -676,6 +624,7 @@ def _plot_driver_telemetry(session: Session, log: structlog.stdlib.BoundLogger, 
             v_min, v_max = min(v_min, y_data.min()), max(v_max, y_data.max())
 
         if v_min == float('inf') or v_max == float('-inf') or (v_min == 0.0 and v_max == 0.0):
+            plt.close(fig)
             continue
 
         for _, corner in circuit_info.corners.iterrows():
@@ -690,15 +639,9 @@ def _plot_driver_telemetry(session: Session, log: structlog.stdlib.BoundLogger, 
         ax.legend(loc='upper right', fontsize='small')
         plt.tight_layout()
 
-        output_path = (
-            f"./images/{session.event.year}/{session.event.RoundNumber}_{session.event.Location}/"
-            f"{session.name.replace(' ', '')}/{key}/{i + 1}-{i + len(group)}.png"
-        )
+        output_path = resolve_output_dir(session, output_dir) / key / f"{i + 1}-{i + len(group)}.png"
         ax.grid(True)
-        os.makedirs(os.path.dirname(output_path), exist_ok=True)
-        fig.savefig(output_path, bbox_inches='tight')
-        log.info(f"Saved plot to {output_path}")
-        plt.close(fig)
+        save_matplotlib(fig, output_path, log)
 
 
 @tracer.start_as_current_span("make_mini_segment")
@@ -735,7 +678,8 @@ def make_mini_segment(session: Session, log: structlog.stdlib.BoundLogger, corne
 
 
 @tracer.start_as_current_span("plot_mini_segment_on_circuit")
-def plot_mini_segment_on_circuit(session: Session, log: structlog.stdlib.BoundLogger, segment_boundaries: list[int], image_name: str):
+def plot_mini_segment_on_circuit(session: Session, log: structlog.stdlib.BoundLogger, segment_boundaries: list[int], image_name: str,
+                                 *, output_dir: str | Path | None = None):
     """ミニセグメントをプロットする
     Args:
         session: 分析対象のセッション
@@ -774,15 +718,11 @@ def plot_mini_segment_on_circuit(session: Session, log: structlog.stdlib.BoundLo
     ax.set_title(f"Mini Segments of Best Lap - {driver}")
     ax.axis('off')
 
-    output_path = f"./images/{session.event.year}/{session.event.RoundNumber}_{session.event.Location}/{session.name.replace(' ', '')}/{image_name}.png"
-    os.makedirs(os.path.dirname(output_path), exist_ok=True)
-    fig.savefig(output_path, bbox_inches='tight')
-    log.info(f"Saved plot to {output_path}")
-    plt.close(fig)
+    save_matplotlib(fig, resolve_output_dir(session, output_dir) / f"{image_name}.png", log)
 
 
 @tracer.start_as_current_span("plot_throttle")
-def plot_throttle(session: Session, log: structlog.stdlib.BoundLogger):
+def plot_throttle(session: Session, log: structlog.stdlib.BoundLogger, *, output_dir: str | Path | None = None):
     """y = スロットル
     x = 距離
     Args:
@@ -794,12 +734,13 @@ def plot_throttle(session: Session, log: structlog.stdlib.BoundLogger):
         session.laps.pick_quicklaps().sort_values(by="LapTime").DriverNumber.unique().tolist(),
         key='throttle',
         label='Throttle [%]',
-        value_func=lambda data: data.Throttle
+        value_func=lambda data: data.Throttle,
+        output_dir=output_dir,
     )
 
 
 @tracer.start_as_current_span("plot_brake")
-def plot_brake(session: Session, log: structlog.stdlib.BoundLogger):
+def plot_brake(session: Session, log: structlog.stdlib.BoundLogger, *, output_dir: str | Path | None = None):
     """y = ブレーキ
     x = 距離
     Args:
@@ -811,12 +752,13 @@ def plot_brake(session: Session, log: structlog.stdlib.BoundLogger):
         session.laps.pick_quicklaps().sort_values(by="LapTime").DriverNumber.unique().tolist(),
         key='brake',
         label='Brake',
-        value_func=lambda data: data.Brake.astype(float)
+        value_func=lambda data: data.Brake.astype(float),
+        output_dir=output_dir,
     )
 
 
 @tracer.start_as_current_span("plot_drs")
-def plot_drs(session: Session, log: structlog.stdlib.BoundLogger):
+def plot_drs(session: Session, log: structlog.stdlib.BoundLogger, *, output_dir: str | Path | None = None):
     """y = DRS
     x = 距離
     Args:
@@ -827,13 +769,14 @@ def plot_drs(session: Session, log: structlog.stdlib.BoundLogger):
                            session.laps.pick_quicklaps().sort_values(by="LapTime").DriverNumber.unique().tolist(),
                            key='drs',
                            label='DRS',
-                           value_func=lambda data: data.DRS.astype(float)
+                           value_func=lambda data: data.DRS.astype(float),
+                           output_dir=output_dir,
                            )
 
 
 @tracer.start_as_current_span("plot_telemetry")
 def plot_telemetry(session: Session, log: structlog.stdlib.BoundLogger,
-                   driver_numbers: list[int], key: str, label, value_func):
+                   driver_numbers: list[int], key: str, label, value_func, *, output_dir: str | Path | None = None):
     """y = key
     x = 距離
     Args:
@@ -860,7 +803,7 @@ def plot_telemetry(session: Session, log: structlog.stdlib.BoundLogger,
         car_data = laps.get_car_data().add_distance()
         driver_name = laps.Driver
         team_color = fastf1.plotting.get_team_color(laps.Team, session)
-        line_style = determine_linestyle(session.event.year, int(driver_number))
+        line_style = driver_linestyle(session.event.year, int(driver_number))
 
         y_data = value_func(car_data)
         ax.plot(car_data.Distance, y_data, label=driver_name,
@@ -869,7 +812,8 @@ def plot_telemetry(session: Session, log: structlog.stdlib.BoundLogger,
         v_min, v_max = min(v_min, y_data.min()), max(v_max, y_data.max())
         name += f"{driver_name}_"
 
-    if v_min == 0.0 and v_max == 0.0:
+    if v_min == float('inf') or v_max == float('-inf') or (v_min == 0.0 and v_max == 0.0):
+        plt.close(fig)
         return
 
     for _, corner in circuit_info.corners.iterrows():
@@ -885,19 +829,13 @@ def plot_telemetry(session: Session, log: structlog.stdlib.BoundLogger,
     ax.legend(loc='upper right', fontsize='small')
     plt.tight_layout()
 
-    output_path = (
-        f"./images/{session.event.year}/{session.event.RoundNumber}_{session.event.Location}/"
-        f"{session.name.replace(' ', '')}/{key}/{name}.png"
-    )
+    output_path = resolve_output_dir(session, output_dir) / key / f"{name}.png"
     ax.grid(True)
-    os.makedirs(os.path.dirname(output_path), exist_ok=True)
-    fig.savefig(output_path, bbox_inches='tight')
-    log.info(f"Saved plot to {output_path}")
-    plt.close(fig)
+    save_matplotlib(fig, output_path, log)
 
 
 @tracer.start_as_current_span("plot_tyre_age_and_laptime")
-def plot_tyre_age_and_laptime(session: Session, log: structlog.stdlib.BoundLogger):
+def plot_tyre_age_and_laptime(session: Session, log: structlog.stdlib.BoundLogger, *, output_dir: str | Path | None = None):
     """y = ラップタイム
     x = タイヤ使用歴
     Args:
@@ -924,10 +862,7 @@ def plot_tyre_age_and_laptime(session: Session, log: structlog.stdlib.BoundLogge
         driver_colors.append(color)
 
     ax.scatter(tyre_life_list, lap_times, c=driver_colors)
-    output_path = f"./images/{session.event.year}/{session.event.RoundNumber}_{session.event.Location}/{session.name.replace(' ', '')}/tyre_age_and_laptime.png"
+    output_path = resolve_output_dir(session, output_dir) / "tyre_age_and_laptime.png"
     fig.gca().invert_yaxis()
     ax.grid(True)
-    os.makedirs(os.path.dirname(output_path), exist_ok=True)
-    fig.savefig(output_path, bbox_inches='tight')
-    log.info(f"Saved plot to {output_path}")
-    plt.close(fig)
+    save_matplotlib(fig, output_path, log)

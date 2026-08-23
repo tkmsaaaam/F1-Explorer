@@ -51,13 +51,13 @@ class Race(unittest.TestCase):
         self.assertEqual(83.456, result_sorted[1].get_laps()[1].get_time())
         self.assertEqual(pandas.to_datetime("2026-01-01 00:00:00"), result_sorted[1].get_laps()[1].get_at())
         self.assertEqual(1, result_sorted[1].get_laps()[1].get_position())
-        self.assertEqual(True, result_sorted[1].get_laps()[1].get_pit_out())
+        self.assertEqual(False, result_sorted[1].get_laps()[1].get_pit_out())
         self.assertEqual(True, result_sorted[1].get_laps()[1].get_tyre().get_new())
         self.assertEqual('Soft', result_sorted[1].get_laps()[1].get_tyre().get_compound())
         self.assertEqual(82.789, result_sorted[1].get_laps()[2].get_time())
         self.assertEqual(pandas.to_datetime("2026-01-01 00:01:23"), result_sorted[1].get_laps()[2].get_at())
         self.assertEqual(1, result_sorted[1].get_laps()[2].get_position())
-        self.assertEqual(True, result_sorted[1].get_laps()[2].get_pit_out())
+        self.assertEqual(False, result_sorted[1].get_laps()[2].get_pit_out())
         self.assertEqual(True, result_sorted[1].get_laps()[2].get_tyre().get_new())
         self.assertEqual('Soft', result_sorted[1].get_laps()[2].get_tyre().get_compound())
 
@@ -68,7 +68,7 @@ class Race(unittest.TestCase):
         self.assertEqual(83.000, result_sorted[0].get_laps()[1].get_time())
         self.assertEqual(pandas.to_datetime("2026-01-01 00:00:00"), result_sorted[0].get_laps()[1].get_at())
         self.assertEqual(2, result_sorted[0].get_laps()[1].get_position())
-        self.assertEqual(True, result_sorted[0].get_laps()[1].get_pit_out())
+        self.assertEqual(False, result_sorted[0].get_laps()[1].get_pit_out())
         self.assertEqual(True, result_sorted[0].get_laps()[1].get_tyre().get_new())
         self.assertEqual('Soft', result_sorted[0].get_laps()[1].get_tyre().get_compound())
 
@@ -94,6 +94,18 @@ class Race(unittest.TestCase):
         self.assertEqual(pandas.to_datetime("2026-01-01 00:00:00"), result[1][2])
         self.assertEqual(pandas.to_datetime("2026-01-01 00:01:23"), result[2][1])
         self.assertEqual(pandas.to_datetime("2026-01-01 00:01:24"), result[2][2])
+
+    def test_make_lap_log_marks_only_laps_with_pit_out_time(self):
+        data = {
+            "DriverNumber": ["1"], "Driver": ["Max"], "Stint": [2], "Team": ["Red Bull"],
+            "LapNumber": [10], "Position": [1], "Compound": ["Soft"], "FreshTyre": [True],
+            "PitOutTime": pandas.to_timedelta(["12s"]),
+            "Time": pandas.to_datetime(["2026-01-01 00:12:00"]),
+            "LapTime": pandas.to_timedelta(["90s"]),
+        }
+        result = make_driver_laps_set(Laps(pandas.DataFrame(data)))
+
+        self.assertTrue(result[0].get_laps()[10].get_pit_out())
 
     def test_make_top_time_map(self):
         data = {

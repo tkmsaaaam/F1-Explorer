@@ -1,5 +1,5 @@
 import datetime
-import os
+from pathlib import Path
 from typing import Final
 
 import fastf1
@@ -9,12 +9,19 @@ import structlog
 from opentelemetry import trace
 
 import constants
+from visualizations.output import save_plotly
 
 tracer = trace.get_tracer(__name__)
 
 
 @tracer.start_as_current_span("plot_tyre")
-def plot_tyre(year: int, race_number: int, log: structlog.stdlib.BoundLogger):
+def plot_tyre(
+        year: int,
+        race_number: int,
+        log: structlog.stdlib.BoundLogger,
+        *,
+        output_dir: str | Path | None = None,
+):
     drivers = {}
     sessions: Final[list[str]] = ['FP1', 'FP2', 'FP3', 'SQ', 'S', 'Q', 'R']
     session = None
@@ -68,7 +75,5 @@ def plot_tyre(year: int, race_number: int, log: structlog.stdlib.BoundLogger):
             cells=go.table.Cells(
                 values=table_columns, fill=go.table.cells.Fill(color=table_colors), align='center'))])
 
-    output_path = f"./images/{session.event.year}/{session.event.RoundNumber}_{session.event.Location}/tyres.png"
-    os.makedirs(os.path.dirname(output_path), exist_ok=True)
-    fig.write_image(output_path, width=1920, height=1080)
-    log.info(f"Saved plot to {output_path}")
+    base_dir = Path(output_dir) if output_dir is not None else Path("images") / str(session.event.year) / f"{session.event.RoundNumber}_{session.event.Location}"
+    save_plotly(fig, base_dir / "tyres.png", log, width=1920, height=1080)

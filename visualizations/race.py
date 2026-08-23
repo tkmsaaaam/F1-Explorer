@@ -3,6 +3,7 @@ import os
 from typing import cast
 
 import fastf1
+import fastf1.plotting
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import pandas
@@ -15,14 +16,19 @@ from opentelemetry import trace
 import constants
 import util
 from visualizations.domain.driver import Driver
+from visualizations.domain.driver_laps import DriverLaps
 from visualizations.domain.lap import Lap
 from visualizations.domain.tyre import Tyre
+from visualizations.output import save_matplotlib, save_plotly
+from visualizations.race_metrics import (
+    gap_to_ahead as calculate_gap_to_ahead,
+    gap_to_leader as calculate_gap_to_leader,
+    lap_times_by_position,
+    top_time_map,
+)
+from visualizations.style import driver_linestyle
 
 tracer = trace.get_tracer(__name__)
-
-
-def determine_linestyle(year: int, driver: int) -> str:
-    return "solid" if constants.camera.get(year, {}).get(driver, 'black') == "black" else "dashed"
 
 
 @tracer.start_as_current_span("execute")
@@ -50,20 +56,8 @@ def execute(session: Session, log: structlog.stdlib.BoundLogger, images_path: st
     util.write_to_file_top(f"{logs_path}/timestamp.txt", datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
 
 
-class DriverLaps:
-    def __init__(self, driver: Driver, laps: dict[int, Lap]):
-        self.__driver = driver
-        self.__laps = laps
-
-    def get_driver(self) -> Driver:
-        return self.__driver
-
-    def get_laps(self) -> dict[int, Lap]:
-        return self.__laps
-
-
-def make_driver_laps_set(laps: Laps) -> set[DriverLaps]:
-    result = set()
+def make_driver_laps_set(laps: Laps) -> list[DriverLaps]:
+    result = []
     grouped = laps.groupby(['DriverNumber'])
     for _, stint_laps in grouped:
         l = stint_laps.iloc[0]
@@ -71,26 +65,19 @@ def make_driver_laps_set(laps: Laps) -> set[DriverLaps]:
         laps: dict[int, Lap] = {}
         for _, l in cast(Laps, stint_laps).iterlaps():
             # noinspection PyTypeChecker
-            lap: Lap = Lap(l.LapTime.total_seconds(), l.Time, l.Position, pandas.isna(l.PitOutTime),
+            lap: Lap = Lap(l.LapTime.total_seconds(), l.Time, l.Position, not pandas.isna(l.PitOutTime),
                            Tyre(l.Compound, l.FreshTyre))
             laps[int(l.LapNumber)] = lap
-        result.add(DriverLaps(driver, laps))
-    return result
+        result.append(DriverLaps(driver, laps))
+    return sorted(result, key=lambda item: item.driver.number)
 
 
 def make_lap_start_by_position_by_number(laps: Laps) -> dict[int, dict[int, datetime.datetime]]:
-    result = {}
-    for i in range(0, len(laps)):
-        lap_number = laps.LapNumber.iloc[i]
-        if lap_number not in result:
-            result[lap_number] = {laps.Position.iloc[i]: laps.Time.iloc[i]}
-        else:
-            result[lap_number][laps.Position.iloc[i]] = laps.Time.iloc[i]
-    return result
+    return lap_times_by_position(make_driver_laps_set(laps))
 
 
 @tracer.start_as_current_span("laptime")
-def laptime(log: structlog.stdlib.BoundLogger, filepath: str, filename: str, session: Session, r: int | None, lap_logs: set[DriverLaps]):
+def laptime(log: structlog.stdlib.BoundLogger, filepath: str, filename: str, session: Session, r: int | None, lap_logs: list[DriverLaps]):
     """x = ラップ番号, y = ラップタイムのドライバーごとの推移
     Args:
         log: ロガー
@@ -109,7 +96,7 @@ def laptime(log: structlog.stdlib.BoundLogger, filepath: str, filename: str, ses
         ]
         color = fastf1.plotting.get_team_color(lap_log.get_driver().get_team_name(), session)
         ax.plot(lap_numbers, lap_times, color=color, label=lap_log.get_driver().get_name(), linewidth=0.5,
-                linestyle=determine_linestyle(session.event.year, lap_log.get_driver().get_number()))
+                linestyle=driver_linestyle(session.event.year, lap_log.get_driver().get_number()))
     minimum: datetime.timedelta = session.laps.sort_values(by='LapTime').LapTime.min()
     maximum: datetime.timedelta = session.laps[
         session.laps.IsAccurate
@@ -123,7 +110,6 @@ def laptime(log: structlog.stdlib.BoundLogger, filepath: str, filename: str, ses
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     fig.savefig(output_path, bbox_inches='tight')
     log.info(f"Saved plot to {output_path}")
-    plt.close(fig)
     if r is not None:
         ax.set_ylim(top=minimum.total_seconds(), bottom=minimum.total_seconds() + r)
         ax.grid(True)
@@ -131,19 +117,15 @@ def laptime(log: structlog.stdlib.BoundLogger, filepath: str, filename: str, ses
         os.makedirs(os.path.dirname(output_path), exist_ok=True)
         fig.savefig(output_path, bbox_inches='tight')
         log.info(f"Saved plot to {output_path}")
-        plt.close(fig)
+    plt.close(fig)
 
 
 def make_top_time_map(all_laps: Laps) -> dict[int, datetime.datetime]:
-    return {
-        all_laps.LapNumber.iloc[i]: all_laps.Time.iloc[i]
-        for i in range(len(all_laps))
-        if all_laps.Position.iloc[i] == 1
-    }
+    return top_time_map(make_driver_laps_set(all_laps))
 
 
 @tracer.start_as_current_span("gap_to_ahead_table")
-def gap_to_ahead_table(log: structlog.stdlib.BoundLogger, filepath: str, lap_logs: set[DriverLaps],
+def gap_to_ahead_table(log: structlog.stdlib.BoundLogger, filepath: str, lap_logs: list[DriverLaps],
                        position_logs: dict[int, dict[int, datetime.datetime]]):
     """ラップごとのギャップの一覧を作成する
     Args:
@@ -167,7 +149,7 @@ def gap_to_ahead_table(log: structlog.stdlib.BoundLogger, filepath: str, lap_log
         lap_keys = driver_laps.get_laps().keys()
         start = int(min(lap_keys))
         end = int(max(lap_keys))
-        for i in range(start, end):
+        for i in range(start, end + 1):
             lap = driver_laps.get_laps().get(i)
             if lap is None:
                 gaps.append('---')
@@ -210,13 +192,11 @@ def gap_to_ahead_table(log: structlog.stdlib.BoundLogger, filepath: str, lap_log
                 align='center'))],
         layout=go.Layout(autosize=True, margin=go.layout.Margin(autoexpand=True)))
 
-    os.makedirs(os.path.dirname(filepath), exist_ok=True)
-    fig.write_image(filepath, width=1920, height=1620)
-    log.info(f"Saved plot to {filepath}")
+    save_plotly(fig, filepath, log, width=1920, height=1620)
 
 
 @tracer.start_as_current_span("gap_to_top_table")
-def gap_to_top_table(log: structlog.stdlib.BoundLogger, filepath: str, lap_logs: set[DriverLaps], session: Session):
+def gap_to_top_table(log: structlog.stdlib.BoundLogger, filepath: str, lap_logs: list[DriverLaps], session: Session):
     """ラップごとのTopへのギャップの一覧を作成する
     Args:
         log: ロガー
@@ -240,7 +220,7 @@ def gap_to_top_table(log: structlog.stdlib.BoundLogger, filepath: str, lap_logs:
         lap_keys = driver_laps.get_laps().keys()
         start = int(min(lap_keys))
         end = int(max(lap_keys))
-        for i in range(start, end):
+        for i in range(start, end + 1):
             lap = driver_laps.get_laps().get(i)
             if lap is None:
                 gaps.append('---')
@@ -278,14 +258,12 @@ def gap_to_top_table(log: structlog.stdlib.BoundLogger, filepath: str, lap_logs:
                     color=[["#f0f0f0"] * max_laps] + fill_colors), align='center'))],
         layout=go.Layout(autosize=True, margin=go.layout.Margin(autoexpand=True)))
 
-    os.makedirs(os.path.dirname(filepath), exist_ok=True)
-    fig.write_image(filepath, width=1920, height=1620)
-    log.info(f"Saved plot to {filepath}")
+    save_plotly(fig, filepath, log, width=1920, height=1620)
 
 
 @tracer.start_as_current_span("gap_to_ahead")
 def gap_to_ahead_graph(log: structlog.stdlib.BoundLogger, filepath: str, filename: str, session: Session, r: int | None,
-                       lap_logs: set[DriverLaps],
+                       lap_logs: list[DriverLaps],
                        position_logs: dict[int, dict[int, datetime.datetime]]):
     """x = ラップ番号, y = 前走とのギャップのドライバーごとの推移
     Args:
@@ -299,15 +277,10 @@ def gap_to_ahead_graph(log: structlog.stdlib.BoundLogger, filepath: str, filenam
     """
     fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
     for driver_laps in lap_logs:
-        x = sorted(driver_laps.get_laps().keys())
-        y = [
-            ((l := driver_laps.get_laps().get(i)) is not None and
-             (p_log := position_logs.get(i)) is not None and
-             (p_target := p_log.get(l.get_position() - 1)) is not None
-             ) and (l.get_at() - p_target).total_seconds() or 0
-            for i in x
-        ]
-        line_style = determine_linestyle(session.event.year, driver_laps.get_driver().get_number())
+        gap_series = calculate_gap_to_ahead(driver_laps, position_logs)
+        x = [lap_number for lap_number, _ in gap_series]
+        y = [gap for _, gap in gap_series]
+        line_style = driver_linestyle(session.event.year, driver_laps.get_driver().get_number())
         ax.plot(x, y, color=fastf1.plotting.get_team_color(driver_laps.get_driver().get_team_name(), session),
                 label=driver_laps.get_driver().get_name(),
                 linestyle=line_style, linewidth=0.5)
@@ -318,19 +291,18 @@ def gap_to_ahead_graph(log: structlog.stdlib.BoundLogger, filepath: str, filenam
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     fig.savefig(output_path, bbox_inches='tight')
     log.info(f"Saved plot to {output_path}")
-    plt.close(fig)
     if r is not None:
         ax.set_ylim(top=0, bottom=r)
         output_path = f"{filepath}/{filename}_{r}.png"
         os.makedirs(os.path.dirname(output_path), exist_ok=True)
         fig.savefig(output_path, bbox_inches='tight')
         log.info(f"Saved plot to {output_path}")
-        plt.close(fig)
+    plt.close(fig)
 
 
 @tracer.start_as_current_span("gap_to_top")
 def gap_to_top_graph(log: structlog.stdlib.BoundLogger, filepath: str, filename: str, session: Session, r: int | None,
-                     lap_logs: set[DriverLaps]):
+                     lap_logs: list[DriverLaps]):
     """x = ラップ番号, y = トップとのギャップのドライバーごとの推移
     Args:
         log: ロガー
@@ -344,14 +316,10 @@ def gap_to_top_graph(log: structlog.stdlib.BoundLogger, filepath: str, filename:
     fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
     for lap_log in lap_logs:
         color = fastf1.plotting.get_team_color(lap_log.get_driver().get_team_name(), session)
-        x = sorted(lap_log.get_laps().keys())
-        y = [
-            (l.get_at() - t).total_seconds()
-            if (l := lap_log.get_laps().get(i)) is not None and (t := top_time_map.get(i)) is not None
-            else 0
-            for i in x
-        ]
-        line_style = determine_linestyle(session.event.year, lap_log.get_driver().get_number())
+        gap_series = calculate_gap_to_leader(lap_log, top_time_map)
+        x = [lap_number for lap_number, _ in gap_series]
+        y = [gap for _, gap in gap_series]
+        line_style = driver_linestyle(session.event.year, lap_log.get_driver().get_number())
         ax.plot(x, y, linewidth=0.5, color=color, label=lap_log.get_driver().get_name(), linestyle=line_style)
     ax.legend(fontsize='small')
     ax.invert_yaxis()
@@ -361,7 +329,6 @@ def gap_to_top_graph(log: structlog.stdlib.BoundLogger, filepath: str, filename:
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     fig.savefig(output_path, bbox_inches='tight')
     log.info(f"Saved plot to {output_path}")
-    plt.close(fig)
     if r is not None:
         ax.set_ylim(top=0, bottom=r)
         ax.grid(True)
@@ -369,11 +336,11 @@ def gap_to_top_graph(log: structlog.stdlib.BoundLogger, filepath: str, filename:
         os.makedirs(os.path.dirname(output_path), exist_ok=True)
         fig.savefig(output_path, bbox_inches='tight')
         log.info(f"Saved plot to {output_path}")
-        plt.close(fig)
+    plt.close(fig)
 
 
 @tracer.start_as_current_span("positions")
-def positions(log: structlog.stdlib.BoundLogger, filepath: str, session: Session, lap_logs: set[DriverLaps]):
+def positions(log: structlog.stdlib.BoundLogger, filepath: str, session: Session, lap_logs: list[DriverLaps]):
     """x = ラップ番号, y = ポジションのドライバーごとの推移
     Args:
         log: ロガー
@@ -389,16 +356,13 @@ def positions(log: structlog.stdlib.BoundLogger, filepath: str, session: Session
             l.get_position() if (l := lap_log.get_laps().get(i)) is not None else 0
             for i in x
         ]
-        line_style = determine_linestyle(session.event.year, lap_log.get_driver().get_number())
+        line_style = driver_linestyle(session.event.year, lap_log.get_driver().get_number())
         ax.plot(x, y, linewidth=1, color=color, label=lap_log.get_driver().get_name(), linestyle=line_style)
 
     ax.legend(fontsize='small')
     ax.invert_yaxis()
     ax.grid(True)
-    os.makedirs(os.path.dirname(filepath), exist_ok=True)
-    fig.savefig(filepath, bbox_inches='tight')
-    log.info(f"Saved plot to {filepath}")
-    plt.close(fig)
+    save_matplotlib(fig, filepath, log)
 
 
 @tracer.start_as_current_span("speed_first_10s")
@@ -420,28 +384,28 @@ def speed_first_10s(log: structlog.stdlib.BoundLogger, filepath: str, session: S
             car_data.Speed,
             label=lap.Driver, linewidth=0.5,
             color=constants.team_color[session.event.EventDate.year][driver_number],
-            linestyle=determine_linestyle(session.event.year, driver_number)
+            linestyle=driver_linestyle(session.event.year, driver_number)
         )
         v_min = min(v_min, int(car_data.Speed.min()) + 50)
         v_max = max(v_max, int(car_data.Speed.max()) + 10)
+    if v_min == float('inf') or v_max == float('-inf'):
+        plt.close(fig)
+        return
     ax.set_xlabel("Time (s)")
     ax.set_ylabel("Speed (km/h)")
     ax.set_title("Speed for First 10 Seconds")
     ax.set_ylim(v_min, v_max)
     ax.legend()
     ax.grid()
-    os.makedirs(os.path.dirname(filepath), exist_ok=True)
-    fig.savefig(filepath, bbox_inches='tight')
-    log.info(f"Saved plot to {filepath}")
-    plt.close(fig)
+    save_matplotlib(fig, filepath, log)
 
 
 @tracer.start_as_current_span("speed_until_turn1")
 def speed_until_turn1(log: structlog.stdlib.BoundLogger, filepath: str, session: Session) -> None:
-    fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
     circuit_info = session.get_circuit_info()
     if circuit_info is None:
         return
+    fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
     first_corner_distance = circuit_info.corners.iloc[0].Distance
     v_min = float('inf')
     v_max = float('-inf')
@@ -458,10 +422,13 @@ def speed_until_turn1(log: structlog.stdlib.BoundLogger, filepath: str, session:
             car_data.Speed,
             label=lap.Driver, linewidth=0.5,
             color=constants.team_color[session.event.EventDate.year][driver_number],
-            linestyle=determine_linestyle(session.event.year, driver_number)
+            linestyle=driver_linestyle(session.event.year, driver_number)
         )
         v_min = min(v_min, int(cast(pandas.Series, car_data.Speed).min()) + 50)
         v_max = max(v_max, int(cast(pandas.Series, car_data.Speed).max()) + 10)
+    if v_min == float('inf') or v_max == float('-inf'):
+        plt.close(fig)
+        return
     ax.set_xlabel("Distance (m)")
     ax.set_ylabel("Speed (km/h)")
     ax.set_title("Speed until Turn 1")
@@ -469,14 +436,11 @@ def speed_until_turn1(log: structlog.stdlib.BoundLogger, filepath: str, session:
     ax.axvline(first_corner_distance, linestyle='dotted', color='grey')
     ax.legend()
     ax.grid()
-    os.makedirs(os.path.dirname(filepath), exist_ok=True)
-    fig.savefig(filepath, bbox_inches='tight')
-    log.info(f"Saved plot to {filepath}")
-    plt.close(fig)
+    save_matplotlib(fig, filepath, log)
 
 
 @tracer.start_as_current_span("tyres")
-def tyres(log: structlog.stdlib.BoundLogger, filepath: str, lap_logs: set[DriverLaps]):
+def tyres(log: structlog.stdlib.BoundLogger, filepath: str, lap_logs: list[DriverLaps]):
     """x = ラップ番号, y = 使用タイヤのドライバーごとの推移
     Args:
         log: ロガー
@@ -521,10 +485,7 @@ def tyres(log: structlog.stdlib.BoundLogger, filepath: str, lap_logs: set[Driver
                        for compound, color in constants.compound_color.items()]
     ax.legend(handles=legend_elements, title='Compound', loc='upper right', fontsize='small')
     ax.grid(True)
-    os.makedirs(os.path.dirname(filepath), exist_ok=True)
-    fig.savefig(filepath, bbox_inches='tight')
-    log.info(f"Saved plot to {filepath}")
-    plt.close(fig)
+    save_matplotlib(fig, filepath, log)
 
 
 @tracer.start_as_current_span("write_messages")

@@ -1,14 +1,26 @@
+"""Driver value object used by the race visualizations."""
+
+from dataclasses import dataclass
+
+
+@dataclass(frozen=True, slots=True)
 class Driver:
-    def __init__(self, number: int, name: str, team_name: str):
-        self.__number: int = number
-        self.__name: str = name
-        self.__team_name: str = team_name
+    """The identity of a driver in a session.
+
+    Driver objects are immutable values.  The ``get_*`` methods are retained
+    for callers in the original plotting code; new code can use the public
+    attributes directly.
+    """
+
+    number: int
+    name: str
+    team_name: str
 
     def get_number(self) -> int:
-        return self.__number
+        return self.number
 
     def get_name(self) -> str:
-        return self.__name
+        return self.name
 
     def get_team_name(self) -> str:
-        return self.__team_name
+        return self.team_name

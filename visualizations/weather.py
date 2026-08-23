@@ -1,10 +1,10 @@
-import os
-
 import matplotlib.pyplot as plt
 import structlog
 from fastf1.core import Session
 # noinspection PyPackageRequirements
 from opentelemetry import trace
+
+from visualizations.output import save_matplotlib
 
 tracer = trace.get_tracer(__name__)
 
@@ -35,7 +35,4 @@ def plot_weather(session: Session, log: structlog.stdlib.BoundLogger, key: str, 
     ax.plot(x, y)
     plt.gcf().autofmt_xdate()
     ax.grid(True)
-    os.makedirs(os.path.dirname(filepath), exist_ok=True)
-    fig.savefig(filepath, bbox_inches='tight')
-    log.info(f"Saved plot to {filepath}")
-    plt.close(fig)
+    save_matplotlib(fig, filepath, log)

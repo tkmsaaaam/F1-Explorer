@@ -1,10 +1,15 @@
+"""Tyre value object."""
+
+from dataclasses import dataclass
+
+
+@dataclass(frozen=True, slots=True)
 class Tyre:
-    def __init__(self, compound: str, new: bool):
-        self.__compound = compound
-        self.__new = new
+    compound: str
+    new: bool
 
     def get_compound(self) -> str:
-        return self.__compound
+        return self.compound
 
     def get_new(self) -> bool:
-        return self.__new
+        return self.new
