@@ -7,8 +7,9 @@ import numpy
 import pandas
 import plotly.graph_objects as go
 import structlog
-from fastf1.core import Session
+from fastf1.core import Laps, Session
 from numpy import datetime64
+from plotly.subplots import make_subplots
 # noinspection PyPackageRequirements
 from opentelemetry import trace
 
@@ -51,43 +52,82 @@ def plot_lap_number_by_timing(session: Session, log: structlog.stdlib.BoundLogge
 
 
 @tracer.start_as_current_span("plot_laptime")
-def plot_laptime(session: Session, log: structlog.stdlib.BoundLogger, *, output_dir: str | Path | None = None):
+def plot_laptime(
+        session: Session,
+        log: structlog.stdlib.BoundLogger,
+        *,
+        output_dir: str | Path | None = None,
+        split_qualifying: bool = False,
+):
     """ラップごとのタイムの一覧を作成する
     Args:
         session: セッション
         log: ロガー
     """
-    header = ["Lap"] + [session.get_driver(driver_number).Abbreviation for driver_number in session.drivers]
+    if split_qualifying:
+        try:
+            qualifying_laps = session.laps.split_qualifying_sessions()
+        except ValueError as exception:
+            log.warning("Could not split qualifying sessions; using one table", reason=str(exception))
+        else:
+            prefix = "SQ" if session.name.startswith("Sprint") else "Q"
+            sections = [
+                (f"{prefix}{index}", laps)
+                for index, laps in enumerate(qualifying_laps, start=1)
+                if laps is not None and not laps.empty
+            ]
+            if sections:
+                _save_laptime_sections(session, log, sections, output_dir)
+                return
 
-    laps = session.laps
-    max_laps = max(len(laps[laps.DriverNumber == d]) for d in session.drivers)
+    table, heights = _make_laptime_table(session, session.laps, "Lap")
+    fig = go.Figure(
+        data=[table],
+        layout=go.Layout(autosize=True, margin=go.layout.Margin(l=10, r=10, t=20, b=20, autoexpand=True)),
+    )
+    image_height = max(1200, sum(heights) + 80)
+    save_plotly(fig, resolve_output_dir(session, output_dir) / "laptime_table.png", log,
+                width=1920, height=image_height)
+
+
+def _make_laptime_table(session: Session, laps: Laps, section_label: str) -> tuple[go.Table, list[int]]:
+    present_drivers = {str(driver_number) for driver_number in laps.DriverNumber.unique()}
+    driver_numbers = [driver_number for driver_number in session.drivers if str(driver_number) in present_drivers]
+    header = [f"{section_label} Lap"] + [
+        session.get_driver(driver_number).Abbreviation for driver_number in driver_numbers
+    ]
+    max_laps = max((
+        len(laps[laps.DriverNumber.astype(str) == str(driver_number)])
+        for driver_number in driver_numbers
+    ), default=0)
     lap_numbers = [str(i) for i in range(1, max_laps + 1)]
     cells: list[list[str]] = [lap_numbers]
     colors = [["#f0f0f0"] * max_laps]
 
-    for driver in header:
-        if driver == 'Lap':
-            continue
-        driver_laps = session.laps.pick_drivers(driver).sort_values(by='LapNumber')
+    for driver_number in driver_numbers:
+        driver_laps = laps[laps.DriverNumber.astype(str) == str(driver_number)].sort_values(by='LapNumber')
         values = []
         lap_colors = []
-        for i in range(len(driver_laps)):
-            lap = driver_laps.iloc[i]
+        for row_index in range(len(driver_laps)):
+            lap = driver_laps.iloc[row_index]
             lap_colors.append(constants.compound_color.get(lap.Compound, "#dddddd"))
+            if pandas.isna(lap.LapTime):
+                values.append("")
+                continue
             if pandas.isna(lap.PitInTime) and pandas.isna(lap.PitOutTime):
                 values.append(str(lap.LapTime.total_seconds()))
             elif pandas.isna(lap.PitOutTime):
-                i = lap.LapStartTime.total_seconds() + lap.LapTime.total_seconds() - lap.PitInTime.total_seconds()
+                pit_in = lap.LapStartTime.total_seconds() + lap.LapTime.total_seconds() - lap.PitInTime.total_seconds()
                 values.append(
-                    f"{lap.LapTime.total_seconds()}<br>({"{:.3f}".format(i)}<br>{"{:.3f}".format(lap.LapTime.total_seconds() - i)})")
+                    f"{lap.LapTime.total_seconds()}<br>({pit_in:.3f}<br>{lap.LapTime.total_seconds() - pit_in:.3f})")
             elif pandas.isna(lap.PitInTime):
-                o = lap.PitOutTime.total_seconds() - lap.LapStartTime.total_seconds()
+                pit_out = lap.PitOutTime.total_seconds() - lap.LapStartTime.total_seconds()
                 values.append(
-                    f"{lap.LapTime.total_seconds()}<br>({"{:.3f}".format(o)}<br>{"{:.3f}".format(lap.LapTime.total_seconds() - o)})")
+                    f"{lap.LapTime.total_seconds()}<br>({pit_out:.3f}<br>{lap.LapTime.total_seconds() - pit_out:.3f})")
             else:
-                i = lap.LapStartTime.total_seconds() + lap.LapTime.total_seconds() - lap.PitInTime.total_seconds()
-                o = lap.PitOutTime.total_seconds() - lap.LapStartTime.total_seconds()
-                values.append(f"{lap.LapTime.total_seconds()}<br>({"{:.3f}".format(i)}<br>/{"{:.3f}".format(o)})")
+                pit_in = lap.LapStartTime.total_seconds() + lap.LapTime.total_seconds() - lap.PitInTime.total_seconds()
+                pit_out = lap.PitOutTime.total_seconds() - lap.LapStartTime.total_seconds()
+                values.append(f"{lap.LapTime.total_seconds()}<br>({pit_in:.3f}<br>/{pit_out:.3f})")
         cells.append(values)
         colors.append(lap_colors)
 
@@ -103,18 +143,31 @@ def plot_laptime(session: Session, log: structlog.stdlib.BoundLogger, *, output_
             if '<br>' in row:
                 heights[i] = 65
 
-    fig = go.Figure(
-        data=[go.Table(
-            header=go.table.Header(
-                values=header, fill=go.table.header.Fill(color='lightgrey'), align='center'),
-            cells=go.table.Cells(
-                values=cells, fill=go.table.cells.Fill(color=colors), align='center'))],
-        layout=go.Layout(autosize=True, margin=go.layout.Margin(l=10, r=10, t=20, b=20, autoexpand=True)))
+    return go.Table(
+        header=go.table.Header(values=header, fill=go.table.header.Fill(color='lightgrey'), align='center'),
+        cells=go.table.Cells(values=cells, fill=go.table.cells.Fill(color=colors), align='center'),
+    ), heights
 
-    image_height = max(1200, sum(heights) + 40 + 40)  # header & bottom = 40
 
-    output_path = resolve_output_dir(session, output_dir) / "laptime_table.png"
-    save_plotly(fig, output_path, log, width=1920, height=image_height)
+def _save_laptime_sections(session: Session, log: structlog.stdlib.BoundLogger, sections: list[tuple[str, Laps]],
+                            output_dir: str | Path | None) -> None:
+    prepared = [
+        (label, *_make_laptime_table(session, laps, label))
+        for label, laps in sections
+    ]
+    row_heights = [max(320, sum(heights) + 100) for _, _, heights in prepared]
+    fig = make_subplots(
+        rows=len(sections), cols=1,
+        specs=[[{"type": "table"}] for _ in sections],
+        subplot_titles=[label for label, _ in sections],
+        row_heights=row_heights,
+        vertical_spacing=0.04,
+    )
+    for row, (_, table, _) in enumerate(prepared, start=1):
+        fig.add_trace(table, row=row, col=1)
+    fig.update_layout(autosize=True, margin=go.layout.Margin(l=10, r=10, t=40, b=20, autoexpand=True))
+    save_plotly(fig, resolve_output_dir(session, output_dir) / "laptime_table.png", log,
+                width=1920, height=max(1200, sum(row_heights)))
 
 
 @tracer.start_as_current_span("plot_pit_time")

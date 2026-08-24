@@ -52,7 +52,7 @@ def __main():
 
     comparison.execute(session, log, config.get_comparison())
     run_volume.plot_lap_number_by_timing(session, log)
-    run_volume.plot_laptime(session, log)
+    run_volume.plot_laptime(session, log, split_qualifying=True)
     run_volume.plot_laptime_by_timing(session, log)
     run_volume.plot_laptime_by_lap_number(session, log)
 
