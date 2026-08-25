@@ -60,15 +60,24 @@ def make_driver_laps_set(laps: Laps) -> list[DriverLaps]:
     result = []
     grouped = laps.groupby(['DriverNumber'])
     for _, stint_laps in grouped:
-        l = stint_laps.iloc[0]
-        driver: Driver = Driver(int(l.DriverNumber), l.Driver, l.Team)
-        laps: dict[int, Lap] = {}
-        for _, l in cast(Laps, stint_laps).iterlaps():
+        first_lap = stint_laps.iloc[0]
+        driver = Driver(int(first_lap.DriverNumber), first_lap.Driver, first_lap.Team)
+        lap_map: dict[int, Lap] = {}
+        for _, lap_row in cast(Laps, stint_laps).iterlaps():
+            if any(pandas.isna(value) for value in (
+                    lap_row.LapNumber, lap_row.LapTime, lap_row.Time, lap_row.Position)):
+                continue
             # noinspection PyTypeChecker
-            lap: Lap = Lap(l.LapTime.total_seconds(), l.Time, l.Position, not pandas.isna(l.PitOutTime),
-                           Tyre(l.Compound, l.FreshTyre))
-            laps[int(l.LapNumber)] = lap
-        result.append(DriverLaps(driver, laps))
+            lap = Lap(
+                lap_row.LapTime.total_seconds(),
+                lap_row.Time,
+                lap_row.Position,
+                not pandas.isna(lap_row.PitOutTime),
+                Tyre(lap_row.Compound, lap_row.FreshTyre),
+            )
+            lap_map[int(lap_row.LapNumber)] = lap
+        if lap_map:
+            result.append(DriverLaps(driver, lap_map))
     return sorted(result, key=lambda item: item.driver.number)
 
 

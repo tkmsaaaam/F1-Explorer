@@ -48,6 +48,7 @@ abbreviation: Final[dict[int, dict[int, str]]] = {
         27: "HUL",
         77: "BOT",
         11: "PER",
+	22: "TSU",
     }
 }
 
@@ -98,6 +99,7 @@ camera: Final[dict[int, dict[int, str]]] = {
         27: "black",
         77: "yellow",
         11: "black",
+	22: "yellow",
     }
 }
 # https://www.motorsport.com/f1/news/mon-the-2026-formula-1-spotters-guide/10801164/
@@ -174,5 +176,6 @@ team_color: Final[dict[int, dict[int, str]]] = {
         27: "#00e700",
         77: "#0A1E3F",
         11: "#0A1E3F",
+	22: "#fcd700",
     }
 }

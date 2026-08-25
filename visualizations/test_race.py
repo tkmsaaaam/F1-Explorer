@@ -107,6 +107,26 @@ class Race(unittest.TestCase):
 
         self.assertTrue(result[0].get_laps()[10].get_pit_out())
 
+    def test_make_lap_log_skips_incomplete_laps_and_empty_drivers(self):
+        data = {
+            "DriverNumber": ["1", "1", "16"],
+            "Driver": ["Max", "Max", "Lec"],
+            "Stint": [1, 1, 1],
+            "Team": ["Red Bull", "Red Bull", "Ferrari"],
+            "LapNumber": [1, 2, 1],
+            "Position": [1, float("nan"), float("nan")],
+            "Compound": ["Soft", "Soft", "Soft"],
+            "FreshTyre": [True, True, True],
+            "PitOutTime": pandas.to_timedelta([None, None, None]),
+            "Time": pandas.to_timedelta(["83s", "166s", "84s"]),
+            "LapTime": pandas.to_timedelta(["83s", "83s", "84s"]),
+        }
+
+        result = make_driver_laps_set(Laps(pandas.DataFrame(data)))
+
+        self.assertEqual([1], [driver_laps.driver.number for driver_laps in result])
+        self.assertEqual([1], list(result[0].laps))
+
     def test_make_top_time_map(self):
         data = {
             "DriverNumber": ["1", "1", "16", "16"],
