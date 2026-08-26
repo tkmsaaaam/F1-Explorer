@@ -1,4 +1,6 @@
 import datetime
+import argparse
+from pathlib import Path
 
 import fastf1
 # noinspection PyPackageRequirements
@@ -6,6 +8,8 @@ from opentelemetry import trace
 
 import setup
 from visualizations import run_volume, short_runs, weather, weekend, comparison
+from visualizations.output import session_output_dir
+from analysis_state import build_fingerprint, manifest_path, should_skip, write_success_manifest
 
 tracer = trace.get_tracer(__name__)
 
@@ -19,7 +23,7 @@ def start_at(session: fastf1.core.Session) -> None | datetime.datetime:
     return None
 
 @tracer.start_as_current_span("main")
-def __main():
+def main(*, force: bool = False):
     log = setup.log()
     try:
         config = setup.load_config()
@@ -35,6 +39,18 @@ def __main():
         session = fastf1.get_session(config.get_year(), config.get_round(), config.get_session())
     except Exception as exception:
         log.warning('setup is failed', args=exception.args)
+        return
+
+    output_dir = session_output_dir(session)
+    identity = {
+        "year": int(config.get_year()),
+        "round": int(config.get_round()),
+        "session": session.name,
+        "entrypoint": Path(__file__).name,
+    }
+    fingerprint = build_fingerprint(Path(__file__), Path(__file__).resolve().parent)
+    if should_skip(manifest_path(output_dir), fingerprint, identity, force=force):
+        log.info("Analysis skipped; source and environment fingerprint unchanged")
         return
     session.load(messages=False)
 
@@ -123,7 +139,15 @@ def __main():
 
     weather.execute(session, log, base_path)
     weekend.plot_tyre(config.get_year(), config.get_round(), log)
+    write_success_manifest(output_dir, fingerprint, identity,
+                           extra_output_paths=(output_dir.parent / "tyres.png",))
+
+
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Analyze a Formula 1 qualifying session")
+    parser.add_argument("--force", action="store_true", help="rerun even when the analysis is unchanged")
+    return parser.parse_args(argv)
 
 
 if __name__ == "__main__":
-    __main()
+    main(force=parse_args().force)
