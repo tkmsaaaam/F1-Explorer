@@ -53,7 +53,10 @@ class SessionReportTest(unittest.TestCase):
             self.assertIn("plotly_selected", html)
             self.assertIn("figure.layout.selectdirection = \"v\"", html)
             self.assertIn("const reverseYAxis", html)
+            self.assertIn("const explicitYAxisRange", html)
             self.assertIn("reverseYAxis ? [Math.max(...values), Math.min(...values)]", html)
+            self.assertIn('event["yaxis.autorange"] !== true', html)
+            self.assertIn('"yaxis.range": [Math.max(...allYValues), Math.min(...allYValues)]', html)
             self.assertNotIn('<script src="https://', html)
             self.assertEqual(html.count("window.Plotly.newPlot"), 1)
 
@@ -76,6 +79,22 @@ class SessionReportTest(unittest.TestCase):
             html = path.read_text(encoding="utf-8")
             self.assertNotIn("</script>alert(1)", html)
             self.assertIn(r"\\u003cscript\\u003e", json.dumps(html))
+
+    def test_race_report_omits_laptime_by_timing(self) -> None:
+        with TemporaryDirectory() as temporary:
+            output_dir = Path(temporary) / "Race"
+            output_dir.mkdir()
+            timing_path = output_dir / "laptime_by_timing.png"
+            timing_path.write_bytes(b"placeholder")
+            session = SimpleNamespace(
+                name="Race",
+                event=SimpleNamespace(EventName="GP", Location="GP"),
+            )
+            report = SessionReport(session, output_dir)
+            report.register_image(timing_path)
+
+            html = report.write().read_text(encoding="utf-8")
+            self.assertNotIn("laptime_by_timing.png", html)
 
 
 if __name__ == "__main__":

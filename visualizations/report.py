@@ -125,9 +125,16 @@ class SessionReport:
             # from a session-level file with the same basename.
             return Path("__external__") / candidate.name
 
+    def _is_race_session(self) -> bool:
+        return str(getattr(self.session, "name", "")).strip().lower() in {
+            "race", "sprint", "sprint race",
+        }
+
     def _add(self, path: str | Path, *, figure_json: str | None = None) -> None:
         candidate = Path(path).resolve()
         if not candidate.is_file():
+            return
+        if self._is_race_session() and candidate.name == "laptime_by_timing.png":
             return
         relative = self._relative(candidate)
         key = relative.as_posix()
@@ -251,8 +258,9 @@ main {{ max-width: 1500px; margin: 0 auto; padding: 1rem 2rem 4rem; }}
     const titleText = figure.layout.title && typeof figure.layout.title.text === "string" ? figure.layout.title.text : "";
     const reverseYAxis = !table && figure.layout.yaxis && typeof figure.layout.yaxis === "object" &&
       (figure.layout.yaxis.autorange === "reversed" || /lap time/i.test(titleText));
+    const explicitYAxisRange = reverseYAxis && Array.isArray(figure.layout.yaxis.range) && figure.layout.yaxis.range.length === 2;
     if (reverseYAxis) {{
-      figure.layout.yaxis = Object.assign({{}}, figure.layout.yaxis, {{autorange: "reversed"}});
+      figure.layout.yaxis = Object.assign({{}}, figure.layout.yaxis, explicitYAxisRange ? {{autorange: false}} : {{autorange: "reversed"}});
     }}
     if (!table && figure.layout.yaxis && typeof figure.layout.yaxis === "object") {{
       figure.layout.yaxis = Object.assign({{}}, figure.layout.yaxis, {{
@@ -261,6 +269,8 @@ main {{ max-width: 1500px; margin: 0 auto; padding: 1rem 2rem 4rem; }}
       figure.layout.selectdirection = "v";
     }}
     window.Plotly.newPlot(node, figure.data || [], figure.layout || {{}}, {{responsive: true, displaylogo: false}}).then(() => {{
+      const allYValues = (figure.data || []).flatMap((trace) => Array.isArray(trace.y) ? trace.y : [])
+        .filter((value) => typeof value === "number" && Number.isFinite(value));
       node.on("plotly_selected", (event) => {{
         const values = (event && event.points ? event.points : [])
           .map((point) => point.y)
@@ -268,6 +278,13 @@ main {{ max-width: 1500px; margin: 0 auto; padding: 1rem 2rem 4rem; }}
         if (values.length < 2) return;
         const range = reverseYAxis ? [Math.max(...values), Math.min(...values)] : [Math.min(...values), Math.max(...values)];
         window.Plotly.relayout(node, {{"yaxis.autorange": false, "yaxis.range": range}});
+      }});
+      node.on("plotly_relayout", (event) => {{
+        if (!reverseYAxis || !event || event["yaxis.autorange"] !== true || allYValues.length < 2) return;
+        window.Plotly.relayout(node, {{
+          "yaxis.autorange": false,
+          "yaxis.range": [Math.max(...allYValues), Math.min(...allYValues)],
+        }});
       }});
     }});
     node.dataset.rendered = "1";

@@ -266,6 +266,37 @@ def plot_laptime_by_lap_number(session: Session, log: structlog.stdlib.BoundLogg
         report.register_plotly(_make_interactive_laptime_by_lap_number(session), output_path)
 
 
+def _is_race_session(session: Session) -> bool:
+    """Return whether the session is a race, including a sprint race."""
+
+    return str(getattr(session, "name", "")).strip().lower() in {
+        "race", "sprint", "sprint race",
+    }
+
+
+def _interactive_race_laptime_range(session: Session) -> list[float] | None:
+    """Calculate the narrower of the race graph and fixed fastest-lap ranges."""
+
+    if not _is_race_session(session):
+        return None
+    seconds = session.laps["LapTime"].dt.total_seconds().dropna()
+    if seconds.empty:
+        return None
+    fastest = float(seconds.min())
+    fixed_range = [fastest + 14.5, fastest - 0.5]
+
+    # Match visualizations.race.laptime(), which produces laptime_graph.png.
+    # The Plotly graph retains every lap; these values only set its viewport.
+    graph_clean = session.laps[
+        session.laps["IsAccurate"].fillna(False).astype(bool)
+        & ~session.laps["Deleted"].fillna(False).astype(bool)
+        & session.laps["TrackStatus"].astype(str).isin({"1", "1.0"})
+    ]["LapTime"].dt.total_seconds().dropna()
+    graph_max = float(graph_clean.max()) if not graph_clean.empty else float(seconds.max())
+    graph_range = [graph_max + 0.1, fastest - 0.1]
+    return min((fixed_range, graph_range), key=lambda item: item[0] - item[1])
+
+
 def _make_interactive_laptime_by_lap_number(session: Session) -> go.Figure:
     """Build an interactive counterpart to the legacy static lap-time plot."""
     fig = go.Figure()
@@ -293,11 +324,16 @@ def _make_interactive_laptime_by_lap_number(session: Session) -> go.Figure:
                 "<br>Stint: %{customdata[2]}<extra></extra>"
             ),
         ))
+    y_range = _interactive_race_laptime_range(session)
+    yaxis = dict(title="Lap Time [s]")
+    if y_range is None:
+        yaxis["autorange"] = "reversed"
+    else:
+        yaxis.update(autorange=False, range=y_range)
     fig.update_layout(
         title="Lap Time by Lap Number (interactive)",
         xaxis_title="Lap Number",
-        yaxis_title="Lap Time [s]",
-        yaxis_autorange="reversed",
+        yaxis=yaxis,
         xaxis=dict(rangeslider=dict(visible=True)),
         hovermode="closest",
         legend_title="Driver (click to toggle)",
