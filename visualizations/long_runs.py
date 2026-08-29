@@ -6,6 +6,7 @@ import fastf1
 import fastf1.plotting
 import matplotlib.pyplot as plt
 import pandas
+import plotly.graph_objects as go
 import structlog
 from fastf1.core import Session, Laps
 from opentelemetry import trace
@@ -13,6 +14,8 @@ from opentelemetry import trace
 from visualizations.domain.driver import Driver
 from visualizations.domain.stint import Stint
 from visualizations.output import resolve_output_dir, save_matplotlib
+from visualizations.report import current_report
+from visualizations.session_order import driver_order, driver_sort_key
 from visualizations.style import driver_linestyle
 
 tracer = trace.get_tracer(__name__)
@@ -220,3 +223,52 @@ def plot_by_tyre_age_and_tyre(
         ax.grid(True)
         output_path = resolve_output_dir(session, output_dir) / "long_runs" / f"{compound}.png"
         save_matplotlib(fig, output_path, log)
+        report = current_report()
+        if report is not None:
+            report.register_plotly(
+                _make_interactive_long_run_figure(session, compound, stint_set),
+                output_path,
+            )
+
+
+def _make_interactive_long_run_figure(
+        session: Session,
+        compound: str,
+        stint_set: list[Stint],
+) -> go.Figure:
+    """Build an interactive long-run counterpart while retaining the PNG."""
+    fig = go.Figure()
+    ranks = driver_order(session)
+    ordered_stints = sorted(
+        stint_set,
+        key=lambda stint: driver_sort_key(stint.driver.number, ranks),
+    )
+    for stint in ordered_stints:
+        laps = sorted(stint.laps)
+        if not laps:
+            continue
+        name = f"{stint.driver.name} / laps {laps[0]}–{laps[-1]}"
+        customdata = [[stint.driver.name, stint.driver.team_name, lap] for lap in laps]
+        fig.add_trace(go.Scatter(
+            x=laps,
+            y=[stint.laps[lap] for lap in laps],
+            mode="lines+markers",
+            name=name,
+            legendrank=ranks.get(str(stint.driver.number), 1_000_000),
+            customdata=customdata,
+            hovertemplate=(
+                "Driver: %{customdata[0]}<br>Team: %{customdata[1]}"
+                "<br>Lap: %{customdata[2]}<br>Lap time: %{y:.3f}s<extra></extra>"
+            ),
+        ))
+    fig.update_layout(
+        title=f"Long Runs — {compound} (interactive)",
+        xaxis_title="Lap Number",
+        yaxis_title="Lap Time [s]",
+        xaxis=dict(rangeslider=dict(visible=True)),
+        yaxis_autorange="reversed",
+        hovermode="closest",
+        legend_title="Driver / stint (click to toggle)",
+        margin=dict(l=60, r=20, t=60, b=50),
+    )
+    return fig

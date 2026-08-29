@@ -9,6 +9,7 @@ from opentelemetry import trace
 import setup
 from visualizations import run_volume, long_runs, short_runs, weather, weekend
 from visualizations.output import session_output_dir
+from visualizations.report import SessionReport
 from analysis_state import build_fingerprint, manifest_path, should_skip, write_success_manifest
 
 tracer = trace.get_tracer(__name__)
@@ -55,12 +56,16 @@ def main(*, force: bool = False):
         log.info("Analysis skipped; source and environment fingerprint unchanged")
         return
     session.load(messages=False)
+    report = SessionReport(session, output_dir)
+    report.activate()
 
     start = start_at(session)
     if start is None:
+        report.deactivate()
         log.warning(f"{session.name} is not Practice 1 or Practice 2 or Practice 3.")
         return
     if datetime.datetime.now().astimezone() < start:
+        report.deactivate()
         log.warning(
             f"{session.event.year} Race {session.event.RoundNumber} {session.event.EventName} Practice is not started.")
         return
@@ -91,9 +96,11 @@ def main(*, force: bool = False):
     fastest = session.laps.pick_fastest()
 
     if circuit is None:
+        report.deactivate()
         log.info("circuit info is None")
         return
     if fastest is None:
+        report.deactivate()
         log.info("fastest info is None")
         return
 
@@ -122,6 +129,8 @@ def main(*, force: bool = False):
     weather.execute(session, log, base_path)
 
     weekend.plot_tyre(config.get_year(), config.get_round(), log)
+    report.deactivate()
+    report.write(extra_paths=(output_dir.parent / "tyres.png",))
     write_success_manifest(output_dir, fingerprint, identity,
                            extra_output_paths=(output_dir.parent / "tyres.png",))
 

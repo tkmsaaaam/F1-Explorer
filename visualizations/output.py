@@ -7,6 +7,8 @@ from typing import Any, Mapping, Protocol
 
 import matplotlib.pyplot as plt
 
+from visualizations.report import current_report
+
 
 class _EventLike(Protocol):
     """The event fields used to build a session output directory."""
@@ -83,6 +85,9 @@ def save_matplotlib(
     savefig_kwargs.setdefault("bbox_inches", "tight")
     try:
         fig.savefig(output_path, **savefig_kwargs)
+        report = current_report()
+        if report is not None:
+            report.register_image(output_path)
         log.info(f"Saved plot to {output_path}")
         return output_path
     finally:
@@ -101,5 +106,8 @@ def save_plotly(
     output_path = Path(path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     fig.write_image(output_path, width=width, height=height)
+    report = current_report()
+    if report is not None:
+        report.register_plotly(fig, output_path)
     log.info(f"Saved plot to {output_path}")
     return output_path

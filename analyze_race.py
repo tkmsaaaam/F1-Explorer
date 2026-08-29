@@ -9,6 +9,7 @@ from opentelemetry import trace
 import setup
 from visualizations import weekend, run_volume, weather, race
 from visualizations.output import session_output_dir
+from visualizations.report import SessionReport
 from analysis_state import build_fingerprint, manifest_path, should_skip, write_success_manifest
 
 tracer = trace.get_tracer(__name__)
@@ -53,12 +54,16 @@ def main(*, force: bool = False):
         log.info("Analysis skipped; source and environment fingerprint unchanged")
         return
     session.load()
+    report = SessionReport(session, output_dir)
+    report.activate()
 
     start = start_at(session)
     if start is None:
+        report.deactivate()
         log.warning(f"{session.name} is not Sprint or Race.")
         return
     if datetime.datetime.now().astimezone() < start:
+        report.deactivate()
         log.warning(
             f"{session.event.year} Race {session.event.RoundNumber} {session.event.EventName} Race is not started.")
         return
@@ -76,6 +81,8 @@ def main(*, force: bool = False):
     race.execute(session, log, path, path, None, None, None)
 
     weather.execute(session, log, path)
+    report.deactivate()
+    report.write(extra_paths=(output_dir.parent / "tyres.png",))
     write_success_manifest(output_dir, fingerprint, identity,
                            extra_output_paths=(output_dir.parent / "tyres.png",))
 

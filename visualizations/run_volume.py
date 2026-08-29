@@ -15,6 +15,8 @@ from opentelemetry import trace
 
 import constants
 from visualizations.output import resolve_output_dir, save_matplotlib, save_plotly
+from visualizations.report import current_report
+from visualizations.session_order import driver_order, driver_sort_key
 from visualizations.style import driver_linestyle
 
 tracer = trace.get_tracer(__name__)
@@ -259,6 +261,49 @@ def plot_laptime_by_lap_number(session: Session, log: structlog.stdlib.BoundLogg
     ax.grid(True)
     output_path = resolve_output_dir(session, output_dir) / "laptime_by_lap_number.png"
     save_matplotlib(fig, output_path, log)
+    report = current_report()
+    if report is not None:
+        report.register_plotly(_make_interactive_laptime_by_lap_number(session), output_path)
+
+
+def _make_interactive_laptime_by_lap_number(session: Session) -> go.Figure:
+    """Build an interactive counterpart to the legacy static lap-time plot."""
+    fig = go.Figure()
+    ranks = driver_order(session)
+    groups = sorted(session.laps.groupby("DriverNumber"), key=lambda item: driver_sort_key(item[0], ranks))
+    for driver_number, driver_laps in groups:
+        driver_laps = driver_laps.sort_values("LapNumber").dropna(subset=["LapTime"])
+        if driver_laps.empty:
+            continue
+        driver = str(driver_laps.Driver.iloc[0])
+        customdata = [
+            [str(row.Compound), row.TyreLife, row.Stint]
+            for row in driver_laps.itertuples()
+        ]
+        fig.add_trace(go.Scatter(
+            x=driver_laps.LapNumber.tolist(),
+            y=driver_laps.LapTime.dt.total_seconds().tolist(),
+            mode="lines+markers",
+            name=driver,
+            legendrank=ranks.get(str(driver_number), 1_000_000),
+            customdata=customdata,
+            hovertemplate=(
+                "Driver: %{fullData.name}<br>Lap: %{x}<br>Time: %{y:.3f}s"
+                "<br>Compound: %{customdata[0]}<br>Tyre life: %{customdata[1]}"
+                "<br>Stint: %{customdata[2]}<extra></extra>"
+            ),
+        ))
+    fig.update_layout(
+        title="Lap Time by Lap Number (interactive)",
+        xaxis_title="Lap Number",
+        yaxis_title="Lap Time [s]",
+        yaxis_autorange="reversed",
+        xaxis=dict(rangeslider=dict(visible=True)),
+        hovermode="closest",
+        legend_title="Driver (click to toggle)",
+        margin=dict(l=60, r=20, t=60, b=50),
+    )
+    return fig
 
 
 @tracer.start_as_current_span("plot_laptime_by_timing")
@@ -298,3 +343,53 @@ def plot_laptime_by_timing(session: Session, log: structlog.stdlib.BoundLogger, 
     ax.legend(fontsize='small')
     ax.grid(True)
     save_matplotlib(fig, output_path, log)
+    report = current_report()
+    if report is not None:
+        report.register_plotly(_make_interactive_laptime_by_timing(session), output_path)
+
+
+def _make_interactive_laptime_by_timing(session: Session) -> go.Figure:
+    """Build an interactive time-axis counterpart to the static plot."""
+    fig = go.Figure()
+    ranks = driver_order(session)
+    groups = sorted(session.laps.groupby("DriverNumber"), key=lambda item: driver_sort_key(item[0], ranks))
+    for driver_number, driver_laps in groups:
+        driver_laps = driver_laps.sort_values("LapNumber").dropna(subset=["LapTime"])
+        if driver_laps.empty:
+            continue
+        starts = driver_laps["LapStartDate"]
+        if starts.isna().all():
+            starts = driver_laps["LapStartTime"]
+        else:
+            starts = starts.fillna(driver_laps["LapStartTime"])
+        first = starts.iloc[0]
+        x = pandas.to_timedelta(starts - first).dt.total_seconds().tolist()
+        driver = str(driver_laps.Driver.iloc[0])
+        customdata = [
+            [int(row.LapNumber), str(row.Compound), row.TyreLife, row.Stint]
+            for row in driver_laps.itertuples()
+        ]
+        fig.add_trace(go.Scatter(
+            x=x,
+            y=driver_laps.LapTime.dt.total_seconds().tolist(),
+            mode="lines+markers",
+            name=driver,
+            legendrank=ranks.get(str(driver_number), 1_000_000),
+            customdata=customdata,
+            hovertemplate=(
+                "Driver: %{fullData.name}<br>Elapsed: %{x:.1f}s<br>Time: %{y:.3f}s"
+                "<br>Lap: %{customdata[0]}<br>Compound: %{customdata[1]}"
+                "<br>Tyre life: %{customdata[2]}<br>Stint: %{customdata[3]}<extra></extra>"
+            ),
+        ))
+    fig.update_layout(
+        title="Lap Time by Session Time (interactive)",
+        xaxis_title="Elapsed Session Time [s]",
+        yaxis_title="Lap Time [s]",
+        yaxis_autorange="reversed",
+        xaxis=dict(rangeslider=dict(visible=True)),
+        hovermode="closest",
+        legend_title="Driver (click to toggle)",
+        margin=dict(l=60, r=20, t=60, b=50),
+    )
+    return fig
