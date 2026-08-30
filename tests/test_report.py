@@ -59,6 +59,9 @@ class SessionReportTest(unittest.TestCase):
             self.assertIn('"yaxis.range": [Math.max(...allYValues), Math.min(...allYValues)]', html)
             self.assertNotIn('<script src="https://', html)
             self.assertEqual(html.count("window.Plotly.newPlot"), 1)
+            self.assertIn("box-sizing: border-box", html)
+            self.assertIn("max-width: 100%", html)
+            self.assertIn("overflow-x: hidden", html)
 
     def test_report_is_stable_and_escapes_embedded_figure_json(self) -> None:
         with TemporaryDirectory() as temporary:

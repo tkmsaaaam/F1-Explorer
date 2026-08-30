@@ -223,20 +223,21 @@ class SessionReport:
 <title>F1 Explorer — {event_name} {session_name}</title>
 <style>
 :root {{ color-scheme: light; font-family: system-ui, -apple-system, sans-serif; }}
+*, *::before, *::after {{ box-sizing: border-box; }}
 body {{ margin: 0; color: #202124; background: #fafafa; }}
 header {{ padding: 1.5rem 2rem; background: #18202a; color: white; }}
 header h1 {{ margin: 0 0 .35rem; font-size: 1.55rem; }}
 header p {{ margin: .2rem 0; color: #d7e0ea; }}
 nav {{ position: sticky; top: 0; z-index: 5; display: flex; flex-wrap: wrap; gap: .65rem 1rem; padding: .7rem 2rem; background: white; border-bottom: 1px solid #d9dee5; }}
 nav a {{ color: #145da0; text-decoration: none; font-weight: 600; }}
-main {{ max-width: 1500px; margin: 0 auto; padding: 1rem 2rem 4rem; }}
+main {{ width: 100%; max-width: 1500px; margin: 0 auto; padding: 1rem 2rem 4rem; }}
 .report-section {{ scroll-margin-top: 4rem; margin: 2rem 0 3rem; }}
 .report-section h2 {{ border-bottom: 2px solid #b8c4d1; padding-bottom: .4rem; }}
-.figure-card {{ scroll-margin-top: 4rem; margin: 1.4rem 0 2rem; padding: 1rem; background: white; border: 1px solid #e0e4e8; border-radius: 8px; box-shadow: 0 1px 3px #0000000d; }}
+.figure-card {{ min-width: 0; max-width: 100%; overflow-x: hidden; scroll-margin-top: 4rem; margin: 1.4rem 0 2rem; padding: 1rem; background: white; border: 1px solid #e0e4e8; border-radius: 8px; box-shadow: 0 1px 3px #0000000d; }}
 .figure-card h3 {{ margin-top: 0; }}
-.figure-card img {{ display: block; width: 100%; height: auto; }}
+.figure-card img {{ display: block; width: auto; max-width: 100%; height: auto; }}
 .zoomable-image {{ cursor: zoom-in; }}
-.plotly-container {{ min-height: 640px; height: 640px; width: 100%; }}
+.plotly-container {{ min-height: 640px; height: 640px; width: 100%; max-width: 100%; overflow-x: hidden; }}
 .plotly-container.table {{ min-height: 900px; height: 900px; }}
 .source {{ color: #687582; font-size: .8rem; margin-bottom: 0; }}
 </style></head><body>
