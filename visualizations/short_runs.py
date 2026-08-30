@@ -469,7 +469,7 @@ def plot_speed_distance_comparison(session: Session, log: structlog.stdlib.Bound
 
 @tracer.start_as_current_span("plot_speed_on_track")
 def plot_speed_on_track(session: Session, log: structlog.stdlib.BoundLogger, *, output_dir: str | Path | None = None):
-    """ドライバーごとに最速ラップのスピードをグラフにする
+    """ドライバーごとに最速ラップのスピードをコースマップにプロットする
     Args:
         session: 分析対象のセッション
         log: ロガー
@@ -478,30 +478,27 @@ def plot_speed_on_track(session: Session, log: structlog.stdlib.BoundLogger, *, 
         lap = session.laps.pick_drivers(driver_number).pick_fastest()
         if lap is None:
             continue
-        fig, ax = plt.subplots(sharex=True, sharey=True, figsize=(12.8, 7.2), layout='tight')
-        rect = 0, 0.08, 1, 1
-        fig.tight_layout(rect=rect)
+        fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
+        tel = lap.get_telemetry()
+        x = np.array(tel.X.values)
+        y = np.array(tel.Y.values)
 
-        fig.subplots_adjust(left=0.1, right=0.9, top=0.9, bottom=0.12)
-        ax.axis('off')
-
-        ax.plot(lap.telemetry.X, lap.telemetry.Y, color='black', linestyle='-', linewidth=16, zorder=0)
-
-        x = lap.telemetry.X
-        y = lap.telemetry.Y
         points = np.array([x, y]).T.reshape(-1, 1, 2)
         segments = np.concatenate([points[:-1], points[1:]], axis=1)
-        colormap = plt.get_cmap("plasma")
-        color = lap.telemetry.Speed
-        norm = plt.Normalize(color.min(), color.max())
-        lc = mpl.collections.LineCollection(segments, cmap=colormap, norm=norm, linestyle='-', linewidth=5)
-        lc.set_array(color)
-        ax.add_collection(lc)
-        axes = 0.25, 0.05, 0.5, 0.05
-        color_bar_axes = fig.add_axes(axes)
-        normal_legend = mpl.colors.Normalize(vmin=color.min(), vmax=color.max())
-        mpl.colorbar.ColorbarBase(color_bar_axes, norm=normal_legend, cmap=colormap, orientation="horizontal")
-        ax.grid(True)
+        speed = tel.Speed.to_numpy().astype(float)
+        cmap = mpl.cm.plasma
+        lc_comp = mpl.collections.LineCollection(
+            segments,
+            norm=plt.Normalize(speed.min(), speed.max()),
+            cmap=cmap,
+            linewidth=4,
+            array=speed,
+        )
+        ax.add_collection(lc_comp)
+        ax.axis('equal')
+        ax.tick_params(labelleft=False, left=False, labelbottom=False, bottom=False)
+
+        fig.colorbar(mappable=lc_comp, label="Speed")
         output_path = resolve_output_dir(session, output_dir) / "speed_on_track" / f"{driver_number}_{lap.Driver}.png"
         save_matplotlib(fig, output_path, log)
 
