@@ -123,6 +123,27 @@ class SessionReportTest(unittest.TestCase):
             self.assertIn("Shift On Track (1 driver)", html)
             self.assertIn('id="telemetry"', html)
 
+    def test_interactive_telemetry_replaces_static_category_images(self) -> None:
+        with TemporaryDirectory() as temporary:
+            output_dir = Path(temporary) / "Qualifying"
+            static_path = output_dir / "brake" / "1-5.png"
+            static_path.parent.mkdir(parents=True)
+            static_path.write_bytes(b"placeholder")
+            interactive_path = output_dir / "brake.png"
+            interactive_path.write_bytes(b"placeholder")
+
+            session = SimpleNamespace(
+                name="Qualifying",
+                event=SimpleNamespace(EventName="GP", Location="GP"),
+            )
+            report = SessionReport(session, output_dir)
+            report.register_image(static_path)
+            report.register_plotly(go.Figure(data=[go.Scatter(x=[0, 1], y=[0, 1])]), interactive_path)
+            html = report.write().read_text(encoding="utf-8")
+
+            self.assertIn('data-plotly-source="figure-data-telemetry-brake"', html)
+            self.assertNotIn("1-5.png", html)
+
 
 if __name__ == "__main__":
     unittest.main()

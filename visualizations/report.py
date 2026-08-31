@@ -66,7 +66,7 @@ def _section_for(relative_path: Path) -> str:
     name = relative_path.stem.lower()
     if "long_run" in name or "long_runs" in parts:
         return "Long Runs"
-    if any(key in name or key in parts for key in ("telemetry", "speed_distance", "speed_on_track", "shift_on_track", "throttle", "brake", "drs")):
+    if any(key in name or key in parts for key in ("telemetry", "speed_distance", "speed_on_track", "shift_on_track", "time_distance_delta", "throttle", "brake", "drs")):
         return "Telemetry"
     if any(key in name for key in ("weather", "air_temp", "track_temp", "wind_speed", "rainfall")):
         return "Weather"
@@ -93,6 +93,15 @@ def _collapsible_group_for(relative_path: Path) -> str | None:
     if parent in {"shift_on_track", "speed_on_track"}:
         return parent
     return None
+
+
+def _is_interactive_telemetry_path(relative_path: Path) -> bool:
+    """Return whether a static telemetry image is replaced in the report."""
+
+    return any(
+        part.lower() in {"brake", "speed_distance", "throttle", "time_distance_delta"}
+        for part in relative_path.parts[:-1]
+    )
 
 
 class SessionReport:
@@ -143,9 +152,11 @@ class SessionReport:
         candidate = Path(path).resolve()
         if not candidate.is_file():
             return
+        relative = self._relative(candidate)
         if self._is_race_session() and candidate.name == "laptime_by_timing.png":
             return
-        relative = self._relative(candidate)
+        if figure_json is None and _is_interactive_telemetry_path(relative):
+            return
         key = relative.as_posix()
         section = _section_for(relative)
         title = _title_for(relative)

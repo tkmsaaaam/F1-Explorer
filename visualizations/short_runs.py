@@ -418,6 +418,16 @@ def plot_speed_distance(session: Session, log: structlog.stdlib.BoundLogger, *, 
         output_path = resolve_output_dir(session, output_dir) / "speed_distance" / f"{driver_number}_{laps.Driver}.png"
         save_matplotlib(fig, output_path, log)
 
+    _save_interactive_driver_telemetry(
+        session,
+        log,
+        key="speed_distance",
+        label="Speed",
+        value_func=lambda data: data.Speed,
+        title=f"{session.event.EventName} {session.name} — Speed by Distance",
+        output_dir=output_dir,
+    )
+
 
 @tracer.start_as_current_span("plot_speed_distance_comparison")
 def plot_speed_distance_comparison(session: Session, log: structlog.stdlib.BoundLogger, *, output_dir: str | Path | None = None):
@@ -590,6 +600,203 @@ def plot_time_distance_comparison(session: Session, log: structlog.stdlib.BoundL
         output_path = resolve_output_dir(session, output_dir) / "time_distance_delta" / f"{start + 1}_.png"
         save_matplotlib(fig, output_path, log)
 
+    _save_interactive_time_distance_delta(session, log, output_dir=output_dir)
+
+
+def _ordered_quicklap_drivers(session: Session) -> list[int]:
+    """Return drivers ordered by their fastest session lap."""
+
+    quicklaps = session.laps.pick_quicklaps()
+    if quicklaps.empty:
+        return []
+    return quicklaps.sort_values(by="LapTime").DriverNumber.unique().tolist()
+
+
+def _plotly_driver_dash(year: int, driver_number: int) -> str:
+    """Translate the shared Matplotlib line style to Plotly's dash names."""
+
+    style = driver_linestyle(year, driver_number)
+    return "dash" if style == "dashed" else style
+
+
+def _save_interactive_driver_telemetry(
+        session: Session,
+        log: structlog.stdlib.BoundLogger,
+        *,
+        key: str,
+        label: str,
+        value_func,
+        title: str,
+        output_dir: str | Path | None = None,
+) -> None:
+    """Save one interactive Plotly telemetry chart containing all drivers."""
+
+    circuit_info = session.get_circuit_info()
+    if circuit_info is None:
+        return
+    driver_numbers = _ordered_quicklap_drivers(session)
+    if not driver_numbers:
+        return
+
+    figure = go.Figure()
+    for rank, driver_number in enumerate(driver_numbers):
+        lap = session.laps.pick_drivers(driver_number).pick_fastest()
+        if lap is None:
+            continue
+        car_data = lap.get_car_data().add_distance()
+        x_data = np.asarray(car_data.Distance, dtype=float)
+        y_data = np.asarray(value_func(car_data), dtype=float)
+        valid = np.isfinite(x_data) & np.isfinite(y_data)
+        if not valid.any():
+            continue
+        try:
+            color = fastf1.plotting.get_team_color(lap.Team, session)
+        except (AttributeError, KeyError, ValueError):
+            color = "gray"
+        try:
+            line_dash = _plotly_driver_dash(session.event.year, int(driver_number))
+        except (TypeError, ValueError):
+            line_dash = "solid"
+        figure.add_trace(go.Scatter(
+            x=x_data[valid],
+            y=y_data[valid],
+            mode="lines",
+            name=str(lap.Driver),
+            legendrank=rank,
+            line={"color": color, "dash": line_dash},
+            hovertemplate=f"{lap.Driver}<br>Distance: %{{x:.1f}} m<br>{label}: %{{y:.2f}}<extra></extra>",
+        ))
+
+    if not figure.data:
+        return
+    for _, corner in circuit_info.corners.iterrows():
+        distance = float(corner.Distance)
+        figure.add_vline(x=distance, line_dash="dot", line_color="grey", opacity=0.6)
+        figure.add_annotation(
+            x=distance,
+            y=0,
+            yref="paper",
+            yshift=-12,
+            text=f"{corner.Number}{corner.Letter}",
+            showarrow=False,
+            font={"size": 9, "color": "grey"},
+        )
+    figure.update_layout(
+        title=title,
+        hovermode="x unified",
+        legend={"traceorder": "normal"},
+        template="plotly_white",
+        margin={"l": 70, "r": 30, "t": 70, "b": 70},
+    )
+    figure.update_xaxes(title="Distance [m]")
+    figure.update_yaxes(title=label)
+    save_plotly(figure, resolve_output_dir(session, output_dir) / f"{key}.png", log, width=1920, height=1080)
+
+
+def _save_interactive_time_distance_delta(
+        session: Session,
+        log: structlog.stdlib.BoundLogger,
+        *,
+        output_dir: str | Path | None = None,
+) -> None:
+    """Save an all-driver interactive delta-to-session-fastest chart."""
+
+    driver_numbers = _ordered_quicklap_drivers(session)
+    if not driver_numbers:
+        return
+    laps_by_driver = {
+        str(driver_number): session.laps.pick_drivers(driver_number).pick_fastest()
+        for driver_number in driver_numbers
+    }
+    laps_by_driver = {driver: lap for driver, lap in laps_by_driver.items() if lap is not None}
+    if not laps_by_driver:
+        return
+    fastest_driver = min(laps_by_driver, key=lambda driver: laps_by_driver[driver].LapTime.total_seconds())
+    fastest_lap = laps_by_driver[fastest_driver]
+
+    def distance_and_time(lap):
+        car_data = lap.get_car_data().add_distance()
+        distance = np.asarray(car_data.Distance, dtype=float)
+        times = np.asarray([time.total_seconds() for time in car_data.Time], dtype=float)
+        valid = np.isfinite(distance) & np.isfinite(times)
+        distance, times = distance[valid], times[valid]
+        indices = np.unique(distance, return_index=True)[1]
+        indices = np.sort(indices)
+        return distance[indices], times[indices]
+
+    fastest_distance, fastest_time = distance_and_time(fastest_lap)
+    if len(fastest_distance) < 2:
+        return
+    common_distance = np.arange(0.0, fastest_distance.max(), 5.0)
+    if len(common_distance) < 2:
+        return
+    reference_time = np.interp(common_distance, fastest_distance, fastest_time)
+    figure = go.Figure()
+    minimum, maximum = float("inf"), float("-inf")
+    for rank, driver_number in enumerate(driver_numbers):
+        lap = laps_by_driver.get(str(driver_number))
+        if lap is None:
+            continue
+        distance, times = distance_and_time(lap)
+        if len(distance) < 2:
+            continue
+        delta = np.interp(common_distance, distance, times) - reference_time
+        minimum, maximum = min(minimum, float(delta.min())), max(maximum, float(delta.max()))
+        try:
+            color = fastf1.plotting.get_team_color(lap.Team, session)
+        except (AttributeError, KeyError, ValueError):
+            color = "gray"
+        try:
+            line_dash = _plotly_driver_dash(session.event.year, int(driver_number))
+        except (TypeError, ValueError):
+            line_dash = "solid"
+        label = f"{lap.Driver} (FASTEST)" if str(driver_number) == fastest_driver else str(lap.Driver)
+        figure.add_trace(go.Scatter(
+            x=common_distance,
+            y=delta,
+            mode="lines",
+            name=label,
+            legendrank=rank,
+            line={"color": color, "dash": line_dash},
+            hovertemplate=f"{label}<br>Distance: %{{x:.1f}} m<br>Delta: %{{y:.3f}} s<extra></extra>",
+        ))
+    if not figure.data:
+        return
+    circuit_info = session.get_circuit_info()
+    if circuit_info is not None:
+        for _, corner in circuit_info.corners.iterrows():
+            distance = float(corner.Distance)
+            if distance > common_distance[-1]:
+                continue
+            figure.add_vline(x=distance, line_dash="dot", line_color="grey", opacity=0.6)
+            figure.add_annotation(
+                x=distance,
+                y=0,
+                text=f"{corner.Number}{corner.Letter}",
+                showarrow=False,
+                yshift=10,
+                font={"size": 9, "color": "grey"},
+            )
+    figure.add_hline(y=0, line_dash="dash", line_color="grey")
+    figure.update_layout(
+        title=f"{session.event.EventName} {session.name} — Delta to fastest ({fastest_lap.Driver})",
+        hovermode="x unified",
+        legend={"traceorder": "normal"},
+        template="plotly_white",
+        margin={"l": 70, "r": 30, "t": 70, "b": 70},
+    )
+    figure.update_xaxes(title=f"Distance (m) — {fastest_lap.Driver} reference")
+    figure.update_yaxes(title="Delta Time (s)")
+    if minimum < maximum:
+        figure.update_yaxes(range=[min(minimum, -3), max(maximum, 3)])
+    save_plotly(
+        figure,
+        resolve_output_dir(session, output_dir) / "time_distance_delta.png",
+        log,
+        width=1920,
+        height=1080,
+    )
+
 
 def _plot_driver_telemetry(session: Session, log: structlog.stdlib.BoundLogger, driver_numbers: list[int], key: str, label, value_func,
                            *, output_dir: str | Path | None = None):
@@ -734,6 +941,15 @@ def plot_throttle(session: Session, log: structlog.stdlib.BoundLogger, *, output
         value_func=lambda data: data.Throttle,
         output_dir=output_dir,
     )
+    _save_interactive_driver_telemetry(
+        session,
+        log,
+        key="throttle",
+        label="Throttle [%]",
+        value_func=lambda data: data.Throttle,
+        title=f"{session.event.EventName} {session.name} — Throttle by Distance",
+        output_dir=output_dir,
+    )
 
 
 @tracer.start_as_current_span("plot_brake")
@@ -750,6 +966,15 @@ def plot_brake(session: Session, log: structlog.stdlib.BoundLogger, *, output_di
         key='brake',
         label='Brake',
         value_func=lambda data: data.Brake.astype(float),
+        output_dir=output_dir,
+    )
+    _save_interactive_driver_telemetry(
+        session,
+        log,
+        key="brake",
+        label="Brake",
+        value_func=lambda data: data.Brake.astype(float),
+        title=f"{session.event.EventName} {session.name} — Brake by Distance",
         output_dir=output_dir,
     )
 
