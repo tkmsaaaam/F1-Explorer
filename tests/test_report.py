@@ -99,6 +99,30 @@ class SessionReportTest(unittest.TestCase):
             html = report.write().read_text(encoding="utf-8")
             self.assertNotIn("laptime_by_timing.png", html)
 
+    def test_driver_track_images_are_collapsible_by_plot_type(self) -> None:
+        with TemporaryDirectory() as temporary:
+            output_dir = Path(temporary) / "Qualifying"
+            for directory, filename in (
+                ("speed_on_track", "1_VER.png"),
+                ("speed_on_track", "11_PER.png"),
+                ("shift_on_track", "1_VER.png"),
+            ):
+                path = output_dir / directory / filename
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_bytes(b"placeholder")
+
+            session = SimpleNamespace(
+                name="Qualifying",
+                event=SimpleNamespace(EventName="GP", Location="GP"),
+            )
+            report = SessionReport(session, output_dir)
+            html = report.write().read_text(encoding="utf-8")
+
+            self.assertEqual(html.count('<details class="figure-group">'), 2)
+            self.assertIn("Speed On Track (2 drivers)", html)
+            self.assertIn("Shift On Track (1 driver)", html)
+            self.assertIn('id="telemetry"', html)
+
 
 if __name__ == "__main__":
     unittest.main()
