@@ -144,6 +144,25 @@ class SessionReportTest(unittest.TestCase):
             self.assertIn('data-plotly-source="figure-data-telemetry-brake"', html)
             self.assertNotIn("1-5.png", html)
 
+    def test_report_can_be_written_outside_the_image_directory(self) -> None:
+        with TemporaryDirectory() as temporary:
+            image_dir = Path(temporary) / "images/session"
+            report_dir = Path(temporary) / "reports/session"
+            image_path = image_dir / "plot.png"
+            image_path.parent.mkdir(parents=True)
+            image_path.write_bytes(b"placeholder")
+            session = SimpleNamespace(
+                name="Practice 1",
+                event=SimpleNamespace(EventName="GP", Location="GP"),
+            )
+
+            report = SessionReport(session, image_dir, report_dir=report_dir)
+            path = report.write()
+
+            self.assertEqual(path, report_dir / "report.html")
+            self.assertTrue(path.is_file())
+            self.assertIn("plot.png", path.read_text(encoding="utf-8"))
+
 
 if __name__ == "__main__":
     unittest.main()

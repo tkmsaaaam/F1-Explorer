@@ -8,7 +8,7 @@ from opentelemetry import trace
 
 import setup
 from visualizations import run_volume, short_runs, weather, weekend, comparison
-from visualizations.output import session_output_dir
+from visualizations.output import session_output_dir, session_report_dir
 from visualizations.report import SessionReport
 from analysis_state import build_fingerprint, manifest_path, should_skip, write_success_manifest
 
@@ -43,6 +43,7 @@ def main(*, force: bool = False):
         return
 
     output_dir = session_output_dir(session)
+    report_dir = session_report_dir(session)
     identity = {
         "year": int(config.get_year()),
         "round": int(config.get_round()),
@@ -50,11 +51,11 @@ def main(*, force: bool = False):
         "entrypoint": Path(__file__).name,
     }
     fingerprint = build_fingerprint(Path(__file__), Path(__file__).resolve().parent)
-    if should_skip(manifest_path(output_dir), fingerprint, identity, force=force):
+    if should_skip(manifest_path(report_dir), fingerprint, identity, force=force):
         log.info("Analysis skipped; source and environment fingerprint unchanged")
         return
     session.load(messages=False)
-    report = SessionReport(session, output_dir)
+    report = SessionReport(session, output_dir, report_dir=report_dir)
     report.activate()
 
     start = start_at(session)
@@ -148,8 +149,13 @@ def main(*, force: bool = False):
     weekend.plot_tyre(config.get_year(), config.get_round(), log)
     report.deactivate()
     report.write(extra_paths=(output_dir.parent / "tyres.png",))
-    write_success_manifest(output_dir, fingerprint, identity,
-                           extra_output_paths=(output_dir.parent / "tyres.png",))
+    write_success_manifest(
+        report_dir,
+        fingerprint,
+        identity,
+        extra_output_paths=(output_dir.parent / "tyres.png",),
+        extra_output_dirs=(output_dir,),
+    )
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:

@@ -68,6 +68,12 @@ def session_output_dir(session: SessionLike, root: str | Path = "images") -> Pat
     )
 
 
+def session_report_dir(session: SessionLike, root: str | Path = "reports") -> Path:
+    """Return the directory for a session's HTML report and metadata."""
+
+    return session_output_dir(session, root)
+
+
 def resolve_output_dir(session: SessionLike, output_dir: str | Path | None) -> Path:
     """Normalize an explicit output directory, or derive the session directory."""
     return session_output_dir(session) if output_dir is None else Path(output_dir)

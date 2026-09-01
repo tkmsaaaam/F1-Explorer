@@ -139,6 +139,35 @@ class AnalysisStateTest(unittest.TestCase):
             self.assertEqual(list(output_dir.glob("*.tmp")), [])
             self.assertTrue(should_skip(path, fingerprint, IDENTITY))
 
+    def test_manifest_tracks_outputs_from_a_separate_image_directory(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = self._repo(Path(temporary) / "repo")
+            report_dir = Path(temporary) / "reports/session"
+            report_dir.mkdir(parents=True)
+            report = report_dir / "report.html"
+            report.write_text("<html></html>", encoding="utf-8")
+            image_dir = Path(temporary) / "images/session"
+            image_dir.mkdir(parents=True)
+            image = image_dir / "plot.png"
+            image.write_bytes(b"image")
+            (image_dir / ".analysis-manifest.json").write_text("legacy", encoding="utf-8")
+            fingerprint = self._fingerprint(root)
+
+            path = write_success_manifest(
+                report_dir,
+                fingerprint,
+                IDENTITY,
+                extra_output_dirs=(image_dir,),
+            )
+            payload = json.loads(path.read_text(encoding="utf-8"))
+
+            self.assertIn("report.html", payload["output_files"])
+            self.assertIn(str(image.resolve()), payload["output_files"])
+            self.assertNotIn(str((image_dir / ".analysis-manifest.json").resolve()), payload["output_files"])
+            self.assertTrue(should_skip(path, fingerprint, IDENTITY))
+            image.unlink()
+            self.assertFalse(should_skip(path, fingerprint, IDENTITY))
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -250,6 +250,7 @@ def write_success_manifest(
     fingerprint: Fingerprint,
     identity: AnalysisIdentity,
     extra_output_paths: Iterable[str | Path] = (),
+    extra_output_dirs: Iterable[str | Path] = (),
 ) -> Path:
     """Atomically record a successful analysis and all existing output files."""
 
@@ -262,6 +263,14 @@ def write_success_manifest(
         for path in directory.rglob("*")
         if path.is_file() and path.resolve() != target.resolve()
     }
+    for extra_directory in map(Path, extra_output_dirs):
+        if not extra_directory.is_dir():
+            continue
+        output_paths.update(
+            path.resolve()
+            for path in extra_directory.rglob("*")
+            if path.is_file() and path.name != MANIFEST_FILENAME
+        )
     output_paths.update(
         Path(path).resolve() for path in extra_output_paths if Path(path).is_file()
     )

@@ -107,9 +107,16 @@ def _is_interactive_telemetry_path(relative_path: Path) -> bool:
 class SessionReport:
     """Collect graph outputs and write one self-contained HTML document."""
 
-    def __init__(self, session: Any, output_dir: str | Path):
+    def __init__(
+        self,
+        session: Any,
+        output_dir: str | Path,
+        *,
+        report_dir: str | Path | None = None,
+    ):
         self.session = session
         self.output_dir = Path(output_dir)
+        self.report_dir = Path(report_dir) if report_dir is not None else self.output_dir
         self._items: dict[str, ReportItem] = {}
         self._anchor_counts: dict[str, int] = {}
         self._token: Token[SessionReport | None] | None = None
@@ -200,7 +207,7 @@ class SessionReport:
         """Write an offline report and return its path."""
 
         self.scan_images(extra_paths)
-        target = Path(output_path) if output_path is not None else self.output_dir / "report.html"
+        target = Path(output_path) if output_path is not None else self.report_dir / "report.html"
         target.parent.mkdir(parents=True, exist_ok=True)
         items = self._ordered_items()
         plotly_js = _plotly_js()

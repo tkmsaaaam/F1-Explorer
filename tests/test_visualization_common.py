@@ -13,6 +13,7 @@ from visualizations.output import (
     save_matplotlib,
     save_plotly,
     session_output_dir,
+    session_report_dir,
 )
 from visualizations.style import driver_linestyle
 
@@ -34,6 +35,10 @@ class VisualizationCommon(unittest.TestCase):
         self.assertEqual(
             session_output_dir(session, "custom"),
             Path("custom/2025/7_Silverstone/FreePractice1"),
+        )
+        self.assertEqual(
+            session_report_dir(session),
+            Path("reports/2025/7_Silverstone/FreePractice1"),
         )
 
 
