@@ -53,6 +53,8 @@ class SessionReportTest(unittest.TestCase):
             self.assertIn("plotly_selected", html)
             self.assertIn("figure.layout.selectdirection = \"v\"", html)
             self.assertIn("const reverseYAxis", html)
+            self.assertIn("const trackMap", html)
+            self.assertIn("scrollZoom: trackMap", html)
             self.assertIn("const explicitYAxisRange", html)
             self.assertIn("reverseYAxis ? [Math.max(...values), Math.min(...values)]", html)
             self.assertIn('event["yaxis.autorange"] !== true', html)
@@ -99,7 +101,7 @@ class SessionReportTest(unittest.TestCase):
             html = report.write().read_text(encoding="utf-8")
             self.assertNotIn("laptime_by_timing.png", html)
 
-    def test_driver_track_images_are_collapsible_by_plot_type(self) -> None:
+    def test_driver_track_images_are_replaced_by_interactive_figures(self) -> None:
         with TemporaryDirectory() as temporary:
             output_dir = Path(temporary) / "Qualifying"
             for directory, filename in (
@@ -111,16 +113,26 @@ class SessionReportTest(unittest.TestCase):
                 path.parent.mkdir(parents=True, exist_ok=True)
                 path.write_bytes(b"placeholder")
 
+            speed_path = output_dir / "speed_on_track.png"
+            shift_path = output_dir / "shift_on_track.png"
+            speed_path.write_bytes(b"placeholder")
+            shift_path.write_bytes(b"placeholder")
+
             session = SimpleNamespace(
                 name="Qualifying",
                 event=SimpleNamespace(EventName="GP", Location="GP"),
             )
             report = SessionReport(session, output_dir)
+            figure = go.Figure(data=[go.Scatter(x=[0, 1], y=[0, 1])])
+            report.register_plotly(figure, speed_path)
+            report.register_plotly(figure, shift_path)
             html = report.write().read_text(encoding="utf-8")
 
-            self.assertEqual(html.count('<details class="figure-group">'), 2)
-            self.assertIn("Speed On Track (2 drivers)", html)
-            self.assertIn("Shift On Track (1 driver)", html)
+            self.assertNotIn('<details class="figure-group">', html)
+            self.assertIn('data-plotly-source="figure-data-telemetry-speed-on-track"', html)
+            self.assertIn('data-plotly-source="figure-data-telemetry-shift-on-track"', html)
+            self.assertNotIn("1_VER.png", html)
+            self.assertNotIn("11_PER.png", html)
             self.assertIn('id="telemetry"', html)
 
     def test_interactive_telemetry_replaces_static_category_images(self) -> None:

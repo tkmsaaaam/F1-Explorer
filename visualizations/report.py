@@ -86,20 +86,18 @@ def _title_for(relative_path: Path) -> str:
     return words.title() or relative_path.name
 
 
-def _collapsible_group_for(relative_path: Path) -> str | None:
-    """Return the track-image group name for driver-by-driver plots."""
-
-    parent = relative_path.parent.name.lower()
-    if parent in {"shift_on_track", "speed_on_track"}:
-        return parent
-    return None
-
-
 def _is_interactive_telemetry_path(relative_path: Path) -> bool:
     """Return whether a static telemetry image is replaced in the report."""
 
     return any(
-        part.lower() in {"brake", "speed_distance", "throttle", "time_distance_delta"}
+        part.lower() in {
+            "brake",
+            "shift_on_track",
+            "speed_distance",
+            "speed_on_track",
+            "throttle",
+            "time_distance_delta",
+        }
         for part in relative_path.parts[:-1]
     )
 
@@ -229,33 +227,20 @@ class SessionReport:
             section_anchor = _slug(section)
             nav.append(f'<a href="#{section_anchor}">{escape(section)}</a>')
             body.append(f'<section class="report-section" id="{section_anchor}"><h2>{escape(section)}</h2>')
-            groups: dict[str | None, list[ReportItem]] = {}
             for item in section_items:
-                groups.setdefault(_collapsible_group_for(self._relative(item.path)), []).append(item)
-            for group_name, group_items in groups.items():
-                if group_name is not None:
-                    group_title = _title_for(Path(group_name))
-                    driver_label = "driver" if len(group_items) == 1 else "drivers"
-                    body.append(
-                        f'<details class="figure-group"><summary>{escape(group_title)} '
-                        f'({len(group_items)} {driver_label})</summary><div class="figure-group-content">'
-                    )
-                for item in group_items:
-                    body.append(f'<article class="figure-card" id="{escape(item.anchor)}"><h3>{escape(item.title)}</h3>')
-                    if item.interactive:
-                        data_id = f"figure-data-{_slug(item.anchor)}"
-                        safe_json = item.figure_json.replace("<", "\\u003c") if item.figure_json else "{}"
-                        is_table = '"type":"table"' in item.figure_json
-                        kind = " table" if is_table else ""
-                        body.append(f'<div class="plotly-container{kind}" data-plotly-source="{escape(data_id)}"></div>')
-                        body.append(f'<script type="application/json" id="{escape(data_id)}">{safe_json}</script>')
-                    else:
-                        encoded = base64.b64encode(item.path.read_bytes()).decode("ascii")
-                        source_url = escape(item.path.as_uri(), quote=True)
-                        body.append(f'<img class="zoomable-image" loading="lazy" src="data:image/png;base64,{encoded}" data-image-path="{source_url}" alt="{escape(item.title)}" title="Click to open the image in a new tab">')
-                    body.append(f'<p class="source">{escape(item.path.name)}</p></article>')
-                if group_name is not None:
-                    body.append('</div></details>')
+                body.append(f'<article class="figure-card" id="{escape(item.anchor)}"><h3>{escape(item.title)}</h3>')
+                if item.interactive:
+                    data_id = f"figure-data-{_slug(item.anchor)}"
+                    safe_json = item.figure_json.replace("<", "\\u003c") if item.figure_json else "{}"
+                    is_table = '"type":"table"' in item.figure_json
+                    kind = " table" if is_table else ""
+                    body.append(f'<div class="plotly-container{kind}" data-plotly-source="{escape(data_id)}"></div>')
+                    body.append(f'<script type="application/json" id="{escape(data_id)}">{safe_json}</script>')
+                else:
+                    encoded = base64.b64encode(item.path.read_bytes()).decode("ascii")
+                    source_url = escape(item.path.as_uri(), quote=True)
+                    body.append(f'<img class="zoomable-image" loading="lazy" src="data:image/png;base64,{encoded}" data-image-path="{source_url}" alt="{escape(item.title)}" title="Click to open the image in a new tab">')
+                body.append(f'<p class="source">{escape(item.path.name)}</p></article>')
             body.append("</section>")
 
         html = f"""<!doctype html>
@@ -276,10 +261,6 @@ main {{ width: 100%; max-width: 1500px; margin: 0 auto; padding: 1rem 2rem 4rem;
 .figure-card {{ min-width: 0; max-width: 100%; overflow-x: hidden; scroll-margin-top: 4rem; margin: 1.4rem 0 2rem; padding: 1rem; background: white; border: 1px solid #e0e4e8; border-radius: 8px; box-shadow: 0 1px 3px #0000000d; }}
 .figure-card h3 {{ margin-top: 0; }}
 .figure-card img {{ display: block; width: auto; max-width: 100%; height: auto; }}
-.figure-group {{ margin: 1.4rem 0 2rem; }}
-.figure-group > summary {{ cursor: pointer; padding: .8rem 1rem; background: white; border: 1px solid #b8c4d1; border-radius: 8px; color: #145da0; font-weight: 700; list-style-position: inside; }}
-.figure-group[open] > summary {{ border-radius: 8px 8px 0 0; }}
-.figure-group-content {{ padding-top: .1rem; }}
 .zoomable-image {{ cursor: zoom-in; }}
 .plotly-container {{ min-height: 640px; height: 640px; width: 100%; max-width: 100%; overflow-x: hidden; }}
 .plotly-container.table {{ min-height: 900px; height: 900px; }}
@@ -297,23 +278,25 @@ main {{ width: 100%; max-width: 1500px; margin: 0 auto; padding: 1rem 2rem 4rem;
     const figure = JSON.parse(source.textContent);
     figure.layout = Object.assign({{}}, figure.layout || {{}});
     const table = Array.isArray(figure.data) && figure.data.some((trace) => trace.type === "table");
+    const trackMap = figure.layout.meta && figure.layout.meta.f1ExplorerKind === "trackMap";
     const minimumHeight = table ? 900 : 640;
     figure.layout.height = Math.max(Number(figure.layout.height) || 0, minimumHeight);
     figure.layout.autosize = true;
     const titleText = figure.layout.title && typeof figure.layout.title.text === "string" ? figure.layout.title.text : "";
-    const reverseYAxis = !table && figure.layout.yaxis && typeof figure.layout.yaxis === "object" &&
+    const reverseYAxis = !table && !trackMap && figure.layout.yaxis && typeof figure.layout.yaxis === "object" &&
       (figure.layout.yaxis.autorange === "reversed" || /lap time/i.test(titleText));
     const explicitYAxisRange = reverseYAxis && Array.isArray(figure.layout.yaxis.range) && figure.layout.yaxis.range.length === 2;
     if (reverseYAxis) {{
       figure.layout.yaxis = Object.assign({{}}, figure.layout.yaxis, explicitYAxisRange ? {{autorange: false}} : {{autorange: "reversed"}});
     }}
-    if (!table && figure.layout.yaxis && typeof figure.layout.yaxis === "object") {{
+    if (!table && !trackMap && figure.layout.yaxis && typeof figure.layout.yaxis === "object") {{
       figure.layout.yaxis = Object.assign({{}}, figure.layout.yaxis, {{
         rangeslider: Object.assign({{}}, figure.layout.yaxis.rangeslider || {{}}, {{visible: true}}),
       }});
       figure.layout.selectdirection = "v";
     }}
-    window.Plotly.newPlot(node, figure.data || [], figure.layout || {{}}, {{responsive: true, displaylogo: false}}).then(() => {{
+    window.Plotly.newPlot(node, figure.data || [], figure.layout || {{}}, {{responsive: true, displaylogo: false, scrollZoom: trackMap}}).then(() => {{
+      if (trackMap) return;
       const allYValues = (figure.data || []).flatMap((trace) => Array.isArray(trace.y) ? trace.y : [])
         .filter((value) => typeof value === "number" && Number.isFinite(value));
       node.on("plotly_selected", (event) => {{

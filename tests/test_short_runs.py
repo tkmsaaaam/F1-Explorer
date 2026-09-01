@@ -11,7 +11,11 @@ from matplotlib.collections import LineCollection
 import pandas as pd
 
 from visualizations.short_runs import plot_speed_on_track
-from visualizations.short_runs import _save_interactive_driver_telemetry
+from visualizations.short_runs import (
+    _gear_colorscale,
+    _save_interactive_driver_telemetry,
+    _save_interactive_track_map,
+)
 
 
 def test_speed_on_track_uses_colored_line_collection_and_vertical_colorbar() -> None:
@@ -37,7 +41,10 @@ def test_speed_on_track_uses_colored_line_collection_and_vertical_colorbar() -> 
         name="Qualifying",
     )
 
-    with patch("visualizations.short_runs.save_matplotlib") as save:
+    with (
+        patch("visualizations.short_runs.save_matplotlib") as save,
+        patch("visualizations.short_runs.save_plotly") as save_plotly,
+    ):
         plot_speed_on_track(session, MagicMock(), output_dir=Path("plots"))
 
     figure = save.call_args.args[0]
@@ -47,6 +54,57 @@ def test_speed_on_track_uses_colored_line_collection_and_vertical_colorbar() -> 
         assert figure.axes[1].get_ylabel() == "Speed"
     finally:
         plt.close(figure)
+    interactive = save_plotly.call_args.args[0]
+    assert [trace.name for trace in interactive.data] == ["VER"]
+    assert interactive.layout.meta["f1ExplorerKind"] == "trackMap"
+    assert save_plotly.call_args.args[1] == Path("plots/speed_on_track.png")
+
+
+def test_interactive_shift_map_driver_dropdown_uses_session_speed_order() -> None:
+    telemetry = pd.DataFrame(
+        {
+            "X": [0.0, 10.0, 20.0],
+            "Y": [0.0, 5.0, 0.0],
+            "nGear": [2, 4, 6],
+        }
+    )
+    track_data = {
+        "2": (SimpleNamespace(Driver="HAM"), telemetry),
+        "1": (SimpleNamespace(Driver="VER"), telemetry),
+    }
+
+    class QuickLaps:
+        empty = False
+        DriverNumber = pd.Series(["1", "2"])
+
+        def sort_values(self, by):
+            return self
+
+    session = SimpleNamespace(
+        laps=SimpleNamespace(pick_quicklaps=lambda: QuickLaps()),
+        event=SimpleNamespace(EventName="GP", year=2026),
+        name="Qualifying",
+    )
+
+    with patch("visualizations.short_runs.save_plotly") as save:
+        _save_interactive_track_map(
+            session,
+            MagicMock(),
+            track_data,
+            key="shift_on_track",
+            value_key="nGear",
+            value_label="Gear",
+            colorscale=_gear_colorscale(),
+            color_range=(0.5, 8.5),
+            colorbar_ticks=list(range(1, 9)),
+            output_dir=Path("plots"),
+        )
+
+    figure = save.call_args.args[0]
+    assert [trace.name for trace in figure.data] == ["VER", "HAM"]
+    assert [trace.visible for trace in figure.data] == [True, False]
+    assert [button.label for button in figure.layout.updatemenus[0].buttons] == ["VER", "HAM"]
+    assert save.call_args.args[1] == Path("plots/shift_on_track.png")
 
 
 def test_interactive_driver_telemetry_is_ordered_by_fastest_session_lap() -> None:

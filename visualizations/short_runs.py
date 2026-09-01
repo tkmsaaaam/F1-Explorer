@@ -326,12 +326,14 @@ def plot_gear_shift_on_track(session: Session, log: structlog.stdlib.BoundLogger
         session: 分析対象のセッション
         log: ロガー
     """
+    track_data = {}
     for driver_number in session.drivers:
         lap = session.laps.pick_drivers(driver_number).pick_fastest()
         if lap is None:
             continue
         fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
         tel = lap.get_telemetry()
+        track_data[str(driver_number)] = (lap, tel)
         x = np.array(tel.X.values)
         y = np.array(tel.Y.values)
 
@@ -350,6 +352,19 @@ def plot_gear_shift_on_track(session: Session, log: structlog.stdlib.BoundLogger
         cbar.set_ticklabels(np.arange(1, 9))
         output_path = resolve_output_dir(session, output_dir) / "shift_on_track" / f"{driver_number}_{lap.Driver}.png"
         save_matplotlib(fig, output_path, log)
+
+    _save_interactive_track_map(
+        session,
+        log,
+        track_data,
+        key="shift_on_track",
+        value_key="nGear",
+        value_label="Gear",
+        colorscale=_gear_colorscale(),
+        color_range=(0.5, 8.5),
+        colorbar_ticks=list(range(1, 9)),
+        output_dir=output_dir,
+    )
 
 
 @tracer.start_as_current_span("plot_speed_and_laptime")
@@ -484,12 +499,14 @@ def plot_speed_on_track(session: Session, log: structlog.stdlib.BoundLogger, *, 
         session: 分析対象のセッション
         log: ロガー
     """
+    track_data = {}
     for driver_number in session.drivers:
         lap = session.laps.pick_drivers(driver_number).pick_fastest()
         if lap is None:
             continue
         fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
         tel = lap.get_telemetry()
+        track_data[str(driver_number)] = (lap, tel)
         x = np.array(tel.X.values)
         y = np.array(tel.Y.values)
 
@@ -511,6 +528,17 @@ def plot_speed_on_track(session: Session, log: structlog.stdlib.BoundLogger, *, 
         fig.colorbar(mappable=lc_comp, label="Speed")
         output_path = resolve_output_dir(session, output_dir) / "speed_on_track" / f"{driver_number}_{lap.Driver}.png"
         save_matplotlib(fig, output_path, log)
+
+    _save_interactive_track_map(
+        session,
+        log,
+        track_data,
+        key="speed_on_track",
+        value_key="Speed",
+        value_label="Speed [km/h]",
+        colorscale="Plasma",
+        output_dir=output_dir,
+    )
 
 
 @tracer.start_as_current_span("plot_time_distance_comparison")
@@ -610,6 +638,141 @@ def _ordered_quicklap_drivers(session: Session) -> list[int]:
     if quicklaps.empty:
         return []
     return quicklaps.sort_values(by="LapTime").DriverNumber.unique().tolist()
+
+
+def _gear_colorscale() -> list[list[float | str]]:
+    """Return a stepped eight-color Plotly scale for discrete gears."""
+
+    colors = px.colors.qualitative.Plotly[:8]
+    scale: list[list[float | str]] = []
+    for index, color in enumerate(colors):
+        scale.append([index / len(colors), color])
+        scale.append([(index + 1) / len(colors), color])
+    return scale
+
+
+def _save_interactive_track_map(
+        session: Session,
+        log: structlog.stdlib.BoundLogger,
+        track_data,
+        *,
+        key: str,
+        value_key: str,
+        value_label: str,
+        colorscale,
+        color_range: tuple[float, float] | None = None,
+        colorbar_ticks: list[int] | None = None,
+        output_dir: str | Path | None = None,
+) -> None:
+    """Save one driver-selectable Plotly track map for the HTML report."""
+
+    if not track_data:
+        return
+    ordered_drivers = [
+        str(driver_number)
+        for driver_number in _ordered_quicklap_drivers(session)
+        if str(driver_number) in track_data
+    ]
+    ordered_drivers.extend(driver for driver in track_data if driver not in ordered_drivers)
+
+    traces = []
+    for driver_number in ordered_drivers:
+        lap, telemetry = track_data[driver_number]
+        x_data = np.asarray(telemetry.X, dtype=float)
+        y_data = np.asarray(telemetry.Y, dtype=float)
+        values = np.asarray(getattr(telemetry, value_key), dtype=float)
+        valid = np.isfinite(x_data) & np.isfinite(y_data) & np.isfinite(values)
+        if not valid.any():
+            continue
+        traces.append((driver_number, lap, x_data[valid], y_data[valid], values[valid]))
+    if not traces:
+        return
+
+    if color_range is None:
+        all_values = np.concatenate([trace[4] for trace in traces])
+        color_min, color_max = float(all_values.min()), float(all_values.max())
+        if color_min == color_max:
+            color_min -= 0.5
+            color_max += 0.5
+    else:
+        color_min, color_max = color_range
+
+    event = session.event
+    event_name = str(getattr(event, "EventName", getattr(event, "Location", "")))
+    plot_name = "Shift on Track" if key == "shift_on_track" else "Speed on Track"
+    figure = go.Figure()
+    for rank, (_, lap, x_data, y_data, values) in enumerate(traces):
+        colorbar = {"title": {"text": value_label}}
+        if colorbar_ticks is not None:
+            colorbar["tickvals"] = colorbar_ticks
+            colorbar["ticktext"] = [str(value) for value in colorbar_ticks]
+        figure.add_trace(go.Scattergl(
+            x=x_data,
+            y=y_data,
+            customdata=values,
+            mode="lines+markers",
+            name=str(lap.Driver),
+            visible=rank == 0,
+            showlegend=False,
+            line={"color": "rgba(80, 80, 80, 0.35)", "width": 1},
+            marker={
+                "color": values,
+                "colorscale": colorscale,
+                "cmin": color_min,
+                "cmax": color_max,
+                "size": 5,
+                "showscale": True,
+                "colorbar": colorbar,
+            },
+            hovertemplate=(
+                f"{lap.Driver}<br>{value_label}: %{{customdata:.0f}}<extra></extra>"
+            ),
+        ))
+
+    buttons = []
+    for selected, trace in enumerate(figure.data):
+        buttons.append({
+            "label": trace.name,
+            "method": "update",
+            "args": [
+                {"visible": [index == selected for index in range(len(figure.data))]},
+                {"title": f"{event_name} {session.name} — {plot_name} — {trace.name}"},
+            ],
+        })
+    figure.update_layout(
+        title=f"{event_name} {session.name} — {plot_name} — {figure.data[0].name}",
+        template="plotly_white",
+        meta={"f1ExplorerKind": "trackMap"},
+        updatemenus=[{
+            "buttons": buttons,
+            "direction": "down",
+            "active": 0,
+            "x": 0.11,
+            "xanchor": "left",
+            "y": 1.13,
+            "yanchor": "top",
+        }],
+        annotations=[{
+            "text": "Driver",
+            "showarrow": False,
+            "xref": "paper",
+            "yref": "paper",
+            "x": 0,
+            "xanchor": "left",
+            "y": 1.105,
+            "yanchor": "middle",
+        }],
+        margin={"l": 30, "r": 90, "t": 110, "b": 30},
+    )
+    figure.update_xaxes(visible=False)
+    figure.update_yaxes(visible=False, scaleanchor="x", scaleratio=1)
+    save_plotly(
+        figure,
+        resolve_output_dir(session, output_dir) / f"{key}.png",
+        log,
+        width=1920,
+        height=1080,
+    )
 
 
 def _plotly_driver_dash(year: int, driver_number: int) -> str:
