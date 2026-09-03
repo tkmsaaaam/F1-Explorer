@@ -82,7 +82,12 @@ def plot_laptime(
                 _save_laptime_sections(session, log, sections, output_dir)
                 return
 
-    table, heights = _make_laptime_table(session, session.laps, "Lap")
+    table, heights = _make_laptime_table(
+        session,
+        session.laps,
+        "Lap",
+        exclude_pit_laps=split_qualifying,
+    )
     fig = go.Figure(
         data=[table],
         layout=go.Layout(autosize=True, margin=go.layout.Margin(l=10, r=10, t=20, b=20, autoexpand=True)),
@@ -92,7 +97,16 @@ def plot_laptime(
                 width=1920, height=image_height)
 
 
-def _make_laptime_table(session: Session, laps: Laps, section_label: str) -> tuple[go.Table, list[int]]:
+def _make_laptime_table(
+        session: Session,
+        laps: Laps,
+        section_label: str,
+        *,
+        exclude_pit_laps: bool = False,
+) -> tuple[go.Table, list[int]]:
+    if exclude_pit_laps:
+        laps = _laps_without_pit_laps(laps)
+
     present_drivers = {str(driver_number) for driver_number in laps.DriverNumber.unique()}
     driver_numbers = [driver_number for driver_number in session.drivers if str(driver_number) in present_drivers]
     header = [f"{section_label} Lap"] + [
@@ -113,23 +127,31 @@ def _make_laptime_table(session: Session, laps: Laps, section_label: str) -> tup
         for row_index in range(len(driver_laps)):
             lap = driver_laps.iloc[row_index]
             lap_colors.append(constants.compound_color.get(lap.Compound, "#dddddd"))
+            stint_label = ""
+            if exclude_pit_laps:
+                stint_number = int(lap.Stint) if pandas.notna(lap.Stint) else "?"
+                stint_label = f"<br>(S{stint_number})"
             if pandas.isna(lap.LapTime):
                 values.append("")
                 continue
             if pandas.isna(lap.PitInTime) and pandas.isna(lap.PitOutTime):
-                values.append(str(lap.LapTime.total_seconds()))
+                values.append(str(lap.LapTime.total_seconds()) + stint_label)
             elif pandas.isna(lap.PitOutTime):
                 pit_in = lap.LapStartTime.total_seconds() + lap.LapTime.total_seconds() - lap.PitInTime.total_seconds()
                 values.append(
-                    f"{lap.LapTime.total_seconds()}<br>({pit_in:.3f}<br>{lap.LapTime.total_seconds() - pit_in:.3f})")
+                    f"{lap.LapTime.total_seconds()}<br>({pit_in:.3f}<br>{lap.LapTime.total_seconds() - pit_in:.3f})"
+                    + stint_label)
             elif pandas.isna(lap.PitInTime):
                 pit_out = lap.PitOutTime.total_seconds() - lap.LapStartTime.total_seconds()
                 values.append(
-                    f"{lap.LapTime.total_seconds()}<br>({pit_out:.3f}<br>{lap.LapTime.total_seconds() - pit_out:.3f})")
+                    f"{lap.LapTime.total_seconds()}<br>({pit_out:.3f}<br>{lap.LapTime.total_seconds() - pit_out:.3f})"
+                    + stint_label)
             else:
                 pit_in = lap.LapStartTime.total_seconds() + lap.LapTime.total_seconds() - lap.PitInTime.total_seconds()
                 pit_out = lap.PitOutTime.total_seconds() - lap.LapStartTime.total_seconds()
-                values.append(f"{lap.LapTime.total_seconds()}<br>({pit_in:.3f}<br>/{pit_out:.3f})")
+                values.append(
+                    f"{lap.LapTime.total_seconds()}<br>({pit_in:.3f}<br>/{pit_out:.3f})"
+                    + stint_label)
         cells.append(values)
         colors.append(lap_colors)
 
@@ -151,10 +173,16 @@ def _make_laptime_table(session: Session, laps: Laps, section_label: str) -> tup
     ), heights
 
 
+def _laps_without_pit_laps(laps: Laps) -> Laps:
+    """Return the timed laps shown in qualifying lap-time visualizations."""
+
+    return laps[laps.PitOutTime.isna() & laps.PitInTime.isna()]
+
+
 def _save_laptime_sections(session: Session, log: structlog.stdlib.BoundLogger, sections: list[tuple[str, Laps]],
                             output_dir: str | Path | None) -> None:
     prepared = [
-        (label, *_make_laptime_table(session, laps, label))
+        (label, *_make_laptime_table(session, laps, label, exclude_pit_laps=True))
         for label, laps in sections
     ]
     row_heights = [max(320, sum(heights) + 100) for _, _, heights in prepared]
@@ -343,7 +371,13 @@ def _make_interactive_laptime_by_lap_number(session: Session) -> go.Figure:
 
 
 @tracer.start_as_current_span("plot_laptime_by_timing")
-def plot_laptime_by_timing(session: Session, log: structlog.stdlib.BoundLogger, *, output_dir: str | Path | None = None):
+def plot_laptime_by_timing(
+        session: Session,
+        log: structlog.stdlib.BoundLogger,
+        *,
+        output_dir: str | Path | None = None,
+        exclude_pit_laps: bool = False,
+):
     """
     y = ラップタイム
     x = 時間
@@ -351,29 +385,37 @@ def plot_laptime_by_timing(session: Session, log: structlog.stdlib.BoundLogger, 
         session: 分析対象のセッション
         log: ロガー
     """
+    laps = _laps_without_pit_laps(session.laps) if exclude_pit_laps else session.laps
     fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
-    grouped = session.laps.groupby(['DriverNumber'])
-    for _, stint_laps in grouped:
-        if stint_laps.empty:
+    grouped = laps.groupby(['DriverNumber'])
+    for _, driver_laps in grouped:
+        if driver_laps.empty:
             continue
-        team = stint_laps.Team.iloc[0]
+        team = driver_laps.Team.iloc[0]
         color = 'white' if team == '' else fastf1.plotting.get_team_color(team, session)
-        stint_laps = stint_laps.sort_values(by='LapNumber')
-        lap_times = stint_laps.LapTime.dt.total_seconds().tolist()
-        if not stint_laps.LapStartDate.values.size:
-            continue
-        d: datetime64 = stint_laps.LapStartDate.values[0]
-        if not pandas.isna(d):
-            lap_starts = stint_laps.LapStartDate.values
-        else:
-            lap_starts = stint_laps.LapStartTime.values
-        if not lap_times or not lap_starts.size:
-            continue
-        ax.plot(lap_starts, lap_times, color=color,
+        driver_laps = driver_laps.sort_values(by='LapNumber')
+        show_label = True
+        for _, stint_laps in driver_laps.groupby('Stint', sort=False, dropna=False):
+            lap_times = stint_laps.LapTime.dt.total_seconds().tolist()
+            if not stint_laps.LapStartDate.values.size:
+                continue
+            d: datetime64 = stint_laps.LapStartDate.values[0]
+            if not pandas.isna(d):
+                lap_starts = stint_laps.LapStartDate.values
+            else:
+                lap_starts = stint_laps.LapStartTime.values
+            if not lap_times or not lap_starts.size:
+                continue
+            ax.plot(
+                lap_starts,
+                lap_times,
+                color=color,
                 linestyle=driver_linestyle(session.event.year, int(stint_laps.DriverNumber.iloc[0])),
-                label=stint_laps.Driver.iloc[0])
+                label=stint_laps.Driver.iloc[0] if show_label else None,
+            )
+            show_label = False
     # noinspection PyUnresolvedReferences
-    minimum = session.laps.LapTime.min().seconds
+    minimum = laps.LapTime.min().seconds
     ax.set_ylim(top=minimum, bottom=minimum * 1.25)
     output_path = resolve_output_dir(session, output_dir) / "laptime_by_timing.png"
     ax.legend(fontsize='small')
@@ -381,14 +423,16 @@ def plot_laptime_by_timing(session: Session, log: structlog.stdlib.BoundLogger, 
     save_matplotlib(fig, output_path, log)
     report = current_report()
     if report is not None:
-        report.register_plotly(_make_interactive_laptime_by_timing(session), output_path)
+        report.register_plotly(_make_interactive_laptime_by_timing(session, laps), output_path)
 
 
-def _make_interactive_laptime_by_timing(session: Session) -> go.Figure:
+def _make_interactive_laptime_by_timing(session: Session, laps: Laps | None = None) -> go.Figure:
     """Build an interactive time-axis counterpart to the static plot."""
+    if laps is None:
+        laps = session.laps
     fig = go.Figure()
     ranks = driver_order(session)
-    groups = sorted(session.laps.groupby("DriverNumber"), key=lambda item: driver_sort_key(item[0], ranks))
+    groups = sorted(laps.groupby("DriverNumber"), key=lambda item: driver_sort_key(item[0], ranks))
     for driver_number, driver_laps in groups:
         driver_laps = driver_laps.sort_values("LapNumber").dropna(subset=["LapTime"])
         if driver_laps.empty:
@@ -399,15 +443,25 @@ def _make_interactive_laptime_by_timing(session: Session) -> go.Figure:
         else:
             starts = starts.fillna(driver_laps["LapStartTime"])
         first = starts.iloc[0]
-        x = pandas.to_timedelta(starts - first).dt.total_seconds().tolist()
+        elapsed = pandas.to_timedelta(starts - first).dt.total_seconds().tolist()
         driver = str(driver_laps.Driver.iloc[0])
-        customdata = [
-            [int(row.LapNumber), str(row.Compound), row.TyreLife, row.Stint]
-            for row in driver_laps.itertuples()
-        ]
+        x = []
+        y = []
+        customdata = []
+        previous_stint = object()
+        for lap_elapsed, row in zip(elapsed, driver_laps.itertuples()):
+            stint = None if pandas.isna(row.Stint) else row.Stint
+            if x and stint != previous_stint:
+                x.append(None)
+                y.append(None)
+                customdata.append([None, None, None, None])
+            x.append(lap_elapsed)
+            y.append(row.LapTime.total_seconds())
+            customdata.append([int(row.LapNumber), str(row.Compound), row.TyreLife, row.Stint])
+            previous_stint = stint
         fig.add_trace(go.Scatter(
             x=x,
-            y=driver_laps.LapTime.dt.total_seconds().tolist(),
+            y=y,
             mode="lines+markers",
             name=driver,
             legendrank=ranks.get(str(driver_number), 1_000_000),

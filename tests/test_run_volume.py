@@ -4,7 +4,12 @@ from unittest.mock import MagicMock, patch
 import pandas
 from fastf1.core import Laps
 
-from visualizations.run_volume import _make_interactive_laptime_by_lap_number, plot_laptime
+from visualizations.run_volume import (
+    _laps_without_pit_laps,
+    _make_interactive_laptime_by_lap_number,
+    _make_interactive_laptime_by_timing,
+    plot_laptime,
+)
 
 
 def _laps(driver_numbers: list[str], lap_numbers: list[int]) -> Laps:
@@ -13,10 +18,14 @@ def _laps(driver_numbers: list[str], lap_numbers: list[int]) -> Laps:
         "DriverNumber": driver_numbers,
         "LapNumber": lap_numbers,
         "LapTime": pandas.to_timedelta([f"{80 + index}s" for index in range(count)]),
+        "Driver": driver_numbers,
         "Compound": ["SOFT"] * count,
-        "PitInTime": [pandas.NaT] * count,
-        "PitOutTime": [pandas.NaT] * count,
+        "TyreLife": list(range(1, count + 1)),
+        "Stint": [1] * count,
+        "PitInTime": pandas.to_timedelta([None] * count),
+        "PitOutTime": pandas.to_timedelta([None] * count),
         "LapStartTime": pandas.to_timedelta([f"{index * 90}s" for index in range(count)]),
+        "LapStartDate": pandas.to_datetime([f"2026-08-23 13:{index:02d}:00" for index in range(count)]),
     }))
 
 
@@ -58,6 +67,48 @@ def test_sprint_qualifying_uses_sq_section_labels():
         plot_laptime(session, MagicMock(), split_qualifying=True, output_dir="test-output")
 
     assert [trace.header.values[0] for trace in save.call_args.args[0].data] == ["SQ1 Lap", "SQ2 Lap", "SQ3 Lap"]
+
+
+def test_qualifying_laptime_table_excludes_pit_laps_and_packs_remaining_laps():
+    q1 = _laps(
+        ["1"] * 6 + ["16"] * 6,
+        [1, 2, 3, 4, 5, 6] * 2,
+    )
+    q1.loc[q1.index[[0, 4, 6, 10]], "PitOutTime"] = pandas.to_timedelta([10, 20, 30, 40], unit="s")
+    q1.loc[q1.index[[3, 9]], "PitInTime"] = pandas.to_timedelta([250, 260], unit="s")
+    q1.loc[q1.index[[4, 5, 10, 11]], "Stint"] = 2
+    session_laps = MagicMock()
+    session_laps.split_qualifying_sessions.return_value = [q1]
+    abbreviations = {"1": "VER", "16": "LEC"}
+    session = SimpleNamespace(
+        name="Qualifying",
+        drivers=["1", "16"],
+        laps=session_laps,
+        get_driver=lambda driver: SimpleNamespace(Abbreviation=abbreviations[str(driver)]),
+    )
+
+    with patch("visualizations.run_volume.save_plotly") as save:
+        plot_laptime(session, MagicMock(), split_qualifying=True, output_dir="test-output")
+
+    table = save.call_args.args[0].data[0]
+    assert list(table.cells.values[0]) == ["1", "2", "3"]
+    assert list(table.cells.values[1]) == ["81.0<br>(S1)", "82.0<br>(S1)", "85.0<br>(S2)"]
+    assert list(table.cells.values[2]) == ["87.0<br>(S1)", "88.0<br>(S1)", "91.0<br>(S2)"]
+
+
+def test_qualifying_laptime_by_timing_uses_table_laps_and_breaks_lines_between_stints():
+    laps = _laps(["1"] * 6, [1, 2, 3, 4, 5, 6])
+    laps.loc[laps.index[[0, 4]], "PitOutTime"] = pandas.to_timedelta([10, 20], unit="s")
+    laps.loc[laps.index[3], "PitInTime"] = pandas.to_timedelta(250, unit="s")
+    laps.loc[laps.index[[4, 5]], "Stint"] = 2
+    session = SimpleNamespace(laps=laps, results=pandas.DataFrame())
+
+    displayed_laps = _laps_without_pit_laps(laps)
+    figure = _make_interactive_laptime_by_timing(session, displayed_laps)
+
+    assert list(displayed_laps.LapNumber) == [2, 3, 6]
+    assert list(figure.data[0].y) == [81.0, 82.0, None, 85.0]
+    assert [row[0] for row in figure.data[0].customdata] == [2, 3, None, 6]
 
 
 def _race_session(name: str) -> SimpleNamespace:
