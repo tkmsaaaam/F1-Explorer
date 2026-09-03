@@ -2,13 +2,13 @@ from pathlib import Path
 from typing import cast
 
 import fastf1.plotting
+import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
 import numpy
 import pandas
 import plotly.graph_objects as go
 import structlog
 from fastf1.core import Laps, Session
-from numpy import datetime64
 from plotly.subplots import make_subplots
 # noinspection PyPackageRequirements
 from opentelemetry import trace
@@ -177,6 +177,17 @@ def _laps_without_pit_laps(laps: Laps) -> Laps:
     """Return the timed laps shown in qualifying lap-time visualizations."""
 
     return laps[laps.PitOutTime.isna() & laps.PitInTime.isna()]
+
+
+def _lap_start_dates(session: Session, laps: Laps) -> pandas.Series:
+    """Return absolute lap-start timestamps, filling from session time when needed."""
+
+    starts = pandas.to_datetime(laps["LapStartDate"], errors="coerce")
+    session_start = getattr(session, "t0_date", pandas.NaT)
+    if pandas.notna(session_start):
+        fallback = pandas.Timestamp(session_start) + laps["LapStartTime"]
+        starts = starts.fillna(fallback)
+    return starts
 
 
 def _save_laptime_sections(session: Session, log: structlog.stdlib.BoundLogger, sections: list[tuple[str, Laps]],
@@ -393,17 +404,12 @@ def plot_laptime_by_timing(
             continue
         team = driver_laps.Team.iloc[0]
         color = 'white' if team == '' else fastf1.plotting.get_team_color(team, session)
-        driver_laps = driver_laps.sort_values(by='LapNumber')
+        driver_laps = driver_laps.sort_values(by='LapNumber').copy()
+        driver_laps['_LapStartDate'] = _lap_start_dates(session, driver_laps)
         show_label = True
         for _, stint_laps in driver_laps.groupby('Stint', sort=False, dropna=False):
             lap_times = stint_laps.LapTime.dt.total_seconds().tolist()
-            if not stint_laps.LapStartDate.values.size:
-                continue
-            d: datetime64 = stint_laps.LapStartDate.values[0]
-            if not pandas.isna(d):
-                lap_starts = stint_laps.LapStartDate.values
-            else:
-                lap_starts = stint_laps.LapStartTime.values
+            lap_starts = stint_laps['_LapStartDate'].values
             if not lap_times or not lap_starts.size:
                 continue
             ax.plot(
@@ -417,6 +423,7 @@ def plot_laptime_by_timing(
     # noinspection PyUnresolvedReferences
     minimum = laps.LapTime.min().seconds
     ax.set_ylim(top=minimum, bottom=minimum * 1.25)
+    ax.xaxis.set_major_formatter(mdates.DateFormatter('%H:%M'))
     output_path = resolve_output_dir(session, output_dir) / "laptime_by_timing.png"
     ax.legend(fontsize='small')
     ax.grid(True)
@@ -437,25 +444,19 @@ def _make_interactive_laptime_by_timing(session: Session, laps: Laps | None = No
         driver_laps = driver_laps.sort_values("LapNumber").dropna(subset=["LapTime"])
         if driver_laps.empty:
             continue
-        starts = driver_laps["LapStartDate"]
-        if starts.isna().all():
-            starts = driver_laps["LapStartTime"]
-        else:
-            starts = starts.fillna(driver_laps["LapStartTime"])
-        first = starts.iloc[0]
-        elapsed = pandas.to_timedelta(starts - first).dt.total_seconds().tolist()
+        starts = _lap_start_dates(session, driver_laps).tolist()
         driver = str(driver_laps.Driver.iloc[0])
         x = []
         y = []
         customdata = []
         previous_stint = object()
-        for lap_elapsed, row in zip(elapsed, driver_laps.itertuples()):
+        for lap_start, row in zip(starts, driver_laps.itertuples()):
             stint = None if pandas.isna(row.Stint) else row.Stint
             if x and stint != previous_stint:
                 x.append(None)
                 y.append(None)
                 customdata.append([None, None, None, None])
-            x.append(lap_elapsed)
+            x.append(lap_start)
             y.append(row.LapTime.total_seconds())
             customdata.append([int(row.LapNumber), str(row.Compound), row.TyreLife, row.Stint])
             previous_stint = stint
@@ -467,17 +468,17 @@ def _make_interactive_laptime_by_timing(session: Session, laps: Laps | None = No
             legendrank=ranks.get(str(driver_number), 1_000_000),
             customdata=customdata,
             hovertemplate=(
-                "Driver: %{fullData.name}<br>Elapsed: %{x:.1f}s<br>Time: %{y:.3f}s"
+                "Driver: %{fullData.name}<br>Start: %{x|%H:%M}<br>Time: %{y:.3f}s"
                 "<br>Lap: %{customdata[0]}<br>Compound: %{customdata[1]}"
                 "<br>Tyre life: %{customdata[2]}<br>Stint: %{customdata[3]}<extra></extra>"
             ),
         ))
     fig.update_layout(
         title="Lap Time by Session Time (interactive)",
-        xaxis_title="Elapsed Session Time [s]",
+        xaxis_title="Time",
         yaxis_title="Lap Time [s]",
         yaxis_autorange="reversed",
-        xaxis=dict(rangeslider=dict(visible=True)),
+        xaxis=dict(tickformat="%H:%M", rangeslider=dict(visible=True)),
         hovermode="closest",
         legend_title="Driver (click to toggle)",
         margin=dict(l=60, r=20, t=60, b=50),

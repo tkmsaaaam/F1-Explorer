@@ -107,8 +107,15 @@ def test_qualifying_laptime_by_timing_uses_table_laps_and_breaks_lines_between_s
     figure = _make_interactive_laptime_by_timing(session, displayed_laps)
 
     assert list(displayed_laps.LapNumber) == [2, 3, 6]
+    assert list(figure.data[0].x) == [
+        pandas.Timestamp("2026-08-23 13:01:00"),
+        pandas.Timestamp("2026-08-23 13:02:00"),
+        None,
+        pandas.Timestamp("2026-08-23 13:05:00"),
+    ]
     assert list(figure.data[0].y) == [81.0, 82.0, None, 85.0]
     assert [row[0] for row in figure.data[0].customdata] == [2, 3, None, 6]
+    assert figure.layout.xaxis.tickformat == "%H:%M"
 
 
 def _race_session(name: str) -> SimpleNamespace:
