@@ -46,7 +46,7 @@ def execute(session: Session, log: structlog.stdlib.BoundLogger, images_path: st
     positions(log, f"{images_path}/position.png", session, driver_laps_set)
     speed_first_10s(log, f"{images_path}/speed_first_10s.png", session)
     speed_until_turn1(log, f"{images_path}/speed_until_turn1.png", session)
-    tyres(log, f"{images_path}/tyres.png", driver_laps_set)
+    tyres(log, f"{images_path}/tyres.png", session.laps)
     write_messages(session, logs_path)
     write_track_status(session, logs_path)
     try:
@@ -449,52 +449,109 @@ def speed_until_turn1(log: structlog.stdlib.BoundLogger, filepath: str, session:
 
 
 @tracer.start_as_current_span("tyres")
-def tyres(log: structlog.stdlib.BoundLogger, filepath: str, lap_logs: list[DriverLaps]):
+def tyres(log: structlog.stdlib.BoundLogger, filepath: str, laps: Laps):
     """x = ラップ番号, y = 使用タイヤのドライバーごとの推移
     Args:
         log: ロガー
         filepath:
-        lap_logs: ドライバーごとのラップ
+        laps: セッションの全ラップ
     """
     fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
-    sorted_lap_logs = sorted(
-        lap_logs,
-        key=lambda dl: (
-            -len(dl.get_laps()),
-            min([l.get_position() for l in dl.get_laps().values()] if dl.get_laps() else [float('inf')])
-        )
-    )
-    y = 0
-    for lap_log in sorted_lap_logs:
-        x = sorted(lap_log.get_laps().keys())
-        start = 0
-        for i in x:
-            lap = lap_log.get_laps().get(i)
-            if lap is None:
-                continue
-            if not lap.get_pit_out() and i != max(x):
-                continue
-            j = i - 1
-            if j < 1:
-                continue
-            previous = lap_log.get_laps().get(j)
-            if previous is None:
-                continue
-            ax.barh(y=y,
-                    width=j - start,
-                    left=start,
-                    color=constants.compound_color.get(previous.get_tyre().get_compound(), 'gray'),
-                    edgecolor='orange' if previous.get_tyre().get_new() else 'gray'
-                    )
-            start = j
-        y += 1
-    ax.set_yticks(range(len(sorted_lap_logs)))
-    ax.set_yticklabels([str(driver.get_driver().get_number()) for driver in sorted_lap_logs])
+    driver_laps = []
+    for driver_number, grouped_laps in laps.groupby('DriverNumber'):
+        grouped_laps = grouped_laps.dropna(subset=['LapNumber']).sort_values('LapNumber')
+        grouped_laps = grouped_laps.drop_duplicates(subset=['LapNumber'], keep='last')
+        if grouped_laps.empty:
+            continue
+        positions = grouped_laps.Position.dropna()
+        final_position = float(positions.iloc[-1]) if not positions.empty else float('inf')
+        driver_laps.append((str(driver_number), grouped_laps, final_position))
+    driver_laps.sort(key=lambda item: (-int(item[1].LapNumber.max()), item[2], item[0]))
+
+    max_lap = 0
+    for y, (_, grouped_laps, _) in enumerate(driver_laps):
+        previous_stint = object()
+        for lap in grouped_laps.itertuples():
+            lap_number = int(lap.LapNumber)
+            max_lap = max(max_lap, lap_number)
+            compound_color = constants.compound_color.get(str(lap.Compound).upper(), 'gray')
+            rgb = mpl.colors.to_rgb(compound_color)
+            luminance = 0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2]
+            annotation_color = (0, 0, 0, 0.50) if luminance > 0.55 else (1, 1, 1, 0.72)
+            boundary_color = '#222222' if luminance > 0.55 else '#f2f2f2'
+
+            stint = None if pandas.isna(lap.Stint) else lap.Stint
+            stint_start = previous_stint != stint
+            previous_stint = stint
+            tyre_age = _format_tyre_age(lap.TyreLife)
+            label = tyre_age
+            if stint_start:
+                if pandas.isna(lap.FreshTyre):
+                    tyre_state = '?'
+                else:
+                    tyre_state = 'N' if bool(lap.FreshTyre) else 'U'
+                label = f"{tyre_age} {tyre_state}"
+
+            ax.barh(
+                y=y,
+                width=1,
+                left=lap_number - 0.5,
+                height=0.78,
+                color=compound_color,
+                edgecolor=(0, 0, 0, 0.22),
+                linewidth=0.35,
+                zorder=2,
+            )
+            ax.text(
+                lap_number,
+                y,
+                label,
+                ha='center',
+                va='center',
+                fontsize=5.5,
+                color=annotation_color,
+                zorder=4,
+            )
+            if stint_start:
+                ax.vlines(
+                    lap_number - 0.5,
+                    y - 0.39,
+                    y + 0.39,
+                    color=boundary_color,
+                    linewidth=2.2,
+                    zorder=3,
+                )
+
+    ax.set_yticks(range(len(driver_laps)))
+    ax.set_yticklabels([driver_number for driver_number, _, _ in driver_laps])
+    if max_lap:
+        ax.set_xlim(0.5, max_lap + 0.5)
+    ax.set_xlabel('Lap')
+    ax.invert_yaxis()
     legend_elements = [mpl.patches.Patch(facecolor=color, edgecolor='black', label=compound)
                        for compound, color in constants.compound_color.items()]
-    ax.legend(handles=legend_elements, title='Compound', loc='upper right', fontsize='small')
-    ax.grid(True)
+    legend_elements.extend([
+        mpl.lines.Line2D([0], [0], color='#222222', linewidth=2.2, label='Stint start / tyre change'),
+        mpl.lines.Line2D([], [], color='none', label='Number: tyre age; N: new; U: used'),
+    ])
+    ax.legend(
+        handles=legend_elements,
+        title='Compound',
+        loc='upper center',
+        bbox_to_anchor=(0.5, -0.10),
+        ncol=4,
+        fontsize='small',
+    )
+    ax.set_axisbelow(True)
+    ax.grid(True, axis='x', alpha=0.25)
     save_matplotlib(fig, filepath, log)
+
+
+def _format_tyre_age(value: object) -> str:
+    if pandas.isna(value):
+        return '?'
+    age = float(value)
+    return str(int(age)) if age.is_integer() else f"{age:g}"
 
 
 @tracer.start_as_current_span("write_messages")

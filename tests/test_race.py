@@ -1,9 +1,11 @@
 import unittest
+from unittest.mock import MagicMock, patch
 
+import matplotlib.pyplot as plt
 import pandas
 from fastf1.core import Laps
 
-from visualizations.race import make_driver_laps_set, make_lap_start_by_position_by_number, make_top_time_map
+from visualizations.race import make_driver_laps_set, make_lap_start_by_position_by_number, make_top_time_map, tyres
 
 
 class Race(unittest.TestCase):
@@ -147,6 +149,27 @@ class Race(unittest.TestCase):
         self.assertEqual(2, len(result))
         self.assertEqual(pandas.to_datetime("2026-01-01 00:00:00"), result[1])
         self.assertEqual(pandas.to_datetime("2026-01-01 00:01:23"), result[2])
+
+    def test_tyre_chart_marks_stint_changes_and_labels_age_and_condition(self):
+        laps = Laps(pandas.DataFrame({
+            "DriverNumber": ["1"] * 5,
+            "LapNumber": [1, 2, 3, 4, 5],
+            "Position": [1] * 5,
+            "Compound": ["SOFT"] * 5,
+            "Stint": [1, 1, 1, 2, 2],
+            "TyreLife": [1, 2, 3, 5, 6],
+            "FreshTyre": [True, True, True, False, False],
+        }))
+
+        with patch("visualizations.race.save_matplotlib") as save:
+            tyres(MagicMock(), "test-output/tyres.png", laps)
+
+        figure = save.call_args.args[0]
+        axis = figure.axes[0]
+        self.assertEqual([text.get_text() for text in axis.texts], ["1 N", "2", "3", "5 U", "6"])
+        self.assertEqual(5, len(axis.patches))
+        self.assertEqual(2, len(axis.collections))
+        plt.close(figure)
 
 
 if __name__ == '__main__':
