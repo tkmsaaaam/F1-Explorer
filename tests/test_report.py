@@ -53,6 +53,7 @@ class SessionReportTest(unittest.TestCase):
             self.assertIn("plotly_selected", html)
             self.assertIn("figure.layout.selectdirection = \"v\"", html)
             self.assertIn("const reverseYAxis", html)
+            self.assertIn("const descendingYAxisRange", html)
             self.assertIn("const trackMap", html)
             self.assertIn("scrollZoom: trackMap", html)
             self.assertIn("const explicitYAxisRange", html)

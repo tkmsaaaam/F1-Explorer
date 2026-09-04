@@ -284,29 +284,43 @@ def gap_to_ahead_graph(log: structlog.stdlib.BoundLogger, filepath: str, filenam
         lap_logs: ドライバーごとのラップ
         position_logs: ラップごとのポジション
     """
-    fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
-    for driver_laps in lap_logs:
-        gap_series = calculate_gap_to_ahead(driver_laps, position_logs)
-        x = [lap_number for lap_number, _ in gap_series]
-        y = [gap for _, gap in gap_series]
-        line_style = driver_linestyle(session.event.year, driver_laps.get_driver().get_number())
-        ax.plot(x, y, color=fastf1.plotting.get_team_color(driver_laps.get_driver().get_team_name(), session),
-                label=driver_laps.get_driver().get_name(),
-                linestyle=line_style, linewidth=0.5)
-    ax.legend(fontsize='small')
-    ax.set_ylim(top=0, bottom=30)
-    ax.grid(True)
+    def make_figure(y_max: int) -> go.Figure:
+        fig = go.Figure()
+        sorted_lap_logs = sorted(
+            lap_logs,
+            key=lambda item: item.get_laps()[max(item.get_laps())].get_position(),
+        )
+        for driver_laps in sorted_lap_logs:
+            gap_series = calculate_gap_to_ahead(driver_laps, position_logs)
+            driver = driver_laps.get_driver()
+            line_style = driver_linestyle(session.event.year, driver.get_number())
+            fig.add_trace(go.Scatter(
+                x=[lap_number for lap_number, _ in gap_series],
+                y=[gap for _, gap in gap_series],
+                mode="lines",
+                name=driver.get_name(),
+                line={
+                    "color": fastf1.plotting.get_team_color(driver.get_team_name(), session),
+                    "dash": "dash" if line_style == "dashed" else "solid",
+                    "width": 1.5,
+                },
+                hovertemplate="Lap %{x}<br>Gap %{y:.3f} s<extra>%{fullData.name}</extra>",
+            ))
+        fig.update_layout(
+            title="Gap Ahead",
+            xaxis={"title": "Lap Number", "gridcolor": "#d9d9d9"},
+            yaxis={"title": "Gap (s)", "range": [y_max, 0], "gridcolor": "#d9d9d9"},
+            hovermode="x unified",
+            legend={"traceorder": "normal"},
+            margin={"l": 70, "r": 30, "t": 60, "b": 60},
+        )
+        return fig
+
     output_path = f"{filepath}/{filename}.png"
-    os.makedirs(os.path.dirname(output_path), exist_ok=True)
-    fig.savefig(output_path, bbox_inches='tight')
-    log.info(f"Saved plot to {output_path}")
+    save_plotly(make_figure(30), output_path, log, width=1920, height=1080)
     if r is not None:
-        ax.set_ylim(top=0, bottom=r)
         output_path = f"{filepath}/{filename}_{r}.png"
-        os.makedirs(os.path.dirname(output_path), exist_ok=True)
-        fig.savefig(output_path, bbox_inches='tight')
-        log.info(f"Saved plot to {output_path}")
-    plt.close(fig)
+        save_plotly(make_figure(r), output_path, log, width=1920, height=1080)
 
 
 @tracer.start_as_current_span("gap_to_top")
@@ -322,30 +336,44 @@ def gap_to_top_graph(log: structlog.stdlib.BoundLogger, filepath: str, filename:
         lap_logs: ドライバーごとのラップ
     """
     top_time_map = make_top_time_map(session.laps)
-    fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
-    for lap_log in lap_logs:
-        color = fastf1.plotting.get_team_color(lap_log.get_driver().get_team_name(), session)
-        gap_series = calculate_gap_to_leader(lap_log, top_time_map)
-        x = [lap_number for lap_number, _ in gap_series]
-        y = [gap for _, gap in gap_series]
-        line_style = driver_linestyle(session.event.year, lap_log.get_driver().get_number())
-        ax.plot(x, y, linewidth=0.5, color=color, label=lap_log.get_driver().get_name(), linestyle=line_style)
-    ax.legend(fontsize='small')
-    ax.invert_yaxis()
-    ax.set_ylim(top=0, bottom=60)
-    ax.grid(True)
+
+    def make_figure(y_max: int) -> go.Figure:
+        fig = go.Figure()
+        sorted_lap_logs = sorted(
+            lap_logs,
+            key=lambda item: item.get_laps()[max(item.get_laps())].get_position(),
+        )
+        for lap_log in sorted_lap_logs:
+            driver = lap_log.get_driver()
+            gap_series = calculate_gap_to_leader(lap_log, top_time_map)
+            line_style = driver_linestyle(session.event.year, driver.get_number())
+            fig.add_trace(go.Scatter(
+                x=[lap_number for lap_number, _ in gap_series],
+                y=[gap for _, gap in gap_series],
+                mode="lines",
+                name=driver.get_name(),
+                line={
+                    "color": fastf1.plotting.get_team_color(driver.get_team_name(), session),
+                    "dash": "dash" if line_style == "dashed" else "solid",
+                    "width": 1.5,
+                },
+                hovertemplate="Lap %{x}<br>Gap %{y:.3f} s<extra>%{fullData.name}</extra>",
+            ))
+        fig.update_layout(
+            title="Gap Top",
+            xaxis={"title": "Lap Number", "gridcolor": "#d9d9d9"},
+            yaxis={"title": "Gap (s)", "range": [y_max, 0], "gridcolor": "#d9d9d9"},
+            hovermode="x unified",
+            legend={"traceorder": "normal"},
+            margin={"l": 70, "r": 30, "t": 60, "b": 60},
+        )
+        return fig
+
     output_path = f"{filepath}/{filename}.png"
-    os.makedirs(os.path.dirname(output_path), exist_ok=True)
-    fig.savefig(output_path, bbox_inches='tight')
-    log.info(f"Saved plot to {output_path}")
+    save_plotly(make_figure(60), output_path, log, width=1920, height=1080)
     if r is not None:
-        ax.set_ylim(top=0, bottom=r)
-        ax.grid(True)
         output_path = f"{filepath}/{filename}_{r}.png"
-        os.makedirs(os.path.dirname(output_path), exist_ok=True)
-        fig.savefig(output_path, bbox_inches='tight')
-        log.info(f"Saved plot to {output_path}")
-    plt.close(fig)
+        save_plotly(make_figure(r), output_path, log, width=1920, height=1080)
 
 
 @tracer.start_as_current_span("positions")

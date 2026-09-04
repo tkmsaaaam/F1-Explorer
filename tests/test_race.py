@@ -1,11 +1,21 @@
 import unittest
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import matplotlib.pyplot as plt
 import pandas
 from fastf1.core import Laps
 
-from visualizations.race import make_driver_laps_set, make_lap_start_by_position_by_number, make_top_time_map, tyres
+from visualizations.domain.driver import Driver
+from visualizations.domain.driver_laps import DriverLaps
+from visualizations.race import (
+    gap_to_ahead_graph,
+    gap_to_top_graph,
+    make_driver_laps_set,
+    make_lap_start_by_position_by_number,
+    make_top_time_map,
+    tyres,
+)
 
 
 class Race(unittest.TestCase):
@@ -170,6 +180,52 @@ class Race(unittest.TestCase):
         self.assertEqual(5, len(axis.patches))
         self.assertEqual(2, len(axis.collections))
         plt.close(figure)
+
+    def test_gap_ahead_graph_is_plotly_and_sorted_by_final_position(self):
+        first_lap = MagicMock()
+        first_lap.get_position.return_value = 1
+        second_lap = MagicMock()
+        second_lap.get_position.return_value = 2
+        lap_logs = [
+            DriverLaps(Driver(2, "SECOND", "Team B"), {1: second_lap}),
+            DriverLaps(Driver(1, "FIRST", "Team A"), {1: first_lap}),
+        ]
+        session = SimpleNamespace(event=SimpleNamespace(year=2026))
+
+        with (
+            patch("visualizations.race.calculate_gap_to_ahead", return_value=[(1, 1.25)]),
+            patch("visualizations.race.fastf1.plotting.get_team_color", return_value="#123456"),
+            patch("visualizations.race.save_plotly") as save,
+        ):
+            gap_to_ahead_graph(MagicMock(), "output", "gap_ahead_graph", session, 15, lap_logs, {})
+
+        self.assertEqual(2, save.call_count)
+        default_figure = save.call_args_list[0].args[0]
+        ranged_figure = save.call_args_list[1].args[0]
+        self.assertEqual(["FIRST", "SECOND"], [trace.name for trace in default_figure.data])
+        self.assertEqual((30, 0), default_figure.layout.yaxis.range)
+        self.assertEqual((15, 0), ranged_figure.layout.yaxis.range)
+        self.assertEqual("output/gap_ahead_graph.png", save.call_args_list[0].args[1])
+
+    def test_gap_top_graph_is_plotly_and_keeps_zero_at_top(self):
+        leader_lap = MagicMock()
+        leader_lap.get_position.return_value = 1
+        lap_logs = [DriverLaps(Driver(1, "FIRST", "Team A"), {1: leader_lap})]
+        session = SimpleNamespace(event=SimpleNamespace(year=2026), laps=MagicMock())
+
+        with (
+            patch("visualizations.race.make_top_time_map", return_value={}),
+            patch("visualizations.race.calculate_gap_to_leader", return_value=[(1, 0.0)]),
+            patch("visualizations.race.fastf1.plotting.get_team_color", return_value="#123456"),
+            patch("visualizations.race.save_plotly") as save,
+        ):
+            gap_to_top_graph(MagicMock(), "output", "gap_top_graph", session, None, lap_logs)
+
+        save.assert_called_once()
+        figure = save.call_args.args[0]
+        self.assertEqual("FIRST", figure.data[0].name)
+        self.assertEqual((60, 0), figure.layout.yaxis.range)
+        self.assertEqual("x unified", figure.layout.hovermode)
 
 
 if __name__ == '__main__':

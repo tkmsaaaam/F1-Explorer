@@ -283,8 +283,11 @@ main {{ width: 100%; max-width: 1500px; margin: 0 auto; padding: 1rem 2rem 4rem;
     figure.layout.height = Math.max(Number(figure.layout.height) || 0, minimumHeight);
     figure.layout.autosize = true;
     const titleText = figure.layout.title && typeof figure.layout.title.text === "string" ? figure.layout.title.text : "";
+    const configuredYAxisRange = figure.layout.yaxis && Array.isArray(figure.layout.yaxis.range) ? figure.layout.yaxis.range : [];
+    const descendingYAxisRange = configuredYAxisRange.length === 2 &&
+      Number(configuredYAxisRange[0]) > Number(configuredYAxisRange[1]);
     const reverseYAxis = !table && !trackMap && figure.layout.yaxis && typeof figure.layout.yaxis === "object" &&
-      (figure.layout.yaxis.autorange === "reversed" || /lap time/i.test(titleText));
+      (figure.layout.yaxis.autorange === "reversed" || descendingYAxisRange || /lap time/i.test(titleText));
     const explicitYAxisRange = reverseYAxis && Array.isArray(figure.layout.yaxis.range) && figure.layout.yaxis.range.length === 2;
     if (reverseYAxis) {{
       figure.layout.yaxis = Object.assign({{}}, figure.layout.yaxis, explicitYAxisRange ? {{autorange: false}} : {{autorange: "reversed"}});
