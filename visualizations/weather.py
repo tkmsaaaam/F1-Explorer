@@ -1,4 +1,5 @@
 import matplotlib.pyplot as plt
+import matplotlib.dates as mdates
 import structlog
 from fastf1.core import Session
 # noinspection PyPackageRequirements
@@ -33,6 +34,16 @@ def plot_weather(session: Session, log: structlog.stdlib.BoundLogger, key: str, 
     x = list((session.date + weather.Time).values)
     y = weather[key].to_list()
     ax.plot(x, y)
+    ax.set_xlabel("Time [UTC, HH:MM]")
+    ax.xaxis.set_major_formatter(mdates.DateFormatter("%H:%M"))
+    ax.set_ylabel({
+        "AirTemp": "Air Temperature [°C]",
+        "TrackTemp": "Track Temperature [°C]",
+        "WindSpeed": "Wind Speed [m/s]",
+        "Rainfall": "Rainfall [0 = dry, 1 = raining]",
+    }.get(key, key))
+    if key == "Rainfall":
+        ax.set_yticks([0, 1], ["0 (dry)", "1 (raining)"])
     plt.gcf().autofmt_xdate()
     ax.grid(True)
     save_matplotlib(fig, filepath, log)

@@ -231,7 +231,7 @@ def plot_flat_out(session: Session, log: structlog.stdlib.BoundLogger, *, output
     """
     driver_numbers = session.laps.DriverNumber.unique()
     driver_numbers.sort()
-    fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
+    fig = go.Figure()
     for driver_number in driver_numbers:
         lap = session.laps.pick_drivers(driver_number).pick_fastest()
         if lap is None:
@@ -249,10 +249,10 @@ def plot_flat_out(session: Session, log: structlog.stdlib.BoundLogger, *, output
             color = fastf1.plotting.get_team_color(lap.Team, session)
         except AttributeError:
             color = 'gray'
-        ax.scatter(x, y, c=color)
-        ax.annotate(lap.Driver, (x, y), fontsize=9, ha='right')
-    ax.grid(True)
-    save_matplotlib(fig, resolve_output_dir(session, output_dir) / "flat_out.png", log)
+        _add_summary_point(fig, lap.Driver, x * 100, y * 100, color)
+    _save_summary_scatter(fig, session, log, output_dir, "flat_out",
+                          "Flat-out Distance / Lap Distance [%]",
+                          "Flat-out Time / Lap Time [%]")
 
 
 @tracer.start_as_current_span("plot_ideal_best")
@@ -263,7 +263,7 @@ def plot_ideal_best(session: Session, log: structlog.stdlib.BoundLogger, *, outp
         session: 分析対象のセッション
         log: ロガー
     """
-    fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
+    fig = go.Figure()
     for driver_number in session.drivers:
         laps = session.laps[session.laps.IsAccurate].pick_drivers(driver_number).sort_values(by='LapNumber')
         if laps.empty:
@@ -281,21 +281,19 @@ def plot_ideal_best(session: Session, log: structlog.stdlib.BoundLogger, *, outp
             color = fastf1.plotting.get_team_color(laps.Team.iloc[0], session)
         except AttributeError:
             color = 'gray'
-        ax.scatter(x, y, c=color)
-        ax.annotate(acronym, (x, y), fontsize=9, ha='right')
-    ax.grid(True)
-    save_matplotlib(fig, resolve_output_dir(session, output_dir) / "ideal_best.png", log)
+        _add_summary_point(fig, acronym, x, y, color)
+    _save_summary_scatter(fig, session, log, output_dir, "ideal_best",
+                          "Best Lap Time [s]", "Ideal Lap Time (Sum of Best Sectors) [s]")
 
 
 @tracer.start_as_current_span("plot_ideal_best_diff")
 def plot_ideal_best_diff(session: Session, log: structlog.stdlib.BoundLogger, *, output_dir: str | Path | None = None):
-    """y = ラップタイム - 理論値
-    x = ラップタイム
+    """y = 理論ラップタイム、x = 理論ラップタイム - ベストラップタイム（秒）。
     Args:
         session: 分析対象のセッション
         log: ロガー
     """
-    fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
+    fig = go.Figure()
     for driver_number in session.drivers:
         laps = session.laps[session.laps.IsAccurate].pick_drivers(driver_number).sort_values(by='LapNumber')
         if laps.empty:
@@ -313,10 +311,10 @@ def plot_ideal_best_diff(session: Session, log: structlog.stdlib.BoundLogger, *,
         if fastest is None:
             continue
         x = y - fastest.LapTime.total_seconds()
-        ax.scatter(x, y, c=color)
-        ax.annotate(acronym, (x, y), fontsize=9, ha='right')
-    ax.grid(True)
-    save_matplotlib(fig, resolve_output_dir(session, output_dir) / "ideal_best_diff.png", log)
+        _add_summary_point(fig, acronym, x, y, color)
+    _save_summary_scatter(fig, session, log, output_dir, "ideal_best_diff",
+                          "Ideal Lap Time - Best Lap Time [s]",
+                          "Ideal Lap Time (Sum of Best Sectors) [s]")
 
 
 @tracer.start_as_current_span("plot_gear_shift_on_track")
@@ -375,28 +373,20 @@ def plot_speed_and_laptime(session: Session, log: structlog.stdlib.BoundLogger, 
         session: 分析対象のセッション
         log: ロガー
     """
-    lap_times = []
-    top_speeds = []
-    driver_colors = []
-    fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
+    fig = go.Figure()
     for driver_number in session.drivers:
         lap = session.laps.pick_drivers(driver_number).pick_fastest()
         if lap is None:
             continue
         max_speed: float = lap.get_car_data().Speed.max()
-        top_speeds.append(max_speed)
         y = lap.LapTime.total_seconds()
-        lap_times.append(y)
-        ax.annotate(lap.Driver, (max_speed, y), fontsize=9, ha='right')
         try:
             color = fastf1.plotting.get_team_color(lap.Team, session)
         except AttributeError:
             color = 'gray'
-        driver_colors.append(color)
-
-    ax.scatter(top_speeds, lap_times, c=driver_colors)
-    ax.grid(True)
-    save_matplotlib(fig, resolve_output_dir(session, output_dir) / "speed_and_laptime.png", log)
+        _add_summary_point(fig, lap.Driver, max_speed, y, color)
+    _save_summary_scatter(fig, session, log, output_dir, "speed_and_laptime",
+                          "Top Speed on Best Lap [km/h]", "Best Lap Time [s]")
 
 
 @tracer.start_as_current_span("plot_speed_distance")
@@ -1227,27 +1217,40 @@ def plot_tyre_age_and_laptime(session: Session, log: structlog.stdlib.BoundLogge
         session: 分析対象のセッション
         log: ロガー
     """
-    lap_times = []
-    tyre_life_list = []
-    driver_colors = []
-    fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
+    fig = go.Figure()
     for driver_number in session.drivers:
         lap = session.laps.pick_drivers(driver_number).pick_fastest()
         if lap is None:
             continue
 
         tyre_life = lap.TyreLife
-        lap_times.append(lap.LapTime.total_seconds())
-        tyre_life_list.append(tyre_life)
-        ax.annotate(lap.Driver, (tyre_life, lap.LapTime.total_seconds()), fontsize=9, ha='right')
         try:
             color = fastf1.plotting.get_team_color(lap.Team, session)
         except AttributeError:
             color = 'gray'
-        driver_colors.append(color)
+        _add_summary_point(fig, lap.Driver, tyre_life, lap.LapTime.total_seconds(), color)
+    _save_summary_scatter(fig, session, log, output_dir, "tyre_age_and_laptime",
+                          "Tyre Age on Best Lap [laps]", "Best Lap Time [s]",
+                          reverse_y=True)
 
-    ax.scatter(tyre_life_list, lap_times, c=driver_colors)
-    output_path = resolve_output_dir(session, output_dir) / "tyre_age_and_laptime.png"
-    fig.gca().invert_yaxis()
-    ax.grid(True)
-    save_matplotlib(fig, output_path, log)
+
+def _add_summary_point(fig, driver, x, y, color):
+    fig.add_trace(go.Scatter(
+        x=[x], y=[y], name=driver, text=[driver], mode="markers+text",
+        textposition="top center", marker=dict(color=color, size=9),
+    ))
+
+
+def _save_summary_scatter(fig, session, log, output_dir, key, x_label, y_label,
+                          *, reverse_y=False):
+    fig.update_layout(
+        template="plotly_white", xaxis_title=x_label, yaxis_title=y_label,
+        legend_title_text="Driver", margin=dict(t=60, b=90),
+    )
+    fig.update_traces(hovertemplate=(
+        x_label + ": %{x:.3f}<br>" + y_label + ": %{y:.3f}<extra>%{fullData.name}</extra>"
+    ))
+    if reverse_y:
+        fig.update_yaxes(autorange="reversed")
+    save_plotly(fig, resolve_output_dir(session, output_dir) / f"{key}.png", log,
+                width=1920, height=1080)

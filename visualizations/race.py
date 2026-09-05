@@ -114,6 +114,8 @@ def laptime(log: structlog.stdlib.BoundLogger, filepath: str, filename: str, ses
         ].sort_values(by='LapTime', ascending=False).LapTime.max()
     ax.legend(fontsize='small')
     ax.set_ylim(top=minimum.total_seconds() - 0.1, bottom=maximum.total_seconds() + 0.1)
+    ax.set_xlabel("Lap Number [lap]")
+    ax.set_ylabel("Lap Time [s]")
     ax.grid(True)
     output_path = f"{filepath}/{filename}.png"
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
@@ -398,6 +400,8 @@ def positions(log: structlog.stdlib.BoundLogger, filepath: str, session: Session
 
     ax.legend(fontsize='small')
     ax.invert_yaxis()
+    ax.set_xlabel("Lap Number [lap]")
+    ax.set_ylabel("Position [rank]")
     ax.grid(True)
     save_matplotlib(fig, filepath, log)
 
@@ -554,13 +558,14 @@ def tyres(log: structlog.stdlib.BoundLogger, filepath: str, laps: Laps):
     ax.set_yticklabels([driver_number for driver_number, _, _ in driver_laps])
     if max_lap:
         ax.set_xlim(0.5, max_lap + 0.5)
-    ax.set_xlabel('Lap')
+    ax.set_xlabel('Lap Number [lap]')
+    ax.set_ylabel('Driver Number')
     ax.invert_yaxis()
     legend_elements = [mpl.patches.Patch(facecolor=color, edgecolor='black', label=compound)
                        for compound, color in constants.compound_color.items()]
     legend_elements.extend([
         mpl.lines.Line2D([0], [0], color='#222222', linewidth=2.2, label='Stint start / tyre change'),
-        mpl.lines.Line2D([], [], color='none', label='Number: tyre age; N: new; U: used'),
+        mpl.lines.Line2D([], [], color='none', label='Number: tyre age [laps]; N: new; U: used'),
     ])
     ax.legend(
         handles=legend_elements,

@@ -17,6 +17,8 @@ from pathlib import Path
 import re
 from typing import Any, Iterable
 
+from visualizations.qualifying_layout import organize_qualifying_report_html
+
 
 _CURRENT_REPORT: ContextVar["SessionReport | None"] = ContextVar(
     "f1_explorer_current_report", default=None
@@ -33,7 +35,6 @@ _SECTION_ORDER = (
     "Weather",
     "Static Graphs",
 )
-
 
 @dataclass(slots=True)
 class ReportItem:
@@ -331,6 +332,10 @@ main {{ width: 100%; max-width: 1500px; margin: 0 auto; padding: 1rem 2rem 4rem;
 }})();
 </script></body></html>
 """
+        if str(getattr(self.session, "name", "")).strip().lower() in {
+            "qualifying", "sprint qualifying", "sprint shootout",
+        }:
+            html = organize_qualifying_report_html(html)
         target.write_text(html, encoding="utf-8")
         return target
 
