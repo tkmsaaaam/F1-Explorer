@@ -277,9 +277,14 @@ main {{ width: 100%; max-width: 1500px; margin: 0 auto; padding: 1rem 2rem 4rem;
 .plotly-container {{ min-height: 640px; height: 640px; width: 100%; max-width: 100%; overflow-x: hidden; }}
 .plotly-container.table {{ min-height: 900px; height: 900px; }}
 .plotly-container.qualifying-best {{ min-height: 1500px; height: 1500px; }}
-.y-range-controls {{ display: grid; grid-template-columns: auto minmax(8rem, 1fr) auto; align-items: center; gap: .45rem .75rem; margin: 0 3rem .5rem 4rem; color: #4d5966; font-size: .82rem; }}
-.y-range-controls input[type="range"] {{ width: 100%; }}
-.y-range-controls output {{ min-width: 5.5rem; text-align: right; font-variant-numeric: tabular-nums; }}
+.y-range-controls {{ display: grid; grid-template-columns: auto minmax(8rem, 1fr) auto; align-items: center; gap: .75rem; margin: 0 3rem .5rem 4rem; color: #4d5966; font-size: .82rem; }}
+.y-range-values {{ min-width: 12rem; text-align: right; font-variant-numeric: tabular-nums; }}
+.dual-range {{ position: relative; height: 1.4rem; }}
+.dual-range input[type="range"] {{ position: absolute; inset: 0; width: 100%; margin: 0; background: transparent; pointer-events: none; appearance: none; -webkit-appearance: none; }}
+.dual-range input[type="range"]::-webkit-slider-runnable-track {{ height: 4px; border-radius: 2px; background: #c7d1dc; }}
+.dual-range input[type="range"]::-moz-range-track {{ height: 4px; border-radius: 2px; background: #c7d1dc; }}
+.dual-range input[type="range"]::-webkit-slider-thumb {{ width: 15px; height: 15px; margin-top: -5.5px; border: 1px solid #145da0; border-radius: 50%; background: #fff; pointer-events: auto; cursor: ew-resize; appearance: none; -webkit-appearance: none; }}
+.dual-range input[type="range"]::-moz-range-thumb {{ width: 15px; height: 15px; border: 1px solid #145da0; border-radius: 50%; background: #fff; pointer-events: auto; cursor: ew-resize; }}
 .source {{ color: #687582; font-size: .8rem; margin-bottom: 0; }}
 </style></head><body>
 <header id="summary"><h1>F1 Explorer — {event_name} / {session_name}</h1><p>Generated: {generated}</p><p>Interactive figures render in your browser; existing PNG outputs remain available beside this report.</p><p>Non-telemetry line charts provide X-axis filtering and Y-axis zoom controls.</p></header>
@@ -359,16 +364,15 @@ main {{ width: 100%; max-width: 1500px; margin: 0 auto; padding: 1rem 2rem 4rem;
         const step = Math.max((maximum - minimum) / 1000, Number.EPSILON);
         const controls = document.createElement("div");
         controls.className = "y-range-controls";
-        controls.innerHTML = `<label>Y min</label><input type="range" min="${{minimum}}" max="${{maximum}}" step="${{step}}" value="${{minimum}}"><output>${{minimum.toFixed(3)}}</output><label>Y max</label><input type="range" min="${{minimum}}" max="${{maximum}}" step="${{step}}" value="${{maximum}}"><output>${{maximum.toFixed(3)}}</output>`;
+        controls.innerHTML = `<label>Y range</label><div class="dual-range"><input aria-label="Y minimum" type="range" min="${{minimum}}" max="${{maximum}}" step="${{step}}" value="${{minimum}}"><input aria-label="Y maximum" type="range" min="${{minimum}}" max="${{maximum}}" step="${{step}}" value="${{maximum}}"></div><output class="y-range-values">${{minimum.toFixed(3)}} – ${{maximum.toFixed(3)}}</output>`;
         node.parentNode.insertBefore(controls, node);
         const sliders = controls.querySelectorAll("input");
-        const outputs = controls.querySelectorAll("output");
+        const output = controls.querySelector("output");
         const applyYRange = () => {{
           let low = Number(sliders[0].value);
           let high = Number(sliders[1].value);
           if (low > high) [low, high] = [high, low];
-          outputs[0].value = low.toFixed(3);
-          outputs[1].value = high.toFixed(3);
+          output.value = `${{low.toFixed(3)}} – ${{high.toFixed(3)}}`;
           const range = reverseYAxis ? [high, low] : [low, high];
           window.Plotly.relayout(node, {{"yaxis.autorange": false, "yaxis.range": range}});
         }};

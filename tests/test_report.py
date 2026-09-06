@@ -49,6 +49,10 @@ class SessionReportTest(unittest.TestCase):
                     self.assertIn("const lineChart = !table && !telemetry && !trackMap", html)
                     self.assertIn("figure.layout.xaxis = Object.assign", html)
                     self.assertIn('controls.className = "y-range-controls"', html)
+                    self.assertIn('class="dual-range"', html)
+                    self.assertIn('aria-label="Y minimum"', html)
+                    self.assertIn('aria-label="Y maximum"', html)
+                    self.assertIn("Y range", html)
 
     def test_practice_and_race_layouts_match_declared_order(self) -> None:
         for session_name, sections, prefix in (
@@ -153,6 +157,8 @@ class SessionReportTest(unittest.TestCase):
             self.assertIn('data-report-section="Run Volume"', html)
             self.assertIn("const lineChart", html)
             self.assertIn('controls.className = "y-range-controls"', html)
+            self.assertIn('class="dual-range"', html)
+            self.assertIn('output.value = `${low.toFixed(3)} – ${high.toFixed(3)}`', html)
             self.assertIn('slider.addEventListener("input", applyYRange)', html)
             self.assertIn('"yaxis.range": range', html)
             self.assertIn("rangeslider", html)
