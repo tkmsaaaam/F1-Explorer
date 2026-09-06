@@ -13,9 +13,28 @@ import plotly.graph_objects as go
 
 from visualizations.report import SessionReport, current_report
 from visualizations.qualifying_layout import QUALIFYING_SECTIONS, organize_qualifying_report_html
+from visualizations.report_layout import PRACTICE_SECTIONS, RACE_SECTIONS, organize_session_report_html
 
 
 class SessionReportTest(unittest.TestCase):
+    def test_practice_and_race_layouts_match_declared_order(self) -> None:
+        for session_name, sections, prefix in (
+            ("Practice 1", PRACTICE_SECTIONS, "P"),
+            ("Race", RACE_SECTIONS, "R"),
+        ):
+            entries = [item for section in sections for item in section.items]
+            cards = []
+            for i, item in enumerate(reversed(entries)):
+                title = "Tyres" if item.key in {"session tyres", "weekend tyres"} else item.key
+                article_id = f"{item.key.replace(' ', '-')}-{i}"
+                if item.key == "weekend tyres":
+                    article_id = f"external-tyres-{i}"
+                cards.append(f'<article id="{article_id}"><h3>{title}</h3></article>')
+            result = organize_session_report_html('<nav></nav><main>' + ''.join(cards) + '</main>', session_name)
+            expected = [f'[{prefix}-{i:02d}] {item.title}' for i, item in enumerate(entries, 1)]
+            self.assertEqual(re.findall(r'<h3>(.*?)</h3>', result), expected)
+            self.assertEqual(organize_session_report_html(result, session_name), result)
+
     def test_qualifying_spec_numbers_preserve_content_and_are_idempotent(self) -> None:
         original = (
             '<nav>old navigation</nav><main>'
@@ -25,8 +44,8 @@ class SessionReportTest(unittest.TestCase):
             '<article id="unknown"><h3>Unknown</h3></article></main>'
         )
         numbered = organize_qualifying_report_html(original)
-        self.assertIn('<h3>[Q-11] 時刻別のラップタイム推移</h3>', numbered)
-        self.assertIn('<h3>[Q-33] 気温の推移</h3>', numbered)
+        self.assertIn('<h3>[Q-08] 時刻別のラップタイム推移</h3>', numbered)
+        self.assertIn('<h3>[Q-30] 気温の推移</h3>', numbered)
         self.assertIn('<article id="unknown"><h3>Unknown</h3></article>', numbered)
         self.assertIn('<script type="application/json">{"data":[]}</script>', numbered)
         self.assertIn('id="timing-2"', numbered)
@@ -59,7 +78,7 @@ class SessionReportTest(unittest.TestCase):
                 with self.subTest(session=name):
                     report = SessionReport(SimpleNamespace(name=name), root)
                     html = report.write().read_text()
-                    self.assertEqual('[Q-15] 自己最速ラップの全開率' in html, 'Qualifying' in name)
+                    self.assertEqual('[Q-12] 自己最速ラップの全開率' in html, 'Qualifying' in name)
 
     def test_report_contains_interactive_and_static_items_in_one_file(self) -> None:
         with TemporaryDirectory() as temporary:
@@ -92,6 +111,7 @@ class SessionReportTest(unittest.TestCase):
             self.assertIn("id=\"summary\"", html)
             self.assertIn("id=\"additional-figures\"", html)
             self.assertIn("plotly-container", html)
+            self.assertIn(".plotly-container.qualifying-best", html)
             self.assertIn("data:image/png;base64,", html)
             self.assertIn("zoomable-image", html)
             self.assertIn('data-image-path="file://', html)
@@ -99,6 +119,9 @@ class SessionReportTest(unittest.TestCase):
             self.assertIn("tyres.png", html)
             self.assertIn("plotly_selected", html)
             self.assertIn("figure.layout.selectdirection = \"v\"", html)
+            self.assertIn('node.on("plotly_buttonclicked"', html)
+            self.assertIn('window.Plotly.restyle(node, {visible}, [index])', html)
+            self.assertIn('axisUpdate["yaxis.range"]', html)
             self.assertIn("const reverseYAxis", html)
             self.assertIn("const descendingYAxisRange", html)
             self.assertIn("const trackMap", html)

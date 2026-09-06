@@ -10,6 +10,7 @@ import setup
 from visualizations import run_volume, short_runs, weather, weekend, comparison
 from visualizations.output import session_output_dir, session_report_dir
 from visualizations.report import SessionReport
+from visualizations.qualifying_best import make_qualifying_best
 from analysis_state import build_fingerprint, manifest_path, should_skip, write_success_manifest
 
 tracer = trace.get_tracer(__name__)
@@ -82,6 +83,7 @@ def main(*, force: bool = False):
     short_runs.plot_best_laptime(session, log, 'Sector2Time')
     short_runs.plot_best_laptime(session, log, 'Sector3Time')
     short_runs.plot_best_laptime(session, log, 'LapTime')
+    report.register_plotly(make_qualifying_best(session), output_dir / 'LapTime.png')
 
     short_runs.plot_best_speed(session, log, 'SpeedFL')
     # noinspection SpellCheckingInspection

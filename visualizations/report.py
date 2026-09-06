@@ -17,7 +17,7 @@ from pathlib import Path
 import re
 from typing import Any, Iterable
 
-from visualizations.qualifying_layout import organize_qualifying_report_html
+from visualizations.report_layout import organize_session_report_html
 
 
 _CURRENT_REPORT: ContextVar["SessionReport | None"] = ContextVar(
@@ -197,8 +197,12 @@ class SessionReport:
 
     def _ordered_items(self) -> list[ReportItem]:
         order = {section: index for index, section in enumerate(_SECTION_ORDER)}
+        items = list(self._items.values())
+        if any(item.figure_json and '"f1ExplorerKind":"qualifyingBest"' in item.figure_json for item in items):
+            items = [item for item in items if item.path.stem.lower() not in
+                     {"sector1time", "sector2time", "sector3time"}]
         return sorted(
-            self._items.values(),
+            items,
             key=lambda item: (order.get(item.section, len(order)), item.path.as_posix()),
         )
 
@@ -234,7 +238,8 @@ class SessionReport:
                     data_id = f"figure-data-{_slug(item.anchor)}"
                     safe_json = item.figure_json.replace("<", "\\u003c") if item.figure_json else "{}"
                     is_table = '"type":"table"' in item.figure_json
-                    kind = " table" if is_table else ""
+                    is_qualifying_best = '"f1ExplorerKind":"qualifyingBest"' in item.figure_json
+                    kind = (" table" if is_table else "") + (" qualifying-best" if is_qualifying_best else "")
                     body.append(f'<div class="plotly-container{kind}" data-plotly-source="{escape(data_id)}"></div>')
                     body.append(f'<script type="application/json" id="{escape(data_id)}">{safe_json}</script>')
                 else:
@@ -265,6 +270,7 @@ main {{ width: 100%; max-width: 1500px; margin: 0 auto; padding: 1rem 2rem 4rem;
 .zoomable-image {{ cursor: zoom-in; }}
 .plotly-container {{ min-height: 640px; height: 640px; width: 100%; max-width: 100%; overflow-x: hidden; }}
 .plotly-container.table {{ min-height: 900px; height: 900px; }}
+.plotly-container.qualifying-best {{ min-height: 1500px; height: 1500px; }}
 .source {{ color: #687582; font-size: .8rem; margin-bottom: 0; }}
 </style></head><body>
 <header id="summary"><h1>F1 Explorer — {event_name} / {session_name}</h1><p>Generated: {generated}</p><p>Interactive figures render in your browser; existing PNG outputs remain available beside this report.</p><p>For vertical zoom, choose Box Select in the graph toolbar and drag across the desired Y range. Use Reset Axes to restore the view.</p></header>
@@ -280,6 +286,7 @@ main {{ width: 100%; max-width: 1500px; margin: 0 auto; padding: 1rem 2rem 4rem;
     figure.layout = Object.assign({{}}, figure.layout || {{}});
     const table = Array.isArray(figure.data) && figure.data.some((trace) => trace.type === "table");
     const trackMap = figure.layout.meta && figure.layout.meta.f1ExplorerKind === "trackMap";
+    const qualifyingBest = figure.layout.meta && figure.layout.meta.f1ExplorerKind === "qualifyingBest";
     const minimumHeight = table ? 900 : 640;
     figure.layout.height = Math.max(Number(figure.layout.height) || 0, minimumHeight);
     figure.layout.autosize = true;
@@ -300,6 +307,34 @@ main {{ width: 100%; max-width: 1500px; margin: 0 auto; padding: 1rem 2rem 4rem;
       figure.layout.selectdirection = "v";
     }}
     window.Plotly.newPlot(node, figure.data || [], figure.layout || {{}}, {{responsive: true, displaylogo: false, scrollZoom: trackMap}}).then(() => {{
+      if (qualifyingBest) {{
+        node.on("plotly_buttonclicked", (event) => {{
+          const label = event && event.button ? event.button.label : "";
+          const modes = {{
+            "タイム": {{visible: [true, false, true], axis: true}},
+            "最速比率": {{visible: [false, true, true], axis: true}},
+          }};
+          const mode = modes[label];
+          if (!mode) return;
+          // Keep the table visible below the selected bar trace.
+          const updates = mode.visible.map((visible, index) =>
+            window.Plotly.restyle(node, {{visible}}, [index])
+          );
+          Promise.all(updates).then(() => {{
+            const values = label === "タイム" ? node.data[0].y : label === "最速比率" ? node.data[1].y : [];
+            const finite = Array.isArray(values) ? values.filter((value) => Number.isFinite(Number(value))).map(Number) : [];
+            const axisUpdate = {{"xaxis.visible": mode.axis, "yaxis.visible": mode.axis}};
+            if (mode.axis && finite.length) {{
+              const low = Math.min(...finite);
+              const high = Math.max(...finite);
+              const padding = Math.max((high - low) * 0.08, high * 0.01);
+              axisUpdate["yaxis.autorange"] = false;
+              axisUpdate["yaxis.range"] = [Math.max(0, low - padding), high + padding];
+            }}
+            window.Plotly.relayout(node, axisUpdate);
+          }});
+        }});
+      }}
       if (trackMap) return;
       const allYValues = (figure.data || []).flatMap((trace) => Array.isArray(trace.y) ? trace.y : [])
         .filter((value) => typeof value === "number" && Number.isFinite(value));
@@ -332,10 +367,7 @@ main {{ width: 100%; max-width: 1500px; margin: 0 auto; padding: 1rem 2rem 4rem;
 }})();
 </script></body></html>
 """
-        if str(getattr(self.session, "name", "")).strip().lower() in {
-            "qualifying", "sprint qualifying", "sprint shootout",
-        }:
-            html = organize_qualifying_report_html(html)
+        html = organize_session_report_html(html, str(getattr(self.session, "name", "")))
         target.write_text(html, encoding="utf-8")
         return target
 
