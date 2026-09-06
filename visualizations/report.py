@@ -243,7 +243,10 @@ class SessionReport:
                     is_table = '"type":"table"' in item.figure_json
                     is_qualifying_best = '"f1ExplorerKind":"qualifyingBest"' in item.figure_json
                     kind = (" table" if is_table else "") + (" qualifying-best" if is_qualifying_best else "")
-                    body.append(f'<div class="plotly-container{kind}" data-plotly-source="{escape(data_id)}"></div>')
+                    body.append(
+                        f'<div class="plotly-container{kind}" data-plotly-source="{escape(data_id)}" '
+                        f'data-report-section="{escape(item.section)}"></div>'
+                    )
                     body.append(f'<script type="application/json" id="{escape(data_id)}">{safe_json}</script>')
                 else:
                     encoded = base64.b64encode(item.path.read_bytes()).decode("ascii")
@@ -274,9 +277,12 @@ main {{ width: 100%; max-width: 1500px; margin: 0 auto; padding: 1rem 2rem 4rem;
 .plotly-container {{ min-height: 640px; height: 640px; width: 100%; max-width: 100%; overflow-x: hidden; }}
 .plotly-container.table {{ min-height: 900px; height: 900px; }}
 .plotly-container.qualifying-best {{ min-height: 1500px; height: 1500px; }}
+.y-range-controls {{ display: grid; grid-template-columns: auto minmax(8rem, 1fr) auto; align-items: center; gap: .45rem .75rem; margin: 0 3rem .5rem 4rem; color: #4d5966; font-size: .82rem; }}
+.y-range-controls input[type="range"] {{ width: 100%; }}
+.y-range-controls output {{ min-width: 5.5rem; text-align: right; font-variant-numeric: tabular-nums; }}
 .source {{ color: #687582; font-size: .8rem; margin-bottom: 0; }}
 </style></head><body>
-<header id="summary"><h1>F1 Explorer — {event_name} / {session_name}</h1><p>Generated: {generated}</p><p>Interactive figures render in your browser; existing PNG outputs remain available beside this report.</p><p>For vertical zoom, choose Box Select in the graph toolbar and drag across the desired Y range. Use Reset Axes to restore the view.</p></header>
+<header id="summary"><h1>F1 Explorer — {event_name} / {session_name}</h1><p>Generated: {generated}</p><p>Interactive figures render in your browser; existing PNG outputs remain available beside this report.</p><p>Non-telemetry line charts provide X-axis filtering and Y-axis zoom controls.</p></header>
 <nav>{''.join(nav)}</nav><main>{''.join(body)}</main>
 <script>{plotly_js}</script>
 <script>
@@ -288,7 +294,11 @@ main {{ width: 100%; max-width: 1500px; margin: 0 auto; padding: 1rem 2rem 4rem;
     const figure = JSON.parse(source.textContent);
     figure.layout = Object.assign({{}}, figure.layout || {{}});
     const table = Array.isArray(figure.data) && figure.data.some((trace) => trace.type === "table");
+    const telemetry = node.dataset.reportSection === "Telemetry";
     const trackMap = figure.layout.meta && figure.layout.meta.f1ExplorerKind === "trackMap";
+    const lineChart = !table && !telemetry && !trackMap && Array.isArray(figure.data) &&
+      figure.data.some((trace) => (trace.type === "scatter" || trace.type === "scattergl") &&
+        typeof trace.mode === "string" && trace.mode.includes("lines"));
     const qualifyingBest = figure.layout.meta && figure.layout.meta.f1ExplorerKind === "qualifyingBest";
     const minimumHeight = table ? 900 : 640;
     figure.layout.height = Math.max(Number(figure.layout.height) || 0, minimumHeight);
@@ -303,11 +313,10 @@ main {{ width: 100%; max-width: 1500px; margin: 0 auto; padding: 1rem 2rem 4rem;
     if (reverseYAxis) {{
       figure.layout.yaxis = Object.assign({{}}, figure.layout.yaxis, explicitYAxisRange ? {{autorange: false}} : {{autorange: "reversed"}});
     }}
-    if (!table && !trackMap && figure.layout.yaxis && typeof figure.layout.yaxis === "object") {{
-      figure.layout.yaxis = Object.assign({{}}, figure.layout.yaxis, {{
-        rangeslider: Object.assign({{}}, figure.layout.yaxis.rangeslider || {{}}, {{visible: true}}),
+    if (lineChart) {{
+      figure.layout.xaxis = Object.assign({{}}, figure.layout.xaxis || {{}}, {{
+        rangeslider: Object.assign({{}}, (figure.layout.xaxis || {{}}).rangeslider || {{}}, {{visible: true}}),
       }});
-      figure.layout.selectdirection = "v";
     }}
     window.Plotly.newPlot(node, figure.data || [], figure.layout || {{}}, {{responsive: true, displaylogo: false, scrollZoom: trackMap}}).then(() => {{
       if (qualifyingBest) {{
@@ -338,17 +347,33 @@ main {{ width: 100%; max-width: 1500px; margin: 0 auto; padding: 1rem 2rem 4rem;
           }});
         }});
       }}
-      if (trackMap) return;
       const allYValues = (figure.data || []).flatMap((trace) => Array.isArray(trace.y) ? trace.y : [])
         .filter((value) => typeof value === "number" && Number.isFinite(value));
-      node.on("plotly_selected", (event) => {{
-        const values = (event && event.points ? event.points : [])
-          .map((point) => point.y)
-          .filter((value) => typeof value === "number" && Number.isFinite(value));
-        if (values.length < 2) return;
-        const range = reverseYAxis ? [Math.max(...values), Math.min(...values)] : [Math.min(...values), Math.max(...values)];
-        window.Plotly.relayout(node, {{"yaxis.autorange": false, "yaxis.range": range}});
-      }});
+      if (lineChart && allYValues.length >= 2) {{
+        const domainLow = Math.min(...allYValues);
+        const domainHigh = Math.max(...allYValues);
+        const span = domainHigh - domainLow || Math.max(Math.abs(domainHigh), 1);
+        const padding = span * 0.02;
+        const minimum = domainLow - padding;
+        const maximum = domainHigh + padding;
+        const step = Math.max((maximum - minimum) / 1000, Number.EPSILON);
+        const controls = document.createElement("div");
+        controls.className = "y-range-controls";
+        controls.innerHTML = `<label>Y min</label><input type="range" min="${{minimum}}" max="${{maximum}}" step="${{step}}" value="${{minimum}}"><output>${{minimum.toFixed(3)}}</output><label>Y max</label><input type="range" min="${{minimum}}" max="${{maximum}}" step="${{step}}" value="${{maximum}}"><output>${{maximum.toFixed(3)}}</output>`;
+        node.parentNode.insertBefore(controls, node);
+        const sliders = controls.querySelectorAll("input");
+        const outputs = controls.querySelectorAll("output");
+        const applyYRange = () => {{
+          let low = Number(sliders[0].value);
+          let high = Number(sliders[1].value);
+          if (low > high) [low, high] = [high, low];
+          outputs[0].value = low.toFixed(3);
+          outputs[1].value = high.toFixed(3);
+          const range = reverseYAxis ? [high, low] : [low, high];
+          window.Plotly.relayout(node, {{"yaxis.autorange": false, "yaxis.range": range}});
+        }};
+        sliders.forEach((slider) => slider.addEventListener("input", applyYRange));
+      }}
       node.on("plotly_relayout", (event) => {{
         if (!reverseYAxis || !event || event["yaxis.autorange"] !== true || allYValues.length < 2) return;
         window.Plotly.relayout(node, {{

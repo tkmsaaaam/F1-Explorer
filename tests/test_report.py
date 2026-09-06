@@ -17,6 +17,39 @@ from visualizations.report_layout import PRACTICE_SECTIONS, RACE_SECTIONS, organ
 
 
 class SessionReportTest(unittest.TestCase):
+    def test_axis_range_controls_cover_race_qualifying_and_practice(self) -> None:
+        cases = (
+            ("Race", "gap_top_graph.png", "Race"),
+            ("Qualifying", "laptime_by_lap_number.png", "Run Volume"),
+            ("Practice 1", "long_run_soft.png", "Long Runs"),
+        )
+        with TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            for session_name, filename, expected_section in cases:
+                with self.subTest(session=session_name):
+                    output_dir = root / session_name
+                    output_dir.mkdir()
+                    line_path = output_dir / filename
+                    line_path.write_bytes(b"placeholder")
+                    telemetry_path = output_dir / "speed_distance.png"
+                    telemetry_path.write_bytes(b"placeholder")
+                    session = SimpleNamespace(
+                        name=session_name,
+                        event=SimpleNamespace(EventName="GP", Location="GP"),
+                    )
+                    report = SessionReport(session, output_dir)
+                    line = go.Figure(data=[go.Scatter(x=[1, 2], y=[3, 4], mode="lines")])
+                    report.register_plotly(line, line_path)
+                    report.register_plotly(line, telemetry_path)
+
+                    html = report.write().read_text(encoding="utf-8")
+
+                    self.assertIn(f'data-report-section="{expected_section}"', html)
+                    self.assertIn('data-report-section="Telemetry"', html)
+                    self.assertIn("const lineChart = !table && !telemetry && !trackMap", html)
+                    self.assertIn("figure.layout.xaxis = Object.assign", html)
+                    self.assertIn('controls.className = "y-range-controls"', html)
+
     def test_practice_and_race_layouts_match_declared_order(self) -> None:
         for session_name, sections, prefix in (
             ("Practice 1", PRACTICE_SECTIONS, "P"),
@@ -100,7 +133,7 @@ class SessionReportTest(unittest.TestCase):
             report.activate()
             self.assertIs(current_report(), report)
             report.register_plotly(
-                go.Figure(data=[go.Scatter(x=[1, 2], y=[3, 4])]),
+                go.Figure(data=[go.Scatter(x=[1, 2], y=[3, 4], mode="lines")]),
                 interactive_path,
             )
             report.deactivate()
@@ -117,8 +150,13 @@ class SessionReportTest(unittest.TestCase):
             self.assertIn('data-image-path="file://', html)
             self.assertIn("window.open(image.dataset.imagePath || image.currentSrc || image.src", html)
             self.assertIn("tyres.png", html)
-            self.assertIn("plotly_selected", html)
-            self.assertIn("figure.layout.selectdirection = \"v\"", html)
+            self.assertIn('data-report-section="Run Volume"', html)
+            self.assertIn("const lineChart", html)
+            self.assertIn('controls.className = "y-range-controls"', html)
+            self.assertIn('slider.addEventListener("input", applyYRange)', html)
+            self.assertIn('"yaxis.range": range', html)
+            self.assertIn("rangeslider", html)
+            self.assertNotIn("figure.layout.yaxis.rangeslider", html)
             self.assertIn('node.on("plotly_buttonclicked"', html)
             self.assertIn('window.Plotly.restyle(node, {visible}, [index])', html)
             self.assertIn('axisUpdate["yaxis.range"]', html)
@@ -127,7 +165,6 @@ class SessionReportTest(unittest.TestCase):
             self.assertIn("const trackMap", html)
             self.assertIn("scrollZoom: trackMap", html)
             self.assertIn("const explicitYAxisRange", html)
-            self.assertIn("reverseYAxis ? [Math.max(...values), Math.min(...values)]", html)
             self.assertIn('event["yaxis.autorange"] !== true', html)
             self.assertIn('"yaxis.range": [Math.max(...allYValues), Math.min(...allYValues)]', html)
             self.assertNotIn('<script src="https://', html)
