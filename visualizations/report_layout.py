@@ -27,10 +27,7 @@ def _items(*values: tuple[str, str]) -> tuple[LayoutItem, ...]:
 QUALIFYING_SECTIONS = (
     LayoutSection("results", "1. 結果の比較", _items(
         ("laptime", "予選区分別のベストラップ・セクタータイム比較"),
-        ("speedfl", "フィニッシュラインの最高速度"),
-        ("speedi1", "第1中間計測地点の最高速度"),
-        ("speedi2", "第2中間計測地点の最高速度"),
-        ("speedst", "スピードトラップの最高速度"),
+        ("speedfl", "ラップ条件・計測地点別の最高速度比較"),
     )),
     LayoutSection("run-history", "2. 走行履歴", _items(
         ("lap number by timing", "時刻別の走行ラップ履歴"),

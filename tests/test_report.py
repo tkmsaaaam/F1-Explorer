@@ -44,8 +44,8 @@ class SessionReportTest(unittest.TestCase):
             '<article id="unknown"><h3>Unknown</h3></article></main>'
         )
         numbered = organize_qualifying_report_html(original)
-        self.assertIn('<h3>[Q-08] 時刻別のラップタイム推移</h3>', numbered)
-        self.assertIn('<h3>[Q-30] 気温の推移</h3>', numbered)
+        self.assertIn('<h3>[Q-05] 時刻別のラップタイム推移</h3>', numbered)
+        self.assertIn('<h3>[Q-27] 気温の推移</h3>', numbered)
         self.assertIn('<article id="unknown"><h3>Unknown</h3></article>', numbered)
         self.assertIn('<script type="application/json">{"data":[]}</script>', numbered)
         self.assertIn('id="timing-2"', numbered)
@@ -78,7 +78,7 @@ class SessionReportTest(unittest.TestCase):
                 with self.subTest(session=name):
                     report = SessionReport(SimpleNamespace(name=name), root)
                     html = report.write().read_text()
-                    self.assertEqual('[Q-12] 自己最速ラップの全開率' in html, 'Qualifying' in name)
+                    self.assertEqual('[Q-09] 自己最速ラップの全開率' in html, 'Qualifying' in name)
 
     def test_report_contains_interactive_and_static_items_in_one_file(self) -> None:
         with TemporaryDirectory() as temporary:

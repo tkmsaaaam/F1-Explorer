@@ -201,6 +201,9 @@ class SessionReport:
         if any(item.figure_json and '"f1ExplorerKind":"qualifyingBest"' in item.figure_json for item in items):
             items = [item for item in items if item.path.stem.lower() not in
                      {"sector1time", "sector2time", "sector3time"}]
+        if any(item.figure_json and '"f1ExplorerKind":"qualifyingSpeed"' in item.figure_json for item in items):
+            items = [item for item in items if item.path.stem.lower() not in
+                     {"speedi1", "speedi2", "speedst"}]
         return sorted(
             items,
             key=lambda item: (order.get(item.section, len(order)), item.path.as_posix()),
