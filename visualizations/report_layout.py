@@ -43,12 +43,8 @@ QUALIFYING_SECTIONS = (
         ("ideal best diff", "ベストラップタイムと理論ベストタイムの差"),
     )),
     LayoutSection("telemetry-comparison", "4. テレメトリー比較", _items(
-        ("time distance delta", "自己最速ラップの累積タイム差"),
-        ("speed distance", "自己最速ラップの速度推移"),
-        ("throttle", "自己最速ラップのスロットル開度"),
-        ("brake", "自己最速ラップのブレーキ操作"),
-        ("speed on track", "自己最速ラップのコース上の速度分布"),
-        ("shift on track", "自己最速ラップの使用ギア"),
+        ("time distance delta", "自己最速ラップのテレメトリー比較"),
+        ("speed on track", "自己最速ラップのコース上分布"),
     )),
     LayoutSection("segment-analysis", "5. 区間別分析", _items(
         ("mini segments", "ミニセグメントの配置"),

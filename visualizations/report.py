@@ -204,6 +204,11 @@ class SessionReport:
         if any(item.figure_json and '"f1ExplorerKind":"qualifyingSpeed"' in item.figure_json for item in items):
             items = [item for item in items if item.path.stem.lower() not in
                      {"speedi1", "speedi2", "speedst"}]
+        if any(item.figure_json and '"f1ExplorerKind":"qualifyingTelemetry"' in item.figure_json for item in items):
+            items = [item for item in items if item.path.stem.lower() not in
+                     {"speed_distance", "throttle", "brake"}]
+        if any(item.figure_json and '"f1ExplorerKind":"qualifyingTrackMap"' in item.figure_json for item in items):
+            items = [item for item in items if item.path.stem.lower() != "shift_on_track"]
         return sorted(
             items,
             key=lambda item: (order.get(item.section, len(order)), item.path.as_posix()),

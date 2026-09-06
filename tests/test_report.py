@@ -82,7 +82,7 @@ class SessionReportTest(unittest.TestCase):
         )
         numbered = organize_qualifying_report_html(original)
         self.assertIn('<h3>[Q-05] 時刻別のラップタイム推移</h3>', numbered)
-        self.assertIn('<h3>[Q-27] 気温の推移</h3>', numbered)
+        self.assertIn('<h3>[Q-23] 気温の推移</h3>', numbered)
         self.assertIn('<article id="unknown"><h3>Unknown</h3></article>', numbered)
         self.assertIn('<script type="application/json">{"data":[]}</script>', numbered)
         self.assertIn('id="timing-2"', numbered)
