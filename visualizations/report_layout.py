@@ -68,14 +68,8 @@ QUALIFYING_SECTIONS = (
 
 PRACTICE_SECTIONS = (
     LayoutSection("results", "1. 結果の比較", _items(
-        ("laptime", "セッション全体のベストラップタイム"),
-        ("sector1time", "セクター1の自己ベストタイム"),
-        ("sector2time", "セクター2の自己ベストタイム"),
-        ("sector3time", "セクター3の自己ベストタイム"),
-        ("speedfl", "フィニッシュラインの最高速度"),
-        ("speedi1", "第1中間計測地点の最高速度"),
-        ("speedi2", "第2中間計測地点の最高速度"),
-        ("speedst", "スピードトラップの最高速度"),
+        ("laptime", "セッション全体のベストタイム比較"),
+        ("speedfl", "計測地点別の最高速度比較"),
     )),
     LayoutSection("run-history", "2. 走行履歴", _items(
         ("lap number by timing", "時刻別の走行ラップ履歴"),
@@ -94,7 +88,7 @@ PRACTICE_SECTIONS = (
         ("ideal best diff", "ベストラップタイムと理論ベストタイムの差"),
     )),
     LayoutSection("telemetry-comparison", "5. テレメトリー比較", _items(
-        ("time distance delta", "自己最速ラップの累積タイム差"),
+        ("time distance delta", "自己最速ラップのテレメトリー比較"),
         ("speed distance", "自己最速ラップの速度推移"),
         ("throttle", "自己最速ラップのスロットル開度"),
         ("brake", "自己最速ラップのブレーキ操作"),

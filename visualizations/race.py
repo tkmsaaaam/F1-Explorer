@@ -1,5 +1,6 @@
 import datetime
 import os
+from math import isfinite
 from typing import cast
 
 import fastf1
@@ -286,14 +287,16 @@ def gap_to_ahead_graph(log: structlog.stdlib.BoundLogger, filepath: str, filenam
         lap_logs: ドライバーごとのラップ
         position_logs: ラップごとのポジション
     """
-    def make_figure(y_max: int) -> go.Figure:
+    def make_figure(y_max: int | None) -> go.Figure:
         fig = go.Figure()
+        all_gaps: list[float] = []
         sorted_lap_logs = sorted(
             lap_logs,
             key=lambda item: item.get_laps()[max(item.get_laps())].get_position(),
         )
         for driver_laps in sorted_lap_logs:
             gap_series = calculate_gap_to_ahead(driver_laps, position_logs)
+            all_gaps.extend(gap for _, gap in gap_series if gap is not None and isfinite(gap))
             driver = driver_laps.get_driver()
             line_style = driver_linestyle(session.event.year, driver.get_number())
             fig.add_trace(go.Scatter(
@@ -308,10 +311,18 @@ def gap_to_ahead_graph(log: structlog.stdlib.BoundLogger, filepath: str, filenam
                 },
                 hovertemplate="Lap %{x}<br>Gap %{y:.3f} s<extra>%{fullData.name}</extra>",
             ))
+        if y_max is None and all_gaps:
+            # Match the full-data domain used by the report's Y-range sliders.
+            low, high = min(all_gaps), max(all_gaps)
+            span = high - low or max(abs(high), 1)
+            padding = span * 0.02
+            y_range = [high + padding, low - padding]
+        else:
+            y_range = [30 if y_max is None else y_max, 0]
         fig.update_layout(
             title="Gap Ahead",
             xaxis={"title": "Lap Number", "gridcolor": "#d9d9d9"},
-            yaxis={"title": "Gap (s)", "range": [y_max, 0], "gridcolor": "#d9d9d9"},
+            yaxis={"title": "Gap (s)", "range": y_range, "gridcolor": "#d9d9d9"},
             hovermode="x unified",
             legend={"traceorder": "normal"},
             margin={"l": 70, "r": 30, "t": 60, "b": 60},
@@ -319,7 +330,7 @@ def gap_to_ahead_graph(log: structlog.stdlib.BoundLogger, filepath: str, filenam
         return fig
 
     output_path = f"{filepath}/{filename}.png"
-    save_plotly(make_figure(30), output_path, log, width=1920, height=1080)
+    save_plotly(make_figure(None), output_path, log, width=1920, height=1080)
     if r is not None:
         output_path = f"{filepath}/{filename}_{r}.png"
         save_plotly(make_figure(r), output_path, log, width=1920, height=1080)

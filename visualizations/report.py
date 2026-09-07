@@ -204,11 +204,19 @@ class SessionReport:
         if any(item.figure_json and '"f1ExplorerKind":"qualifyingSpeed"' in item.figure_json for item in items):
             items = [item for item in items if item.path.stem.lower() not in
                      {"speedi1", "speedi2", "speedst"}]
-        if any(item.figure_json and '"f1ExplorerKind":"qualifyingTelemetry"' in item.figure_json for item in items):
+        if any(item.figure_json and any(kind in item.figure_json for kind in (
+                '"f1ExplorerKind":"qualifyingTelemetry"',
+                '"f1ExplorerKind":"telemetryComparison"')) for item in items):
             items = [item for item in items if item.path.stem.lower() not in
                      {"speed_distance", "throttle", "brake"}]
-        if any(item.figure_json and '"f1ExplorerKind":"qualifyingTrackMap"' in item.figure_json for item in items):
+        if any(item.figure_json and any(kind in item.figure_json for kind in (
+                '"f1ExplorerKind":"qualifyingTrackMap"',
+                '"f1ExplorerKind":"trackMapComparison"')) for item in items):
             items = [item for item in items if item.path.stem.lower() != "shift_on_track"]
+        if any(item.figure_json and '"f1ExplorerKind":"practiceBest"' in item.figure_json for item in items):
+            items = [item for item in items if item.path.stem.lower() not in {"sector1time", "sector2time", "sector3time"}]
+        if any(item.figure_json and '"f1ExplorerKind":"practiceSpeed"' in item.figure_json for item in items):
+            items = [item for item in items if item.path.stem.lower() not in {"speedi1", "speedi2", "speedst"}]
         return sorted(
             items,
             key=lambda item: (order.get(item.section, len(order)), item.path.as_posix()),
@@ -305,7 +313,7 @@ main {{ width: 100%; max-width: 1500px; margin: 0 auto; padding: 1rem 2rem 4rem;
     figure.layout = Object.assign({{}}, figure.layout || {{}});
     const table = Array.isArray(figure.data) && figure.data.some((trace) => trace.type === "table");
     const telemetry = node.dataset.reportSection === "Telemetry";
-    const trackMap = figure.layout.meta && figure.layout.meta.f1ExplorerKind === "trackMap";
+    const trackMap = figure.layout.meta && ["trackMap", "qualifyingTrackMap", "trackMapComparison"].includes(figure.layout.meta.f1ExplorerKind);
     const lineChart = !table && !telemetry && !trackMap && Array.isArray(figure.data) &&
       figure.data.some((trace) => (trace.type === "scatter" || trace.type === "scattergl") &&
         typeof trace.mode === "string" && trace.mode.includes("lines"));

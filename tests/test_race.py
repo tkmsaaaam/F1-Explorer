@@ -193,7 +193,10 @@ class Race(unittest.TestCase):
         session = SimpleNamespace(event=SimpleNamespace(year=2026))
 
         with (
-            patch("visualizations.race.calculate_gap_to_ahead", return_value=[(1, 1.25)]),
+            patch(
+                "visualizations.race.calculate_gap_to_ahead",
+                return_value=[(1, None), (2, 1.25), (3, 3.25)],
+            ),
             patch("visualizations.race.fastf1.plotting.get_team_color", return_value="#123456"),
             patch("visualizations.race.save_plotly") as save,
         ):
@@ -203,7 +206,7 @@ class Race(unittest.TestCase):
         default_figure = save.call_args_list[0].args[0]
         ranged_figure = save.call_args_list[1].args[0]
         self.assertEqual(["FIRST", "SECOND"], [trace.name for trace in default_figure.data])
-        self.assertEqual((30, 0), default_figure.layout.yaxis.range)
+        self.assertEqual((3.29, 1.21), default_figure.layout.yaxis.range)
         self.assertEqual((15, 0), ranged_figure.layout.yaxis.range)
         self.assertEqual("output/gap_ahead_graph.png", save.call_args_list[0].args[1])
 

@@ -22,6 +22,22 @@ from visualizations.style import driver_linestyle
 tracer = trace.get_tracer(__name__)
 
 
+def _interactive_driver_style(session: Session, driver_number, team) -> tuple[str, str]:
+    """Return the team color and camera-based Plotly dash for a driver."""
+    color = "gray"
+    if pandas.notna(team) and str(team):
+        try:
+            color = fastf1.plotting.get_team_color(str(team), session)
+        except (AttributeError, KeyError, TypeError, ValueError):
+            pass
+    try:
+        style = driver_linestyle(session.event.year, int(driver_number))
+        dash = "dash" if style == "dashed" else "solid"
+    except (AttributeError, TypeError, ValueError):
+        dash = "solid"
+    return color, dash
+
+
 @tracer.start_as_current_span("plot_lap_number_by_timing")
 def plot_lap_number_by_timing(session: Session, log: structlog.stdlib.BoundLogger, *, output_dir: str | Path | None = None):
     """y = ラップ番号
@@ -346,6 +362,8 @@ def _make_interactive_laptime_by_lap_number(session: Session) -> go.Figure:
         if driver_laps.empty:
             continue
         driver = str(driver_laps.Driver.iloc[0])
+        team = driver_laps.Team.iloc[0] if "Team" in driver_laps else ""
+        color, dash = _interactive_driver_style(session, driver_number, team)
         customdata = [
             [str(row.Compound), row.TyreLife, row.Stint]
             for row in driver_laps.itertuples()
@@ -355,6 +373,7 @@ def _make_interactive_laptime_by_lap_number(session: Session) -> go.Figure:
             y=driver_laps.LapTime.dt.total_seconds().tolist(),
             mode="lines+markers",
             name=driver,
+            line={"color": color, "dash": dash},
             legendrank=ranks.get(str(driver_number), 1_000_000),
             customdata=customdata,
             hovertemplate=(
@@ -446,6 +465,8 @@ def _make_interactive_laptime_by_timing(session: Session, laps: Laps | None = No
             continue
         starts = _lap_start_dates(session, driver_laps).tolist()
         driver = str(driver_laps.Driver.iloc[0])
+        team = driver_laps.Team.iloc[0] if "Team" in driver_laps else ""
+        color, dash = _interactive_driver_style(session, driver_number, team)
         x = []
         y = []
         customdata = []
@@ -465,6 +486,7 @@ def _make_interactive_laptime_by_timing(session: Session, laps: Laps | None = No
             y=y,
             mode="lines+markers",
             name=driver,
+            line={"color": color, "dash": dash},
             legendrank=ranks.get(str(driver_number), 1_000_000),
             customdata=customdata,
             hovertemplate=(

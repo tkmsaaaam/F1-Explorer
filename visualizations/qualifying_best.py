@@ -3,14 +3,7 @@
 import pandas as pd
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
-
-
-def _bar_range(values):
-    if not values:
-        return None
-    low, high = min(values), max(values)
-    pad = max((high - low) * 0.08, high * 0.01)
-    return [max(0, low - pad), high + pad]
+from visualizations.chart_ranges import bar_range
 
 
 def _team_colors(drivers, teams, session):
@@ -81,7 +74,7 @@ def make_qualifying_best(session):
              "cells.values": [None, None, cells]},
             {"title.text": label + ("（有効なタイムなし）" if not times else ""),
              "yaxis.autorange": False,
-             "yaxis.range": _bar_range(times),
+             "yaxis.range": bar_range(times),
              "xaxis.categoryarray": drivers},
         ]))
     views = []
@@ -96,7 +89,7 @@ def make_qualifying_best(session):
         title=initial_label, height=1500, margin=dict(t=160, b=40), showlegend=False,
         meta=dict(f1ExplorerKind="qualifyingBest"),
         xaxis=dict(title="Driver", categoryorder="array", categoryarray=initial_drivers),
-        yaxis=dict(title="Time [s]", tickformat=".3f", range=_bar_range(initial_times)),
+        yaxis=dict(title="Time [s]", tickformat=".3f", range=bar_range(initial_times)),
         updatemenus=[dict(buttons=combinations_menu, x=0, y=1.14, xanchor="left"),
                      dict(buttons=views, type="buttons", direction="right", x=0.55, y=1.14)],
     )

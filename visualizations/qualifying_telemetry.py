@@ -46,8 +46,8 @@ def _distance_time(lap: Any) -> tuple[np.ndarray, np.ndarray] | None:
     return (distance, times) if len(distance) >= 2 else None
 
 
-def make_qualifying_telemetry(session: Any) -> go.Figure:
-    """Build one five-tab telemetry chart for qualifying."""
+def make_telemetry_comparison(session: Any) -> go.Figure:
+    """Build one five-tab telemetry chart for short-session reports."""
     driver_numbers = _ordered_quicklap_drivers(session)
     laps = {}
     for number in driver_numbers:
@@ -154,7 +154,7 @@ def make_qualifying_telemetry(session: Any) -> go.Figure:
     figure.update_layout(
         title=labels[0] if figure.data else "有効なテレメトリーデータなし",
         hovermode="x unified", template="plotly_white",
-        meta={"f1ExplorerKind": "qualifyingTelemetry"},
+        meta={"f1ExplorerKind": "telemetryComparison"},
         updatemenus=[dict(buttons=buttons, type="buttons", direction="right", x=0, y=1.16, xanchor="left")],
         margin={"l": 70, "r": 30, "t": 110, "b": 70},
     )
@@ -173,8 +173,8 @@ def make_qualifying_telemetry(session: Any) -> go.Figure:
     return figure
 
 
-def make_qualifying_track_map(session: Any) -> go.Figure:
-    """Build one driver-selectable speed/gear track map for qualifying."""
+def make_track_map_comparison(session: Any) -> go.Figure:
+    """Build one driver-selectable speed/gear track map for short-session reports."""
     drivers = _ordered_quicklap_drivers(session)
     entries: list[tuple[str, Any, np.ndarray, np.ndarray, np.ndarray, np.ndarray]] = []
     for number in drivers:
@@ -244,7 +244,7 @@ def make_qualifying_track_map(session: Any) -> go.Figure:
         driver_buttons.append({"label": str(driver_name), "method": "update", "args": [{"visible": visible}, {"title.text": f"速度 — {driver_name}"}]})
     figure.update_layout(
         title="速度 — " + (str(entries[0][1].Driver) if entries else "有効なテレメトリーデータなし"),
-        template="plotly_white", meta={"f1ExplorerKind": "qualifyingTrackMap"},
+        template="plotly_white", meta={"f1ExplorerKind": "trackMapComparison"},
         updatemenus=[
             {"buttons": [{"label": label, "method": "update", "args": [{"visible": [i in groups[label] and i == driver_indices[driver_labels[0]][0 if label == '速度' else 1] for i in range(len(figure.data))]}, {"title.text": label}]} for label in ("速度", "ギア")], "type": "buttons", "direction": "right", "x": 0, "y": 1.16},
             {"buttons": driver_buttons, "type": "dropdown", "x": 0.28, "y": 1.16},
@@ -254,3 +254,8 @@ def make_qualifying_track_map(session: Any) -> go.Figure:
     figure.update_xaxes(visible=False)
     figure.update_yaxes(visible=False, scaleanchor="x", scaleratio=1)
     return figure
+
+
+# Backward-compatible names used by the qualifying entry point.
+make_qualifying_telemetry = make_telemetry_comparison
+make_qualifying_track_map = make_track_map_comparison

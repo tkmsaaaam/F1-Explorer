@@ -249,11 +249,22 @@ def _make_interactive_long_run_figure(
             continue
         name = f"{stint.driver.name} / laps {laps[0]}–{laps[-1]}"
         customdata = [[stint.driver.name, stint.driver.team_name, lap] for lap in laps]
+        try:
+            color = (fastf1.plotting.get_team_color(stint.driver.team_name, session)
+                     if stint.driver.team_name else "gray")
+        except (AttributeError, KeyError, TypeError, ValueError):
+            color = "gray"
+        try:
+            line_style = driver_linestyle(session.event.year, stint.driver.number)
+            dash = "dash" if line_style == "dashed" else "solid"
+        except (AttributeError, TypeError, ValueError):
+            dash = "solid"
         fig.add_trace(go.Scatter(
             x=laps,
             y=[stint.laps[lap] for lap in laps],
             mode="lines+markers",
             name=name,
+            line={"color": color, "dash": dash},
             legendrank=ranks.get(str(stint.driver.number), 1_000_000),
             customdata=customdata,
             hovertemplate=(

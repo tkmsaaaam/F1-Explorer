@@ -116,6 +116,27 @@ def test_qualifying_laptime_by_timing_uses_table_laps_and_breaks_lines_between_s
     assert list(figure.data[0].y) == [81.0, 82.0, None, 85.0]
     assert [row[0] for row in figure.data[0].customdata] == [2, 3, None, 6]
     assert figure.layout.xaxis.tickformat == "%H:%M"
+    assert figure.data[0].line.color == "gray"
+    assert figure.data[0].line.dash == "solid"
+
+
+def test_practice_laptime_charts_use_team_color_and_camera_dash():
+    laps = _laps(["1", "22"], [1, 1])
+    laps["Team"] = ["Shared Team", "Shared Team"]
+    session = SimpleNamespace(
+        name="Practice 1", laps=laps, results=pandas.DataFrame(),
+        event=SimpleNamespace(year=2025),
+    )
+
+    with patch("visualizations.run_volume.fastf1.plotting.get_team_color", return_value="#123456"):
+        figures = (
+            _make_interactive_laptime_by_timing(session),
+            _make_interactive_laptime_by_lap_number(session),
+        )
+
+    for figure in figures:
+        assert [trace.line.color for trace in figure.data] == ["#123456", "#123456"]
+        assert [trace.line.dash for trace in figure.data] == ["solid", "dash"]
 
 
 def _race_session(name: str) -> SimpleNamespace:
@@ -182,3 +203,5 @@ def test_non_race_interactive_laptime_range_keeps_full_autorange():
 
     assert figure.layout.yaxis.range is None
     assert figure.layout.yaxis.autorange == "reversed"
+    assert figure.data[0].line.color == "gray"
+    assert figure.data[0].line.dash == "solid"

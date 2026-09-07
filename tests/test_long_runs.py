@@ -1,9 +1,12 @@
 import unittest
+from types import SimpleNamespace
+from unittest.mock import patch
 
 import pandas
 from fastf1.core import Laps
 
-from visualizations.long_runs import LongRunCriteria, make_stint_set, Stint
+from visualizations.domain.driver import Driver
+from visualizations.long_runs import LongRunCriteria, _make_interactive_long_run_figure, make_stint_set, Stint
 
 
 class LongRuns(unittest.TestCase):
@@ -190,6 +193,32 @@ class LongRuns(unittest.TestCase):
         }
         result = make_stint_set(3, Laps(pandas.DataFrame(data)), "SOFT", LongRunCriteria())
         self.assertEqual(1, len(result))
+
+    def test_interactive_stints_keep_team_color_and_camera_dash(self):
+        stints = [
+            Stint("SOFT", {1: 94.0, 2: 94.2}, Driver(1, "Max", "Shared Team")),
+            Stint("SOFT", {5: 95.0, 6: 95.2}, Driver(1, "Max", "Shared Team")),
+            Stint("SOFT", {1: 95.5, 2: 95.7}, Driver(22, "Yuki", "Shared Team")),
+        ]
+        session = SimpleNamespace(
+            event=SimpleNamespace(year=2025),
+            results=pandas.DataFrame(),
+            laps=pandas.DataFrame(),
+        )
+
+        with patch("visualizations.long_runs.fastf1.plotting.get_team_color", return_value="#123456"):
+            figure = _make_interactive_long_run_figure(session, "SOFT", stints)
+
+        self.assertEqual(["#123456"] * 3, [trace.line.color for trace in figure.data])
+        self.assertEqual(["solid", "solid", "dash"], [trace.line.dash for trace in figure.data])
+
+        fallback_session = SimpleNamespace(results=pandas.DataFrame(), laps=pandas.DataFrame())
+        fallback = _make_interactive_long_run_figure(
+            fallback_session, "SOFT",
+            [Stint("SOFT", {1: 96.0, 2: 96.2}, Driver(99, "Unknown", ""))],
+        )
+        self.assertEqual("gray", fallback.data[0].line.color)
+        self.assertEqual("solid", fallback.data[0].line.dash)
 
 
 if __name__ == '__main__':
