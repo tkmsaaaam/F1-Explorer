@@ -1,4 +1,5 @@
 from pathlib import Path
+from bisect import bisect_left
 from typing import cast
 
 import fastf1.plotting
@@ -20,6 +21,69 @@ from visualizations.session_order import driver_order, driver_sort_key
 from visualizations.style import driver_linestyle
 
 tracer = trace.get_tracer(__name__)
+
+TURBULENCE_GAP_SECONDS = 2.0
+
+
+def _lap_start_context(laps: Laps, threshold: float = TURBULENCE_GAP_SECONDS) -> dict[tuple[str, int], dict[str, object]]:
+    """Return the line-crossing context for each lap's start.
+
+    The immediately preceding crossing is used instead of classification
+    position, so lapped cars and cars that have changed position are handled
+    in on-track order.
+    """
+    events = []
+    for row in laps.itertuples():
+        if pandas.isna(getattr(row, "Time", pandas.NaT)) or pandas.isna(getattr(row, "DriverNumber", pandas.NA)):
+            continue
+        events.append((row.Time, str(row.DriverNumber), row))
+    events.sort(key=lambda event: event[0])
+    event_times = [event[0] for event in events]
+    result = {}
+    for row in laps.itertuples():
+        key = (str(row.DriverNumber), int(row.LapNumber)) if not pandas.isna(row.LapNumber) else None
+        if key is None or pandas.isna(getattr(row, "LapStartTime", pandas.NaT)):
+            continue
+        prior_index = bisect_left(event_times, row.LapStartTime) - 1
+        if prior_index < 0:
+            continue
+        crossing_time, ahead_number, _ = events[prior_index]
+        if ahead_number == key[0]:
+            continue
+        gap = (row.LapStartTime - crossing_time).total_seconds()
+        if gap < 0:
+            continue
+        result[key] = {
+            "ahead_driver_number": ahead_number,
+            "gap_seconds": gap,
+            "within_threshold": gap <= threshold,
+        }
+    return result
+
+
+def _lap_quality(row) -> tuple[bool, list[str]]:
+    """Classify a lap for the R-02 marker outline and explain the result."""
+    def is_true(value) -> bool:
+        if value is None or value is pandas.NA:
+            return False
+        present = pandas.notna(value)
+        return bool(present) and bool(value)
+
+    reasons = []
+    if not is_true(getattr(row, "IsAccurate", False)):
+        reasons.append("timing accuracy")
+    if is_true(getattr(row, "Deleted", False)):
+        reasons.append("deleted")
+    if is_true(getattr(row, "FastF1Generated", False)):
+        reasons.append("generated timing")
+    if not pandas.isna(getattr(row, "PitInTime", pandas.NaT)):
+        reasons.append("pit-in lap")
+    if not pandas.isna(getattr(row, "PitOutTime", pandas.NaT)):
+        reasons.append("pit-out lap")
+    status = str(getattr(row, "TrackStatus", ""))
+    if status not in {"1", "1.0"}:
+        reasons.append(f"track status {status or 'unknown'}")
+    return not reasons, reasons
 
 
 def _interactive_driver_style(session: Session, driver_number, team) -> tuple[str, str]:
@@ -356,6 +420,7 @@ def _make_interactive_laptime_by_lap_number(session: Session) -> go.Figure:
     """Build an interactive counterpart to the legacy static lap-time plot."""
     fig = go.Figure()
     ranks = driver_order(session)
+    lap_context = _lap_start_context(session.laps)
     groups = sorted(session.laps.groupby("DriverNumber"), key=lambda item: driver_sort_key(item[0], ranks))
     for driver_number, driver_laps in groups:
         driver_laps = driver_laps.sort_values("LapNumber").dropna(subset=["LapTime"])
@@ -364,22 +429,32 @@ def _make_interactive_laptime_by_lap_number(session: Session) -> go.Figure:
         driver = str(driver_laps.Driver.iloc[0])
         team = driver_laps.Team.iloc[0] if "Team" in driver_laps else ""
         color, dash = _interactive_driver_style(session, driver_number, team)
-        customdata = [
-            [str(row.Compound), row.TyreLife, row.Stint]
-            for row in driver_laps.itertuples()
-        ]
+        marker_colors, marker_line_colors, marker_line_widths, customdata = [], [], [], []
+        for row in driver_laps.itertuples():
+            context = lap_context.get((str(driver_number), int(row.LapNumber)))
+            clean, reasons = _lap_quality(row)
+            close = context is not None and bool(context["within_threshold"])
+            marker_colors.append("white" if close else color)
+            marker_line_colors.append(color if clean else "black")
+            marker_line_widths.append(1.5 if clean else 1.0)
+            gap_text = "unknown" if context is None else f'{float(context["gap_seconds"]):.3f}s'
+            ahead_text = "unknown" if context is None else str(context["ahead_driver_number"])
+            quality_text = "clean" if clean else "non-clean: " + ", ".join(reasons)
+            customdata.append([str(row.Compound), row.TyreLife, row.Stint, ahead_text, gap_text, quality_text])
         fig.add_trace(go.Scatter(
             x=driver_laps.LapNumber.tolist(),
             y=driver_laps.LapTime.dt.total_seconds().tolist(),
             mode="lines+markers",
             name=driver,
             line={"color": color, "dash": dash},
+            marker={"color": marker_colors, "line": {"color": marker_line_colors, "width": marker_line_widths}},
             legendrank=ranks.get(str(driver_number), 1_000_000),
             customdata=customdata,
             hovertemplate=(
                 "Driver: %{fullData.name}<br>Lap: %{x}<br>Time: %{y:.3f}s"
                 "<br>Compound: %{customdata[0]}<br>Tyre life: %{customdata[1]}"
-                "<br>Stint: %{customdata[2]}<extra></extra>"
+                "<br>Stint: %{customdata[2]}<br>Ahead at lap start: %{customdata[3]}"
+                "<br>Gap at lap start: %{customdata[4]}<br>Lap quality: %{customdata[5]}<extra></extra>"
             ),
         ))
     y_range = _interactive_race_laptime_range(session)
@@ -395,6 +470,7 @@ def _make_interactive_laptime_by_lap_number(session: Session) -> go.Figure:
         xaxis=dict(rangeslider=dict(visible=True)),
         hovermode="closest",
         legend_title="Driver (click to toggle)",
+        meta={"f1ExplorerKind": "raceLapTime", "f1ExplorerDisplayRules": True},
         margin=dict(l=60, r=20, t=60, b=50),
     )
     return fig

@@ -246,7 +246,10 @@ class SessionReport:
                     safe_json = item.figure_json.replace("<", "\\u003c") if item.figure_json else "{}"
                     is_table = '"type":"table"' in item.figure_json
                     is_qualifying_best = '"f1ExplorerKind":"qualifyingBest"' in item.figure_json
+                    is_race_laptime = '"f1ExplorerKind":"raceLapTime"' in item.figure_json
                     kind = (" table" if is_table else "") + (" qualifying-best" if is_qualifying_best else "")
+                    if is_race_laptime:
+                        body.append('''<div class="r02-rules"><strong>マーカーの見方</strong><table><thead><tr><th>ラップ開始時の状況</th><th>クリーンラップ</th><th>非クリーンラップ</th></tr></thead><tbody><tr><th>前走車とのギャップが2.000秒以内</th><td><span class="r02-swatch r02-close-clean"></span>白塗り＋チームカラー枠</td><td><span class="r02-swatch r02-close-unclean"></span>白塗り＋細い黒枠</td></tr><tr><th>2.000秒超またはギャップ不明</th><td><span class="r02-swatch r02-normal-clean"></span>チームカラー塗り</td><td><span class="r02-swatch r02-normal-unclean"></span>チームカラー塗り＋細い黒枠</td></tr></tbody></table><p>前走車は順位ではなく、ラップ開始時点で直前にコントロールラインを通過した車です。非クリーンラップにはSC・VSC・黄旗、ピットイン／アウト、計測精度不足などを含みます。判定はラップ開始時点を基準とし、ラップ途中で追いついたケースは含みません。</p></div>''')
                     body.append(
                         f'<div class="plotly-container{kind}" data-plotly-source="{escape(data_id)}" '
                         f'data-report-section="{escape(item.section)}"></div>'
@@ -275,6 +278,15 @@ main {{ width: 100%; max-width: 1500px; margin: 0 auto; padding: 1rem 2rem 4rem;
 .report-section h2 {{ border-bottom: 2px solid #b8c4d1; padding-bottom: .4rem; }}
 .figure-card {{ min-width: 0; max-width: 100%; overflow-x: hidden; scroll-margin-top: 4rem; margin: 1.4rem 0 2rem; padding: 1rem; background: white; border: 1px solid #e0e4e8; border-radius: 8px; box-shadow: 0 1px 3px #0000000d; }}
 .figure-card h3 {{ margin-top: 0; }}
+.r02-rules {{ margin: 0 0 1rem; padding: .75rem 1rem; background: #f5f7fa; border: 1px solid #d9dee5; border-radius: 6px; font-size: .9rem; overflow-x: auto; }}
+.r02-rules table {{ margin: .5rem 0; border-collapse: collapse; width: 100%; min-width: 620px; }}
+.r02-rules th, .r02-rules td {{ padding: .35rem .5rem; border: 1px solid #d9dee5; text-align: left; vertical-align: middle; }}
+.r02-rules th {{ background: #edf1f5; font-weight: 600; }}
+.r02-rules p {{ margin: .6rem 0 0; color: #4d5966; }}
+.r02-swatch {{ display: inline-block; width: .85rem; height: .85rem; margin-right: .35rem; vertical-align: -.1rem; border-radius: 50%; background: #58708a; }}
+.r02-close-clean {{ background: white; border: 2px solid #58708a; }}
+.r02-close-unclean {{ background: white; border: 1px solid #111; }}
+.r02-normal-unclean {{ border: 1px solid #111; }}
 .figure-card img {{ display: block; width: auto; max-width: 100%; height: auto; }}
 .zoomable-image {{ cursor: zoom-in; }}
 .plotly-container {{ min-height: 640px; height: 640px; width: 100%; max-width: 100%; overflow-x: hidden; }}

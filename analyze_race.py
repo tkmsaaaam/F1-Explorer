@@ -82,7 +82,7 @@ def main(*, force: bool = False):
 
     weather.execute(session, log, path)
     report.deactivate()
-    report.write(extra_paths=(output_dir.parent / "tyres.png",))
+    report.write(scan_existing=False)
     write_success_manifest(
         report_dir,
         fingerprint,

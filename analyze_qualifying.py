@@ -7,7 +7,9 @@ import fastf1
 from opentelemetry import trace
 
 import setup
-from visualizations import run_volume, short_runs, weather, weekend, comparison
+from visualizations import run_volume, short_runs, weather, weekend
+from visualizations.qualifying_telemetry import make_qualifying_telemetry, make_qualifying_track_map
+from visualizations.output import save_plotly
 from visualizations.output import session_output_dir, session_report_dir
 from visualizations.report import SessionReport
 from visualizations.qualifying_best import make_qualifying_best
@@ -74,19 +76,13 @@ def main(*, force: bool = False):
     config.set_attribute_to_span()
     log.info(f"{config.get_year()} Race {config.get_round()} {session.event.EventName} {config.get_session()}")
 
-    comparison.execute(session, log, config.get_comparison())
     run_volume.plot_lap_number_by_timing(session, log)
     run_volume.plot_laptime(session, log, split_qualifying=True)
     run_volume.plot_laptime_by_timing(session, log, exclude_pit_laps=True)
     run_volume.plot_laptime_by_lap_number(session, log)
 
-    short_runs.plot_best_laptime(session, log, 'Sector1Time')
-    short_runs.plot_best_laptime(session, log, 'Sector2Time')
-    short_runs.plot_best_laptime(session, log, 'Sector3Time')
-    short_runs.plot_best_laptime(session, log, 'LapTime')
-    report.register_plotly(make_qualifying_best(session), output_dir / 'LapTime.png')
-
-    report.register_plotly(make_qualifying_speed(session), output_dir / 'SpeedFL.png')
+    save_plotly(make_qualifying_best(session), output_dir / 'LapTime.png', log, width=1920, height=1500)
+    save_plotly(make_qualifying_speed(session), output_dir / 'SpeedFL.png', log, width=1920, height=1080)
 
     circuit = session.get_circuit_info()
     fastest = session.laps.pick_fastest()
@@ -112,41 +108,27 @@ def main(*, force: bool = False):
     short_runs.plot_flat_out(session, log)
     short_runs.plot_ideal_best(session, log)
     short_runs.plot_ideal_best_diff(session, log)
-    short_runs.plot_gear_shift_on_track(session, log)
     short_runs.plot_speed_and_laptime(session, log)
-    short_runs.plot_speed_distance(session, log)
-    short_runs.plot_speed_distance_comparison(session, log)
-    short_runs.plot_speed_on_track(session, log)
-    short_runs.plot_time_distance_comparison(session, log)
     short_runs.plot_tyre_age_and_laptime(session, log)
-    short_runs.plot_drs(session, log)
-    short_runs.plot_brake(session, log)
-    short_runs.plot_throttle(session, log)
-
-    n = short_runs.compute_competitive_drivers(session, log, 4)
-    short_runs.plot_telemetry(session, log,
-                              n,
-                              key='drs',
-                              label='DRS',
-                              value_func=lambda data: data.DRS.astype(float)
-                              )
-    short_runs.plot_telemetry(session, log,
-                              n,
-                              key='brake',
-                              label='Brake',
-                              value_func=lambda data: data.Brake.astype(float)
-                              )
-    short_runs.plot_telemetry(session, log,
-                              n,
-                              key='throttle',
-                              label='Throttle [%]',
-                              value_func=lambda data: data.Throttle
-                              )
+    save_plotly(
+        make_qualifying_telemetry(session),
+        output_dir / "time_distance_delta.png",
+        log,
+        width=1920,
+        height=1080,
+    )
+    save_plotly(
+        make_qualifying_track_map(session),
+        output_dir / "speed_on_track.png",
+        log,
+        width=1920,
+        height=1080,
+    )
 
     weather.execute(session, log, base_path)
     weekend.plot_tyre(config.get_year(), config.get_round(), log)
     report.deactivate()
-    report.write(extra_paths=(output_dir.parent / "tyres.png",))
+    report.write(scan_existing=False)
     write_success_manifest(
         report_dir,
         fingerprint,
