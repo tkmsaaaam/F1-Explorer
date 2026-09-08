@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from html import escape
 import re
+from pathlib import Path
 
 
 @dataclass(frozen=True, slots=True)
@@ -164,6 +165,28 @@ def _plain_title(title: str) -> str:
     return re.split(r"\s+—\s+", plain, maxsplit=1)[0]
 
 
+def is_spec_output(session_name: str, relative_path: Path) -> bool:
+    """Allow only declared outputs, including the five P-07 compounds."""
+    selected = layout_for_session(session_name)
+    if selected is None:
+        return True
+    prefix, sections = selected
+    if relative_path.parent == Path("long_runs"):
+        return prefix == "P" and relative_path.stem.lower() in {
+            "soft", "medium", "hard", "intermediate", "wet",
+        }
+    if relative_path.parent == Path("__external__"):
+        return relative_path.name == "tyres.png"
+    if relative_path.parent != Path("."):
+        return False
+    key = relative_path.stem.lower().replace("_", " ")
+    if key == "tyres":
+        return prefix == "R"
+    if prefix == "P" and key in {"speed distance", "throttle", "brake", "shift on track"}:
+        return False  # P-14/15/16/18 are replaced by the integrated tabs.
+    return any(key == item.key for section in sections for item in section.items)
+
+
 def _card_key(card: str) -> tuple[str, str]:
     article = re.search(r'<article\b[^>]*id="([^"]+)"', card, re.S)
     anchor = article[1].lower() if article else ""
@@ -227,6 +250,8 @@ def organize_session_report_html(html: str, session_name: str) -> str:
         for item in section.items:
             item_number += 1
             entries = groups.pop(item.key, [])
+            if prefix == "P" and item_number in {14, 15, 16, 18}:
+                continue
             if item.key == "long run":
                 entries.sort(key=lambda entry: long_run_order.get(entry[1].lower(), 99))
             for branch_index, (card, raw_title) in enumerate(entries):
@@ -259,14 +284,6 @@ def organize_session_report_html(html: str, session_name: str) -> str:
                 + '</ul></details>' + ''.join(section_content) + '</section>'
             )
 
-    if groups:
-        nav.append('<a href="#additional-figures">その他の出力（仕様未登録）</a>')
-        rendered_sections.append(
-            '<section class="report-section" id="additional-figures">'
-            '<h2>その他の出力（仕様未登録）</h2>'
-            + ''.join(card for entries in groups.values() for card, _ in entries)
-            + '</section>'
-        )
     html = html[:main.start(1)] + ''.join(rendered_sections) + html[main.end(1):]
     return re.sub(
         r'<nav>.*?</nav>', lambda _: '<nav>' + ''.join(nav) + '</nav>', html, count=1, flags=re.S

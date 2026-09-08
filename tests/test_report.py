@@ -14,14 +14,59 @@ import plotly.graph_objects as go
 from visualizations.report import SessionReport, current_report
 from visualizations.qualifying_layout import QUALIFYING_SECTIONS, organize_qualifying_report_html
 from visualizations.report_layout import PRACTICE_SECTIONS, RACE_SECTIONS, organize_session_report_html
+from unittest.mock import MagicMock, patch
+from visualizations.output import save_matplotlib, save_plotly
 
 
 class SessionReportTest(unittest.TestCase):
+    def test_unknown_outputs_are_neither_saved_nor_scanned(self):
+        with TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            with SessionReport(SimpleNamespace(name="Practice 1"), root) as report:
+                unknown = root / "unknown.png"
+                figure = MagicMock()
+                with patch("visualizations.output.plt.close") as close:
+                    save_matplotlib(figure, unknown, MagicMock())
+                figure.savefig.assert_not_called()
+                close.assert_called_once_with(figure)
+                save_plotly(figure, unknown, MagicMock(), width=640, height=640)
+                figure.write_image.assert_not_called()
+                unknown.write_bytes(b"old image")
+                report.scan_images()
+                self.assertEqual([], report._ordered_items())
+
+    def test_fresh_generation_does_not_reuse_stale_start_images(self):
+        with TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root / "speed_first_10s.png").write_bytes(b"old fastest lap")
+            report = SessionReport(SimpleNamespace(name="Race"), root)
+            html = report.write(scan_existing=False).read_text()
+            self.assertNotIn("speed_first_10s.png", html)
+
+    def test_sprint_qualifying_has_exactly_26_declared_cards(self):
+        with TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            output = root / "SprintQualifying"
+            output.mkdir()
+            report = SessionReport(SimpleNamespace(name="Sprint Qualifying"), output)
+            for _, _, entries in QUALIFYING_SECTIONS:
+                for key, _ in entries:
+                    path = root / "tyres.png" if key == "weekend tyres" else output / (key.replace(" ", "_") + ".png")
+                    path.write_bytes(b"placeholder")
+                    report.register_image(path)
+            (output / "sector1time.png").write_bytes(b"obsolete")
+            html = report.write().read_text()
+            self.assertEqual(re.findall(r'<h3>\[(Q-\d+)\]', html),
+                             [f"Q-{number:02}" for number in range(1, 27)])
+            self.assertNotIn("additional-figures", html)
+            self.assertNotIn("sector1time.png", html)
+
     def test_axis_range_controls_cover_race_qualifying_and_practice(self) -> None:
         cases = (
             ("Race", "gap_top_graph.png", "Race"),
+            ("Sprint", "gap_top_graph.png", "Race"),
             ("Qualifying", "laptime_by_lap_number.png", "Run Volume"),
-            ("Practice 1", "long_run_soft.png", "Long Runs"),
+            ("Practice 1", "long_runs/SOFT.png", "Long Runs"),
         )
         with TemporaryDirectory() as temporary:
             root = Path(temporary)
@@ -30,8 +75,9 @@ class SessionReportTest(unittest.TestCase):
                     output_dir = root / session_name
                     output_dir.mkdir()
                     line_path = output_dir / filename
+                    line_path.parent.mkdir(parents=True, exist_ok=True)
                     line_path.write_bytes(b"placeholder")
-                    telemetry_path = output_dir / "speed_distance.png"
+                    telemetry_path = output_dir / "time_distance_delta.png"
                     telemetry_path.write_bytes(b"placeholder")
                     session = SimpleNamespace(
                         name=session_name,
@@ -45,7 +91,8 @@ class SessionReportTest(unittest.TestCase):
                     html = report.write().read_text(encoding="utf-8")
 
                     self.assertIn(f'data-report-section="{expected_section}"', html)
-                    self.assertIn('data-report-section="Telemetry"', html)
+                    if session_name not in {"Race", "Sprint"}:
+                        self.assertIn('data-report-section="Telemetry"', html)
                     self.assertIn("const lineChart = !table && !telemetry && !trackMap", html)
                     self.assertIn("figure.layout.xaxis = Object.assign", html)
                     self.assertIn('controls.className = "y-range-controls"', html)
@@ -68,7 +115,8 @@ class SessionReportTest(unittest.TestCase):
                     article_id = f"external-tyres-{i}"
                 cards.append(f'<article id="{article_id}"><h3>{title}</h3></article>')
             result = organize_session_report_html('<nav></nav><main>' + ''.join(cards) + '</main>', session_name)
-            expected = [f'[{prefix}-{i:02d}] {item.title}' for i, item in enumerate(entries, 1)]
+            expected = [f'[{prefix}-{i:02d}] {item.title}' for i, item in enumerate(entries, 1)
+                        if prefix != "P" or i not in {14, 15, 16, 18}]
             self.assertEqual(re.findall(r'<h3>(.*?)</h3>', result), expected)
             self.assertEqual(organize_session_report_html(result, session_name), result)
 
@@ -83,7 +131,7 @@ class SessionReportTest(unittest.TestCase):
         numbered = organize_qualifying_report_html(original)
         self.assertIn('<h3>[Q-05] 時刻別のラップタイム推移</h3>', numbered)
         self.assertIn('<h3>[Q-23] 気温の推移</h3>', numbered)
-        self.assertIn('<article id="unknown"><h3>Unknown</h3></article>', numbered)
+        self.assertNotIn('<article id="unknown">', numbered)
         self.assertIn('<script type="application/json">{"data":[]}</script>', numbered)
         self.assertIn('id="timing-2"', numbered)
         self.assertEqual(organize_qualifying_report_html(numbered), numbered)
@@ -121,8 +169,7 @@ class SessionReportTest(unittest.TestCase):
         with TemporaryDirectory() as temporary:
             output_dir = Path(temporary) / "Qualifying"
             output_dir.mkdir()
-            static_path = output_dir / "long_runs" / "Soft.png"
-            static_path.parent.mkdir()
+            static_path = output_dir / "air_temp.png"
             static_path.write_bytes(b"not-a-real-image")
             interactive_path = output_dir / "laptime_by_lap_number.png"
             interactive_path.write_bytes(b"placeholder")
@@ -146,13 +193,16 @@ class SessionReportTest(unittest.TestCase):
 
             html = report_path.read_text(encoding="utf-8")
             self.assertIn("id=\"summary\"", html)
-            self.assertIn("id=\"additional-figures\"", html)
+            self.assertNotIn("id=\"additional-figures\"", html)
             self.assertIn("plotly-container", html)
             self.assertIn(".plotly-container.qualifying-best", html)
             self.assertIn("data:image/png;base64,", html)
             self.assertIn("zoomable-image", html)
-            self.assertIn('data-image-path="file://', html)
-            self.assertIn("window.open(image.dataset.imagePath || image.currentSrc || image.src", html)
+            self.assertNotIn('data-image-path=', html)
+            self.assertIn('new Blob([bytes], {type: "image/png"})', html)
+            self.assertIn('window.open(url, "_blank", "noopener,noreferrer")', html)
+            self.assertIn('value="${initialLow}"', html)
+            self.assertIn('value="${initialHigh}"', html)
             self.assertIn("tyres.png", html)
             self.assertIn('data-report-section="Run Volume"', html)
             self.assertIn("const lineChart", html)
@@ -244,7 +294,7 @@ class SessionReportTest(unittest.TestCase):
 
             self.assertNotIn('<details class="figure-group">', html)
             self.assertIn('data-plotly-source="figure-data-telemetry-speed-on-track"', html)
-            self.assertIn('data-plotly-source="figure-data-telemetry-shift-on-track"', html)
+            self.assertNotIn('data-plotly-source="figure-data-telemetry-shift-on-track"', html)
             self.assertNotIn("1_VER.png", html)
             self.assertNotIn("11_PER.png", html)
             self.assertIn('id="telemetry-comparison"', html)
@@ -255,7 +305,7 @@ class SessionReportTest(unittest.TestCase):
             static_path = output_dir / "brake" / "1-5.png"
             static_path.parent.mkdir(parents=True)
             static_path.write_bytes(b"placeholder")
-            interactive_path = output_dir / "brake.png"
+            interactive_path = output_dir / "time_distance_delta.png"
             interactive_path.write_bytes(b"placeholder")
 
             session = SimpleNamespace(
@@ -267,14 +317,14 @@ class SessionReportTest(unittest.TestCase):
             report.register_plotly(go.Figure(data=[go.Scatter(x=[0, 1], y=[0, 1])]), interactive_path)
             html = report.write().read_text(encoding="utf-8")
 
-            self.assertIn('data-plotly-source="figure-data-telemetry-brake"', html)
+            self.assertIn('data-plotly-source="figure-data-telemetry-time-distance-delta"', html)
             self.assertNotIn("1-5.png", html)
 
     def test_report_can_be_written_outside_the_image_directory(self) -> None:
         with TemporaryDirectory() as temporary:
             image_dir = Path(temporary) / "images/session"
             report_dir = Path(temporary) / "reports/session"
-            image_path = image_dir / "plot.png"
+            image_path = image_dir / "air_temp.png"
             image_path.parent.mkdir(parents=True)
             image_path.write_bytes(b"placeholder")
             session = SimpleNamespace(
@@ -287,7 +337,7 @@ class SessionReportTest(unittest.TestCase):
 
             self.assertEqual(path, report_dir / "report.html")
             self.assertTrue(path.is_file())
-            self.assertIn("plot.png", path.read_text(encoding="utf-8"))
+            self.assertIn("air_temp.png", path.read_text(encoding="utf-8"))
 
 
 if __name__ == "__main__":

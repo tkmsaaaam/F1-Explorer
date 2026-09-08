@@ -2,6 +2,7 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import pandas
+import pytest
 from fastf1.core import Laps
 
 from visualizations.run_volume import (
@@ -120,11 +121,15 @@ def test_qualifying_laptime_by_timing_uses_table_laps_and_breaks_lines_between_s
     assert figure.data[0].line.dash == "solid"
 
 
-def test_practice_laptime_charts_use_team_color_and_camera_dash():
+@pytest.mark.parametrize("name", ["Practice 1", "Race", "Sprint"])
+def test_laptime_charts_use_team_color_and_camera_dash(name):
     laps = _laps(["1", "22"], [1, 1])
     laps["Team"] = ["Shared Team", "Shared Team"]
+    laps["IsAccurate"] = True
+    laps["Deleted"] = False
+    laps["TrackStatus"] = "1"
     session = SimpleNamespace(
-        name="Practice 1", laps=laps, results=pandas.DataFrame(),
+        name=name, laps=laps, results=pandas.DataFrame(),
         event=SimpleNamespace(year=2025),
     )
 

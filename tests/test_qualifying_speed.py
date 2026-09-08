@@ -2,6 +2,7 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 import pandas as pd
+import pytest
 
 from visualizations.qualifying_speed import make_qualifying_speed, _tow_mask
 
@@ -24,7 +25,8 @@ def test_tow_is_classified_at_each_telemetry_distance():
     assert _tow_mask(1, cache).tolist() == [False, False, False]
 
 
-def test_lap_selections_and_measurements_are_selectable():
+@pytest.mark.parametrize("name,prefix", [("Qualifying", "Q"), ("Sprint Qualifying", "SQ")])
+def test_lap_selections_and_measurements_are_selectable(name, prefix):
     laps = pd.DataFrame({
         "Driver": ["AAA", "AAA", "BBB", "CCC"],
         "Team": ["A", "A", "B", "C"],
@@ -46,7 +48,7 @@ def test_lap_selections_and_measurements_are_selectable():
           patch("visualizations.qualifying_speed._telemetry_cache", return_value=cache),
           patch("fastf1.plotting.get_team_color",
                 side_effect=lambda team, session: {"A": "red", "B": "blue"}.get(team, "gray"))):
-        figure = make_qualifying_speed(SimpleNamespace(name="Qualifying", laps=laps))
+        figure = make_qualifying_speed(SimpleNamespace(name=name, laps=laps))
 
     assert len(figure.data) == 24
     assert list(figure.data[0].x) == ["BBB", "AAA"]
@@ -57,8 +59,9 @@ def test_lap_selections_and_measurements_are_selectable():
     assert buttons[0].label == "全有効ラップ · フィニッシュライン"
     assert buttons[4].label == "全有効ラップ · ラップ中の最高速（トウあり）"
     assert buttons[5].label == "全有効ラップ · ラップ中の最高速（トウなし）"
-    assert buttons[6].label == "Q1ベストラップ · フィニッシュライン"
-    assert buttons[18].label == "Q3ベストラップ · フィニッシュライン"
+    assert buttons[6].label == f"{prefix}1ベストラップ · フィニッシュライン"
+    assert buttons[12].label == f"{prefix}2ベストラップ · フィニッシュライン"
+    assert buttons[18].label == f"{prefix}3ベストラップ · フィニッシュライン"
     assert buttons[1].args[1]["yaxis.range"] == [280.0, 295.0]
     assert list(figure.layout.yaxis.range) == [300.0, 315.0]
     assert figure.layout.meta["f1ExplorerKind"] == "qualifyingSpeed"

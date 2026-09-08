@@ -211,6 +211,8 @@ class LongRuns(unittest.TestCase):
 
         self.assertEqual(["#123456"] * 3, [trace.line.color for trace in figure.data])
         self.assertEqual(["solid", "solid", "dash"], [trace.line.dash for trace in figure.data])
+        self.assertEqual("Tyre age [laps]", figure.layout.xaxis.title.text)
+        self.assertEqual([5, 6], list(figure.data[1].x))
 
         fallback_session = SimpleNamespace(results=pandas.DataFrame(), laps=pandas.DataFrame())
         fallback = _make_interactive_long_run_figure(

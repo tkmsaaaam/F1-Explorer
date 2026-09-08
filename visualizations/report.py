@@ -1,8 +1,8 @@
 """Generate a self-contained, offline HTML report for one session.
 
-The report collector is intentionally additive: existing PNG files continue to
-be written, while Plotly figures are captured for interactive rendering and
-other images are embedded as static fallbacks.
+Declared PNG outputs remain available, while Plotly figures are captured for
+interactive rendering and static images are embedded. Fresh analysis runs do
+not scan old outputs; an explicit rebuild can still import declared PNGs.
 """
 
 from __future__ import annotations
@@ -17,7 +17,7 @@ from pathlib import Path
 import re
 from typing import Any, Iterable
 
-from visualizations.report_layout import organize_session_report_html
+from visualizations.report_layout import organize_session_report_html, is_spec_output
 
 
 _CURRENT_REPORT: ContextVar["SessionReport | None"] = ContextVar(
@@ -154,11 +154,16 @@ class SessionReport:
             "race", "sprint", "sprint race",
         }
 
+    def accepts_output(self, path: str | Path) -> bool:
+        return is_spec_output(str(getattr(self.session, "name", "")), self._relative(path))
+
     def _add(self, path: str | Path, *, figure_json: str | None = None) -> None:
         candidate = Path(path).resolve()
         if not candidate.is_file():
             return
         relative = self._relative(candidate)
+        if not self.accepts_output(candidate):
+            return
         if self._is_race_session() and candidate.name == "laptime_by_timing.png":
             return
         if figure_json is None and _is_interactive_telemetry_path(relative):
@@ -198,34 +203,20 @@ class SessionReport:
     def _ordered_items(self) -> list[ReportItem]:
         order = {section: index for index, section in enumerate(_SECTION_ORDER)}
         items = list(self._items.values())
-        if any(item.figure_json and '"f1ExplorerKind":"qualifyingBest"' in item.figure_json for item in items):
-            items = [item for item in items if item.path.stem.lower() not in
-                     {"sector1time", "sector2time", "sector3time"}]
-        if any(item.figure_json and '"f1ExplorerKind":"qualifyingSpeed"' in item.figure_json for item in items):
-            items = [item for item in items if item.path.stem.lower() not in
-                     {"speedi1", "speedi2", "speedst"}]
-        if any(item.figure_json and any(kind in item.figure_json for kind in (
-                '"f1ExplorerKind":"qualifyingTelemetry"',
-                '"f1ExplorerKind":"telemetryComparison"')) for item in items):
-            items = [item for item in items if item.path.stem.lower() not in
-                     {"speed_distance", "throttle", "brake"}]
-        if any(item.figure_json and any(kind in item.figure_json for kind in (
-                '"f1ExplorerKind":"qualifyingTrackMap"',
-                '"f1ExplorerKind":"trackMapComparison"')) for item in items):
-            items = [item for item in items if item.path.stem.lower() != "shift_on_track"]
-        if any(item.figure_json and '"f1ExplorerKind":"practiceBest"' in item.figure_json for item in items):
-            items = [item for item in items if item.path.stem.lower() not in {"sector1time", "sector2time", "sector3time"}]
-        if any(item.figure_json and '"f1ExplorerKind":"practiceSpeed"' in item.figure_json for item in items):
-            items = [item for item in items if item.path.stem.lower() not in {"speedi1", "speedi2", "speedst"}]
         return sorted(
             items,
             key=lambda item: (order.get(item.section, len(order)), item.path.as_posix()),
         )
 
-    def write(self, output_path: str | Path | None = None, *, extra_paths: Iterable[str | Path] = ()) -> Path:
+    def write(self, output_path: str | Path | None = None, *, extra_paths: Iterable[str | Path] = (),
+              scan_existing: bool = True) -> Path:
         """Write an offline report and return its path."""
 
-        self.scan_images(extra_paths)
+        if scan_existing:
+            self.scan_images(extra_paths)
+        else:
+            for path in extra_paths:
+                self.register_image(path)
         target = Path(output_path) if output_path is not None else self.report_dir / "report.html"
         target.parent.mkdir(parents=True, exist_ok=True)
         items = self._ordered_items()
@@ -263,8 +254,7 @@ class SessionReport:
                     body.append(f'<script type="application/json" id="{escape(data_id)}">{safe_json}</script>')
                 else:
                     encoded = base64.b64encode(item.path.read_bytes()).decode("ascii")
-                    source_url = escape(item.path.as_uri(), quote=True)
-                    body.append(f'<img class="zoomable-image" loading="lazy" src="data:image/png;base64,{encoded}" data-image-path="{source_url}" alt="{escape(item.title)}" title="Click to open the image in a new tab">')
+                    body.append(f'<img class="zoomable-image" loading="lazy" src="data:image/png;base64,{encoded}" alt="{escape(item.title)}" title="Click to open the image in a new tab">')
                 body.append(f'<p class="source">{escape(item.path.name)}</p></article>')
             body.append("</section>")
 
@@ -331,10 +321,20 @@ main {{ width: 100%; max-width: 1500px; margin: 0 auto; padding: 1rem 2rem 4rem;
     if (reverseYAxis) {{
       figure.layout.yaxis = Object.assign({{}}, figure.layout.yaxis, explicitYAxisRange ? {{autorange: false}} : {{autorange: "reversed"}});
     }}
+    const allYValues = (figure.data || []).flatMap((trace) => Array.isArray(trace.y) ? trace.y : [])
+      .filter((value) => typeof value === "number" && Number.isFinite(value));
     if (lineChart) {{
       figure.layout.xaxis = Object.assign({{}}, figure.layout.xaxis || {{}}, {{
         rangeslider: Object.assign({{}}, (figure.layout.xaxis || {{}}).rangeslider || {{}}, {{visible: true}}),
       }});
+      if (configuredYAxisRange.length !== 2 && allYValues.length >= 2) {{
+        const low = Math.min(...allYValues), high = Math.max(...allYValues);
+        const padding = (high - low || Math.max(Math.abs(high), 1)) * 0.02;
+        figure.layout.yaxis = Object.assign({{}}, figure.layout.yaxis || {{}}, {{
+          autorange: false,
+          range: reverseYAxis ? [high + padding, low - padding] : [low - padding, high + padding],
+        }});
+      }}
     }}
     window.Plotly.newPlot(node, figure.data || [], figure.layout || {{}}, {{responsive: true, displaylogo: false, scrollZoom: trackMap}}).then(() => {{
       if (qualifyingBest) {{
@@ -365,19 +365,21 @@ main {{ width: 100%; max-width: 1500px; margin: 0 auto; padding: 1rem 2rem 4rem;
           }});
         }});
       }}
-      const allYValues = (figure.data || []).flatMap((trace) => Array.isArray(trace.y) ? trace.y : [])
-        .filter((value) => typeof value === "number" && Number.isFinite(value));
       if (lineChart && allYValues.length >= 2) {{
         const domainLow = Math.min(...allYValues);
         const domainHigh = Math.max(...allYValues);
         const span = domainHigh - domainLow || Math.max(Math.abs(domainHigh), 1);
         const padding = span * 0.02;
-        const minimum = domainLow - padding;
-        const maximum = domainHigh + padding;
-        const step = Math.max((maximum - minimum) / 1000, Number.EPSILON);
+        const initialRange = configuredYAxisRange.length === 2 ? configuredYAxisRange :
+          (node._fullLayout.yaxis.range || [domainLow - padding, domainHigh + padding]);
+        const initialLow = Math.min(...initialRange);
+        const initialHigh = Math.max(...initialRange);
+        // Include explicit bounds (e.g. 60s even when all gaps are smaller).
+        const minimum = Math.min(domainLow - padding, initialLow);
+        const maximum = Math.max(domainHigh + padding, initialHigh);
         const controls = document.createElement("div");
         controls.className = "y-range-controls";
-        controls.innerHTML = `<label>Y range</label><div class="dual-range"><input aria-label="Y minimum" type="range" min="${{minimum}}" max="${{maximum}}" step="${{step}}" value="${{minimum}}"><input aria-label="Y maximum" type="range" min="${{minimum}}" max="${{maximum}}" step="${{step}}" value="${{maximum}}"></div><output class="y-range-values">${{minimum.toFixed(3)}} – ${{maximum.toFixed(3)}}</output>`;
+        controls.innerHTML = `<label>Y range</label><div class="dual-range"><input aria-label="Y minimum" type="range" min="${{minimum}}" max="${{maximum}}" step="any" value="${{initialLow}}"><input aria-label="Y maximum" type="range" min="${{minimum}}" max="${{maximum}}" step="any" value="${{initialHigh}}"></div><output class="y-range-values">${{initialLow.toFixed(3)}} – ${{initialHigh.toFixed(3)}}</output>`;
         node.parentNode.insertBefore(controls, node);
         const sliders = controls.querySelectorAll("input");
         const output = controls.querySelector("output");
@@ -390,6 +392,17 @@ main {{ width: 100%; max-width: 1500px; margin: 0 auto; padding: 1rem 2rem 4rem;
           window.Plotly.relayout(node, {{"yaxis.autorange": false, "yaxis.range": range}});
         }};
         sliders.forEach((slider) => slider.addEventListener("input", applyYRange));
+        node.on("plotly_relayout", () => {{
+          const range = node._fullLayout.yaxis.range;
+          const low = Math.min(...range), high = Math.max(...range);
+          sliders.forEach((slider) => {{
+            slider.min = Math.min(minimum, low);
+            slider.max = Math.max(maximum, high);
+          }});
+          sliders[0].value = low;
+          sliders[1].value = high;
+          output.value = `${{low.toFixed(3)}} – ${{high.toFixed(3)}}`;
+        }});
       }}
       node.on("plotly_relayout", (event) => {{
         if (!reverseYAxis || !event || event["yaxis.autorange"] !== true || allYValues.length < 2) return;
@@ -407,7 +420,12 @@ main {{ width: 100%; max-width: 1500px; margin: 0 auto; padding: 1rem 2rem 4rem;
     nodes.forEach((node) => observer.observe(node));
   }} else {{ nodes.forEach(render); }}
   document.querySelectorAll(".zoomable-image").forEach((image) => {{
-    image.addEventListener("click", () => window.open(image.dataset.imagePath || image.currentSrc || image.src, "_blank", "noopener,noreferrer"));
+    image.addEventListener("click", () => {{
+      const bytes = Uint8Array.from(atob(image.src.split(",")[1]), (char) => char.charCodeAt(0));
+      const url = URL.createObjectURL(new Blob([bytes], {{type: "image/png"}}));
+      window.open(url, "_blank", "noopener,noreferrer");
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+    }});
   }});
 }})();
 </script></body></html>

@@ -87,6 +87,10 @@ def save_matplotlib(
 ) -> Path:
     """Save a Matplotlib figure and close it exactly once, including on failure."""
     output_path = Path(path)
+    report = current_report()
+    if report is not None and not report.accepts_output(output_path):
+        plt.close(fig)
+        return output_path
     output_path.parent.mkdir(parents=True, exist_ok=True)
     savefig_kwargs.setdefault("bbox_inches", "tight")
     try:
@@ -110,6 +114,9 @@ def save_plotly(
 ) -> Path:
     """Save a Plotly figure at the requested dimensions."""
     output_path = Path(path)
+    report = current_report()
+    if report is not None and not report.accepts_output(output_path):
+        return output_path
     output_path.parent.mkdir(parents=True, exist_ok=True)
     fig.write_image(output_path, width=width, height=height)
     report = current_report()

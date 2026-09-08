@@ -220,6 +220,8 @@ def plot_by_tyre_age_and_tyre(
                 legends.add(stint.driver.number)
         ax.legend(fontsize='small')
         ax.invert_yaxis()
+        ax.set_xlabel("Tyre age [laps]")
+        ax.set_ylabel("Lap Time [s]")
         ax.grid(True)
         output_path = resolve_output_dir(session, output_dir) / "long_runs" / f"{compound}.png"
         save_matplotlib(fig, output_path, log)
@@ -269,12 +271,12 @@ def _make_interactive_long_run_figure(
             customdata=customdata,
             hovertemplate=(
                 "Driver: %{customdata[0]}<br>Team: %{customdata[1]}"
-                "<br>Lap: %{customdata[2]}<br>Lap time: %{y:.3f}s<extra></extra>"
+                "<br>Tyre age: %{customdata[2]} laps<br>Lap time: %{y:.3f}s<extra></extra>"
             ),
         ))
     fig.update_layout(
         title=f"Long Runs — {compound} (interactive)",
-        xaxis_title="Lap Number",
+        xaxis_title="Tyre age [laps]",
         yaxis_title="Lap Time [s]",
         xaxis=dict(rangeslider=dict(visible=True)),
         yaxis_autorange="reversed",

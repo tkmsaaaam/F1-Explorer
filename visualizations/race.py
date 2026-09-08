@@ -21,6 +21,7 @@ from visualizations.domain.driver_laps import DriverLaps
 from visualizations.domain.lap import Lap
 from visualizations.domain.tyre import Tyre
 from visualizations.output import save_matplotlib, save_plotly
+from visualizations.report import current_report
 from visualizations.race_metrics import (
     gap_to_ahead as calculate_gap_to_ahead,
     gap_to_leader as calculate_gap_to_leader,
@@ -28,6 +29,7 @@ from visualizations.race_metrics import (
     top_time_map,
 )
 from visualizations.style import driver_linestyle
+from visualizations.race_start import start_samples
 
 tracer = trace.get_tracer(__name__)
 
@@ -119,6 +121,9 @@ def laptime(log: structlog.stdlib.BoundLogger, filepath: str, filename: str, ses
     ax.set_ylabel("Lap Time [s]")
     ax.grid(True)
     output_path = f"{filepath}/{filename}.png"
+    if current_report() is not None:
+        save_matplotlib(fig, output_path, log)
+        return
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     fig.savefig(output_path, bbox_inches='tight')
     log.info(f"Saved plot to {output_path}")
@@ -423,27 +428,25 @@ def speed_first_10s(log: structlog.stdlib.BoundLogger, filepath: str, session: S
     v_min = float('inf')
     v_max = float('-inf')
     for driver in session.drivers:
-        laps = session.laps.pick_drivers(driver)
-        lap = laps.pick_fastest()
-        if lap is None:
+        result = start_samples(session, driver)
+        if result is None:
+            log.warning(f"Start telemetry unavailable for {driver}; omitting R-10 series")
             continue
-        car_data = lap.get_car_data().copy()
-        car_data["TimeSeconds"] = car_data.Time.dt.total_seconds()
-        car_data = car_data[car_data.TimeSeconds <= 10]
-        driver_number = int(lap.DriverNumber)
+        car_data, _ = result
+        driver_number = int(driver)
         ax.plot(
             car_data.TimeSeconds,
             car_data.Speed,
-            label=lap.Driver, linewidth=0.5,
-            color=constants.team_color[session.event.EventDate.year][driver_number],
+            label=session.get_driver(driver).Abbreviation, linewidth=0.5,
+            color=constants.team_color.get(session.event.year, {}).get(driver_number, 'gray'),
             linestyle=driver_linestyle(session.event.year, driver_number)
         )
-        v_min = min(v_min, int(car_data.Speed.min()) + 50)
+        v_min = min(v_min, max(0, float(car_data.Speed.min()) - 10))
         v_max = max(v_max, int(car_data.Speed.max()) + 10)
     if v_min == float('inf') or v_max == float('-inf'):
         plt.close(fig)
         return
-    ax.set_xlabel("Time (s)")
+    ax.set_xlabel("Time since race start [s]")
     ax.set_ylabel("Speed (km/h)")
     ax.set_title("Speed for First 10 Seconds")
     ax.set_ylim(v_min, v_max)
@@ -456,36 +459,36 @@ def speed_first_10s(log: structlog.stdlib.BoundLogger, filepath: str, session: S
 def speed_until_turn1(log: structlog.stdlib.BoundLogger, filepath: str, session: Session) -> None:
     circuit_info = session.get_circuit_info()
     if circuit_info is None:
+        log.warning("Circuit positions unavailable; omitting R-11")
         return
     fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
-    first_corner_distance = circuit_info.corners.iloc[0].Distance
     v_min = float('inf')
     v_max = float('-inf')
     for driver in session.drivers:
-        laps = session.laps.pick_drivers(driver)
-        lap = laps.pick_fastest()
-        if lap is None:
+        result = start_samples(session, driver, until_turn1=True, circuit_info=circuit_info)
+        if result is None:
+            log.warning(f"Start/corner telemetry unavailable for {driver}; omitting R-11 series")
             continue
-        car_data = lap.get_car_data().add_distance()[
-            lap.get_car_data().add_distance().Distance <= first_corner_distance]
-        driver_number = int(lap.DriverNumber)
+        car_data, first_corner_distance = result
+        driver_number = int(driver)
+        color = constants.team_color.get(session.event.year, {}).get(driver_number, 'gray')
         ax.plot(
             car_data.Distance,
             car_data.Speed,
-            label=lap.Driver, linewidth=0.5,
-            color=constants.team_color[session.event.EventDate.year][driver_number],
+            label=session.get_driver(driver).Abbreviation, linewidth=0.5,
+            color=color,
             linestyle=driver_linestyle(session.event.year, driver_number)
         )
-        v_min = min(v_min, int(cast(pandas.Series, car_data.Speed).min()) + 50)
+        ax.axvline(first_corner_distance, linestyle='dotted', color=color, linewidth=0.5)
+        v_min = min(v_min, max(0, float(car_data.Speed.min()) - 10))
         v_max = max(v_max, int(cast(pandas.Series, car_data.Speed).max()) + 10)
     if v_min == float('inf') or v_max == float('-inf'):
         plt.close(fig)
         return
-    ax.set_xlabel("Distance (m)")
+    ax.set_xlabel("Distance from each driver's start position [m]")
     ax.set_ylabel("Speed (km/h)")
     ax.set_title("Speed until Turn 1")
     ax.set_ylim(v_min, v_max)
-    ax.axvline(first_corner_distance, linestyle='dotted', color='grey')
     ax.legend()
     ax.grid()
     save_matplotlib(fig, filepath, log)
