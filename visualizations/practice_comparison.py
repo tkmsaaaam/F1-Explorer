@@ -6,6 +6,7 @@ import pandas as pd
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 from visualizations.chart_ranges import bar_range
+from visualizations.qualifying_speed import _measurement_values, _telemetry_cache
 
 
 def _colors(drivers, teams, session):
@@ -87,26 +88,29 @@ def make_practice_speed(session):
     metrics = (("SpeedFL", "フィニッシュライン"), ("SpeedI1", "第1中間計測地点"),
                ("SpeedI2", "第2中間計測地点"), ("SpeedST", "スピードトラップ"))
     laps = _valid(session.laps)
+    telemetry_cache = _telemetry_cache(laps)
     fig = go.Figure()
     choices = []
     for key, label in metrics:
         values = pd.to_numeric(laps[key], errors="coerce") if key in laps else pd.Series(dtype=float)
         valid = laps.loc[values.notna() & (values > 0)].assign(_value=values)
-        best = valid.groupby("Driver")["_value"].max().sort_values(ascending=False) if not valid.empty else pd.Series(dtype=float)
-        drivers = best.index.tolist()
-        teams = (valid.sort_values("_value").drop_duplicates("Driver").set_index("Driver")["Team"].to_dict()
-                 if not valid.empty and "Team" in valid else {})
-        choices.append((label, drivers, best.tolist(), _colors(drivers, teams, session)))
-    for index, (label, drivers, values, colors) in enumerate(choices):
+        if valid.empty:
+            choices.append((label, [], [], [], {}, {}))
+            continue
+        drivers, speeds, teams, tow = _measurement_values(valid, key, telemetry_cache, session)
+        choices.append((label, drivers, speeds, _colors(drivers, teams, session), tow, key))
+    for index, (label, drivers, values, colors, tow, key) in enumerate(choices):
+        text = [f"<b>{value:.1f}</b>" if tow.get(driver, False) and key != "SpeedST" else f"{value:.1f}"
+                for driver, value in zip(drivers, values)]
         fig.add_trace(go.Bar(x=drivers, y=values, name=label, visible=index == 0, marker_color=colors,
-                             text=[f"{v:.1f}" for v in values], textposition="inside",
+                             text=text, textposition="inside",
                              hovertemplate="%{x}: %{y:.1f} km/h<extra></extra>"))
     buttons = [dict(label=label, method="update", args=[{"visible": [i == index for i in range(4)],
                     "x": [drivers if i == index else None for i in range(4)],
                     "y": [values if i == index else None for i in range(4)]},
                     {"title.text": label + "（Practice）", "yaxis.title.text": "Speed [km/h]",
                      "yaxis.autorange": False, "yaxis.range": _speed_range(values),
-                     "xaxis.categoryarray": drivers}]) for index, (label, drivers, values, _) in enumerate(choices)]
+                    "xaxis.categoryarray": drivers}]) for index, (label, drivers, values, _, _, _) in enumerate(choices)]
     fig.update_layout(title="フィニッシュライン（Practice）", meta={"f1ExplorerKind": "practiceSpeed"},
                       showlegend=False, xaxis={"title": "Driver"},
                       yaxis={"title": "Speed [km/h]", "range": _speed_range(choices[0][2]), "autorange": False},

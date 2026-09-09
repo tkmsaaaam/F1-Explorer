@@ -102,7 +102,40 @@ def _tow_mask(lap_index, telemetry_cache):
     return tow
 
 
-def _measurement_values(laps, key, telemetry_cache):
+def _tow_at_measurement(lap_index, key, telemetry_cache, session):
+    """Return tow context at FL/I1/I2; SpeedST intentionally has no context."""
+    if key == "SpeedST" or lap_index not in telemetry_cache:
+        return None
+    _, telemetry = telemetry_cache[lap_index]
+    lap = next((row for index, row in _iter_laps(session.laps) if index == lap_index), None)
+    if lap is None:
+        return None
+    if key == "SpeedFL":
+        sample = telemetry.iloc[-1]
+    else:
+        field = {"SpeedI1": "Sector1SessionTime", "SpeedI2": "Sector2SessionTime"}[key]
+        when = lap.get(field)
+        if pd.isna(when) or not hasattr(session, "t0_date"):
+            return None
+        target = session.t0_date + when
+        sample = telemetry.iloc[(telemetry["Date"] - target).abs().argmin()]
+    distances = telemetry["Distance"].to_numpy(dtype=float)
+    times = telemetry["Date"].astype("int64").to_numpy(dtype=float)
+    best = None
+    for other_index, (other_driver, other) in telemetry_cache.items():
+        if other_index == lap_index or other_driver == lap.get("Driver") or len(other) < 2:
+            continue
+        distance = float(sample["Distance"])
+        if distance < other["Distance"].min() or distance > other["Distance"].max():
+            continue
+        other_time = np.interp(distance, other["Distance"].to_numpy(dtype=float), other["Date"].astype("int64").to_numpy(dtype=float))
+        gap = (float(sample["Date"].value) - other_time) / 1_000_000_000
+        if 0 < gap <= _TOW_THRESHOLD_SECONDS and (best is None or gap < best[1]):
+            best = (other_driver, gap)
+    return best
+
+
+def _measurement_values(laps, key, telemetry_cache, session=None):
     rows = []
     if key.startswith("Telemetry"):
         wants_tow = key == "TelemetryTow"
@@ -114,19 +147,21 @@ def _measurement_values(laps, key, telemetry_cache):
             selected = telemetry.loc[mask if wants_tow else ~mask, "Speed"]
             maximum = selected.max()
             if pd.notna(maximum) and maximum > 0:
-                rows.append((lap.get("Driver"), lap.get("Team", ""), float(maximum)))
+                rows.append((lap.get("Driver"), lap.get("Team", ""), float(maximum), lap_index, wants_tow))
     else:
-        for _, lap in _iter_laps(laps):
+        for lap_index, lap in _iter_laps(laps):
             speed = pd.to_numeric(pd.Series([lap.get(key)]), errors="coerce").iloc[0]
             if pd.notna(speed) and speed > 0:
-                rows.append((lap.get("Driver"), lap.get("Team", ""), float(speed)))
+                tow = _tow_at_measurement(lap_index, key, telemetry_cache, session) if session is not None else None
+                rows.append((lap.get("Driver"), lap.get("Team", ""), float(speed), lap_index, tow is not None))
 
     if not rows:
-        return [], [], {}
-    measured = pd.DataFrame(rows, columns=["Driver", "Team", "Speed"])
+        return [], [], {}, {}
+    measured = pd.DataFrame(rows, columns=["Driver", "Team", "Speed", "LapIndex", "Tow"])
     fastest = measured.sort_values("Speed", ascending=False).drop_duplicates("Driver")
     return (fastest["Driver"].tolist(), fastest["Speed"].tolist(),
-            fastest.set_index("Driver")["Team"].to_dict())
+            fastest.set_index("Driver")["Team"].to_dict(),
+            fastest.set_index("Driver")["Tow"].to_dict())
 
 
 def make_qualifying_speed(session):
@@ -145,21 +180,22 @@ def make_qualifying_speed(session):
     combinations = []
     for scope_label, laps in scopes:
         for key, measurement_label in _MEASUREMENTS:
-            drivers, speeds, teams = _measurement_values(laps, key, telemetry_cache)
+            drivers, speeds, teams, tow = _measurement_values(laps, key, telemetry_cache, session)
             label = f"{scope_label} · {measurement_label}"
-            combinations.append((label, drivers, speeds, _team_colors(drivers, teams, session)))
+            combinations.append((label, key, drivers, speeds, _team_colors(drivers, teams, session), tow))
 
     fig = go.Figure()
-    for index, (label, drivers, speeds, colors) in enumerate(combinations):
+    for index, (label, key, drivers, speeds, colors, tow) in enumerate(combinations):
+        text = [f"<b>{speed:.1f}</b>" if tow.get(driver, False) and key != "SpeedST" else f"{speed:.1f}" for driver, speed in zip(drivers, speeds)]
         fig.add_trace(go.Bar(
             x=drivers, y=speeds, name=label, visible=index == 0,
-            marker_color=colors, text=[f"{speed:.1f}" for speed in speeds],
+            marker_color=colors, text=text,
             textposition="inside", textangle=0, insidetextanchor="end",
             hovertemplate="%{x}: %{y:.1f} km/h<extra></extra>",
         ))
 
     buttons = []
-    for index, (label, drivers, speeds, _) in enumerate(combinations):
+    for index, (label, _, drivers, speeds, _, _) in enumerate(combinations):
         buttons.append(dict(label=label, method="update", args=[
             {"visible": [trace_index == index for trace_index in range(len(combinations))]},
             {"title.text": label + ("（有効な速度なし）" if not speeds else ""),
@@ -167,7 +203,7 @@ def make_qualifying_speed(session):
              "xaxis.categoryarray": drivers},
         ]))
 
-    initial_label, initial_drivers, initial_speeds, _ = combinations[0]
+    initial_label, _, initial_drivers, initial_speeds, _, _ = combinations[0]
     fig.update_layout(
         title=dict(text=initial_label, x=0, xanchor="left", y=0.98),
         height=640, margin=dict(t=150), showlegend=False,
