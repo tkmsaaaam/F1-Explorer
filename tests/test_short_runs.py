@@ -14,10 +14,45 @@ import numpy as np
 
 from visualizations.short_runs import plot_speed_on_track
 from visualizations.short_runs import (
+    CORNER_SPEED_COLORS,
+    _corner_segment_colors,
+    _corner_speed_color,
     _gear_colorscale,
     _save_interactive_driver_telemetry,
     _save_interactive_track_map,
 )
+
+
+def test_corner_speed_color_boundaries() -> None:
+    assert _corner_speed_color(100) == CORNER_SPEED_COLORS["low"]
+    assert _corner_speed_color(100.1) == CORNER_SPEED_COLORS["medium_low"]
+    assert _corner_speed_color(150) == CORNER_SPEED_COLORS["medium_low"]
+    assert _corner_speed_color(150.1) == CORNER_SPEED_COLORS["medium_high"]
+    assert _corner_speed_color(200) == CORNER_SPEED_COLORS["medium_high"]
+    assert _corner_speed_color(200.1) == CORNER_SPEED_COLORS["high"]
+    assert _corner_speed_color(None) == CORNER_SPEED_COLORS["unavailable"]
+
+
+def test_corner_segment_colors_use_interpolated_fastest_lap_speed() -> None:
+    telemetry = pd.DataFrame({
+        "Distance": [0.0, 100.0, 200.0, 300.0, 400.0],
+        "Speed": [50.0, 100.0, 150.0, 200.0, 250.0],
+    })
+    telemetry.add_distance = lambda: telemetry
+    fastest_lap = SimpleNamespace(get_car_data=lambda: telemetry)
+
+    colors = _corner_segment_colors(
+        fastest_lap,
+        [100.0, 200.0, 300.0],
+        [0.0, 100.0, 200.0, 300.0, 400.0],
+    )
+
+    assert colors == [
+        CORNER_SPEED_COLORS["low"],
+        CORNER_SPEED_COLORS["medium_low"],
+        CORNER_SPEED_COLORS["medium_high"],
+        CORNER_SPEED_COLORS["unavailable"],
+    ]
 
 
 def test_summary_scatter_values_and_interactive_report(tmp_path):

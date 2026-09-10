@@ -22,6 +22,59 @@ from visualizations.style import driver_linestyle
 tracer = trace.get_tracer(__name__)
 
 
+CORNER_SPEED_COLORS = {
+    "low": "#f8d7da",
+    "medium_low": "#ffe5b4",
+    "medium_high": "#fff3b0",
+    "high": "#d4edda",
+    "unavailable": "white",
+}
+
+
+def _corner_speed_color(speed: float | None) -> str:
+    """Return the background color for a corner's passing speed."""
+    if speed is None or not math.isfinite(speed):
+        return CORNER_SPEED_COLORS["unavailable"]
+    if speed <= 100:
+        return CORNER_SPEED_COLORS["low"]
+    if speed <= 150:
+        return CORNER_SPEED_COLORS["medium_low"]
+    if speed <= 200:
+        return CORNER_SPEED_COLORS["medium_high"]
+    return CORNER_SPEED_COLORS["high"]
+
+
+def _corner_segment_colors(
+        fastest_lap: Lap,
+        corner_distances: list[float],
+        segment_boundaries: list[float],
+) -> list[str]:
+    """Color each segment by the fastest lap's speed at its end corner."""
+    car_data = fastest_lap.get_car_data().add_distance()
+    samples = car_data[["Distance", "Speed"]].dropna().sort_values("Distance")
+    samples = samples.drop_duplicates(subset="Distance", keep="last")
+    if samples.empty:
+        return [CORNER_SPEED_COLORS["unavailable"]] * (len(segment_boundaries) - 1)
+
+    colors = []
+    for end_distance in segment_boundaries[1:]:
+        matching_corner = next(
+            (distance for distance in corner_distances if math.isclose(distance, end_distance, abs_tol=0.1)),
+            None,
+        )
+        if matching_corner is None:
+            colors.append(CORNER_SPEED_COLORS["unavailable"])
+            continue
+        speed = float(np.interp(matching_corner, samples.Distance, samples.Speed))
+        colors.append(_corner_speed_color(speed))
+    return colors
+
+
+def _table_fill_colors(column_count: int, row_colors: list[str]) -> list[list[str]]:
+    """Expand row colors into Plotly's column-major table fill format."""
+    return [row_colors] * column_count
+
+
 @tracer.start_as_current_span("compute_competitive_drivers")
 def compute_competitive_drivers(session: Session, log: structlog.stdlib.BoundLogger, c: int) -> list[int]:
     """トップcチームの早い方のドライバーの車番を算出する
@@ -51,7 +104,9 @@ def compute_and_save_segment_tables_plotly(
         session: Session,
         filename_base: str,
         segment_boundaries: list[float],
-        log: structlog.stdlib.BoundLogger
+        log: structlog.stdlib.BoundLogger,
+        *,
+        color_by_corner_speed: bool = False,
 ):
     """mini segmentごとのタイムをプロットする
     Args:
@@ -94,6 +149,17 @@ def compute_and_save_segment_tables_plotly(
         )
 
     abbreviations = [session.get_driver(d).Abbreviation for d in drivers]
+    row_colors = [CORNER_SPEED_COLORS["unavailable"]] * len(segment_rows)
+    if color_by_corner_speed:
+        fastest_lap = session.laps.pick_fastest()
+        if fastest_lap is not None and not fastest_lap.empty:
+            row_colors = _corner_segment_colors(
+                fastest_lap,
+                [float(distance) for distance in circuit.corners.Distance],
+                segment_boundaries,
+            )
+        else:
+            log.warning("Fastest lap telemetry unavailable for corner speed colors.")
 
     fig_segment = go.Figure(
         data=[go.Table(
@@ -101,7 +167,13 @@ def compute_and_save_segment_tables_plotly(
                 values=["segment", "distance", "corners"] + abbreviations,
                 fill=go.table.header.Fill(color='lightgrey'),
                 align='center'),
-            cells=go.table.Cells(values=list(zip(*segment_rows)), align='center')
+            cells=go.table.Cells(
+                values=list(zip(*segment_rows)),
+                fill=go.table.cells.Fill(
+                    color=_table_fill_colors(3 + len(abbreviations), row_colors),
+                ),
+                align='center',
+            )
         )])
     save_plotly(fig_segment, f"{filename_base}_durations.png", log, width=1920, height=1080)
 
@@ -122,7 +194,13 @@ def compute_and_save_segment_tables_plotly(
                 values=["segment", "distance"] + abbreviations,
                 fill=go.table.header.Fill(color='lightgrey'),
                 align='center'),
-            cells=go.table.Cells(values=list(zip(*segment_rank_rows)), align='center'))])
+            cells=go.table.Cells(
+                values=list(zip(*segment_rank_rows)),
+                fill=go.table.cells.Fill(
+                    color=_table_fill_colors(2 + len(abbreviations), row_colors),
+                ),
+                align='center',
+            ))])
     save_plotly(fig_ranks, f"{filename_base}_ranks.png", log, width=1920, height=1080)
 
     best = session.laps.pick_fastest()
@@ -155,7 +233,13 @@ def compute_and_save_segment_tables_plotly(
             values=["segment", "distance", "corners"] + abbreviations,
             fill=go.table.header.Fill(color='lightgrey'),
             align='center'),
-        cells=go.table.Cells(values=list(zip(*gap_rows)), align='center')
+        cells=go.table.Cells(
+            values=list(zip(*gap_rows)),
+            fill=go.table.cells.Fill(
+                color=_table_fill_colors(3 + len(abbreviations), row_colors),
+            ),
+            align='center',
+        )
     )])
     save_plotly(fig_gap, f"{filename_base}_gaps_to_best.png", log, width=1920, height=1080)
 
