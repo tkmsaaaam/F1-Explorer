@@ -1,10 +1,11 @@
 from types import SimpleNamespace
 from unittest.mock import patch
+import warnings
 
 import pandas as pd
 import pytest
 
-from visualizations.qualifying_speed import make_qualifying_speed, _tow_mask
+from visualizations.qualifying_speed import _valid_laps, make_qualifying_speed, _tow_mask
 
 
 def _telemetry(times, speeds):
@@ -66,3 +67,14 @@ def test_lap_selections_and_measurements_are_selectable(name, prefix):
     assert list(figure.layout.yaxis.range) == [300.0, 315.0]
     assert figure.layout.meta["f1ExplorerKind"] == "qualifyingSpeed"
     assert all(trace.textangle == 0 for trace in figure.data)
+
+
+def test_valid_filter_handles_nullable_object_flags_without_future_warning():
+    laps = pd.DataFrame({
+        "IsAccurate": pd.Series([True, None], dtype=object),
+        "Deleted": pd.Series([False, None], dtype=object),
+    })
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", FutureWarning)
+        result = _valid_laps(laps)
+    assert len(result) == 1

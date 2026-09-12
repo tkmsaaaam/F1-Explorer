@@ -30,10 +30,15 @@ def _team_colors(drivers, teams, session):
             if teams.get(driver, "") else "gray" for driver in drivers]
 
 
+def _truthy(values):
+    """Convert nullable object values without pandas' deprecated fillna downcast."""
+    return values.map(lambda value: False if pd.isna(value) else bool(value))
+
+
 def _valid_laps(laps):
-    valid = laps.loc[laps["IsAccurate"].fillna(False).astype(bool)]
+    valid = laps.loc[_truthy(laps["IsAccurate"])]
     if "Deleted" in valid:
-        valid = valid.loc[~valid["Deleted"].fillna(False).astype(bool)]
+        valid = valid.loc[~_truthy(valid["Deleted"])]
     return valid
 
 

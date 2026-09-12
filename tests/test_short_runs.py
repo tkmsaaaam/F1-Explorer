@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import warnings
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
@@ -12,7 +13,8 @@ from matplotlib.collections import LineCollection
 import pandas as pd
 import numpy as np
 
-from visualizations.short_runs import plot_speed_on_track
+from separator_estimator import SeparatorBoundary
+from visualizations.short_runs import plot_flat_out, plot_speed_on_track
 from visualizations.short_runs import (
     CORNER_SPEED_COLORS,
     _corner_segment_colors,
@@ -20,6 +22,10 @@ from visualizations.short_runs import (
     _gear_colorscale,
     _save_interactive_driver_telemetry,
     _save_interactive_track_map,
+    _sector_boundary_distances,
+    _structured_sector_boundary_distances,
+    make_mini_segment_layout,
+    plot_mini_segment_on_circuit,
 )
 
 
@@ -31,6 +37,97 @@ def test_corner_speed_color_boundaries() -> None:
     assert _corner_speed_color(200) == CORNER_SPEED_COLORS["medium_high"]
     assert _corner_speed_color(200.1) == CORNER_SPEED_COLORS["high"]
     assert _corner_speed_color(None) == CORNER_SPEED_COLORS["unavailable"]
+
+
+def test_sector_boundary_distances_interpolate_fastest_lap_telemetry() -> None:
+    telemetry = pd.DataFrame({
+        "Time": pd.to_timedelta([0, 20, 40, 60, 80, 100], unit="s"),
+        "Distance": [0.0, 1000.0, 2000.0, 3000.0, 4000.0, 5000.0],
+    })
+    lap = SimpleNamespace(
+        Sector1Time=pd.Timedelta(seconds=30),
+        Sector2Time=pd.Timedelta(seconds=40),
+    )
+    assert _sector_boundary_distances(lap, telemetry) == [1500.0, 3500.0]
+
+
+def test_structured_sector_markers_use_last_saved_mini_segment_boundary() -> None:
+    boundaries = [
+        SeparatorBoundary(200.0, 0, 6), SeparatorBoundary(350.0, 0, 7),
+        SeparatorBoundary(500.0, 1, 2),
+    ]
+    assert _structured_sector_boundary_distances(boundaries) == [350.0, 500.0]
+
+
+def test_mini_segment_layout_projects_structured_boundaries_to_distances() -> None:
+    telemetry = pd.DataFrame({
+        "Distance": [0.0, 100.0, 200.0, 300.0, 400.0],
+        "X": [0.0, 100.0, 200.0, 300.0, 400.0],
+        "Y": [0.0, 0.0, 0.0, 0.0, 0.0],
+    })
+    telemetry.add_distance = lambda: telemetry
+    lap = SimpleNamespace(Driver="VER", get_telemetry=lambda: telemetry)
+    session = SimpleNamespace(
+        laps=SimpleNamespace(pick_fastest=lambda: lap),
+        get_circuit_info=lambda: None,
+    )
+    layout = make_mini_segment_layout(
+        session, MagicMock(), {}, [SeparatorBoundary(100.0, 0, 1), SeparatorBoundary(300.0, 1, 2)]
+    )
+    assert layout.distances == [0.0, 100.0, 300.0, 400.0]
+    assert layout.separator_boundaries[1].sector == 1
+
+
+def test_mini_segment_map_uses_structured_markers_instead_of_fastest_lap_times(tmp_path: Path) -> None:
+    telemetry = pd.DataFrame({
+        "Distance": [0.0, 100.0, 200.0, 300.0, 400.0],
+        "X": [0.0, 100.0, 200.0, 300.0, 400.0],
+        "Y": [0.0, 0.0, 0.0, 0.0, 0.0],
+    })
+    telemetry.add_distance = lambda: telemetry
+    lap = SimpleNamespace(
+        Driver="VER", Sector1Time=pd.Timedelta(seconds=15), Sector2Time=pd.Timedelta(seconds=15),
+        get_telemetry=lambda: telemetry,
+    )
+    session = SimpleNamespace(laps=SimpleNamespace(pick_fastest=lambda: lap))
+    with patch("visualizations.short_runs.save_matplotlib") as save:
+        plot_mini_segment_on_circuit(
+            session, MagicMock(), [0.0, 200.0, 400.0], "mini_segments",
+            separator_boundaries=[
+                SeparatorBoundary(200.0, 0, 7), SeparatorBoundary(400.0, 1, 3)
+            ],
+            output_dir=tmp_path,
+            show_sector_boundaries=True,
+        )
+    figure = save.call_args.args[0]
+    try:
+        marker_x = [float(offset[0]) for collection in figure.axes[0].collections for offset in collection.get_offsets()]
+        assert marker_x == [200.0, 400.0]
+    finally:
+        plt.close(figure)
+
+
+def test_mini_segment_map_skips_sparse_empty_interval(tmp_path: Path) -> None:
+    telemetry = pd.DataFrame({
+        "Distance": [0.0, 100.0, 200.0],
+        "X": [0.0, 100.0, 200.0],
+        "Y": [0.0, 0.0, 0.0],
+    })
+    telemetry.add_distance = lambda: telemetry
+    lap = SimpleNamespace(Driver="VER", get_telemetry=lambda: telemetry)
+    session = SimpleNamespace(laps=SimpleNamespace(pick_fastest=lambda: lap))
+
+    with patch("visualizations.short_runs.save_matplotlib") as save:
+        plot_mini_segment_on_circuit(
+            session, MagicMock(), [0.0, 50.0, 60.0, 200.0], "mini_segments",
+            output_dir=tmp_path,
+        )
+
+    figure = save.call_args.args[0]
+    try:
+        assert figure.axes[0].texts
+    finally:
+        plt.close(figure)
 
 
 def test_corner_segment_colors_use_interpolated_fastest_lap_speed() -> None:
@@ -108,6 +205,30 @@ def test_summary_scatter_values_and_interactive_report(tmp_path):
         html = report.write().read_text()
     assert html.count('class="plotly-container') == 5
     assert '<img ' not in html
+
+
+def test_flat_out_skips_zero_distance_laps_without_runtime_warning():
+    telemetry = pd.DataFrame({
+        "Throttle": [100, 100],
+        "Distance": [0.0, 0.0],
+        "Time": pd.to_timedelta([0, 1], unit="s"),
+    })
+    lap = SimpleNamespace(telemetry=telemetry)
+    driver_laps = MagicMock()
+    driver_laps.pick_fastest.return_value = lap
+    laps = MagicMock()
+    laps.DriverNumber.unique.return_value = np.array(["1"])
+    laps.pick_drivers.return_value = driver_laps
+    session = SimpleNamespace(laps=laps)
+
+    with (
+        warnings.catch_warnings(),
+        patch("visualizations.short_runs._save_summary_scatter") as save,
+    ):
+        warnings.simplefilter("error", RuntimeWarning)
+        plot_flat_out(session, MagicMock())
+
+    save.assert_called_once()
 
 
 def test_speed_on_track_uses_colored_line_collection_and_vertical_colorbar() -> None:

@@ -218,7 +218,8 @@ def plot_by_tyre_age_and_tyre(
             else:
                 ax.plot(x, y, linewidth=0.5, color=color, linestyle=line_style, label=stint.driver.name)
                 legends.add(stint.driver.number)
-        ax.legend(fontsize='small')
+        if legends:
+            ax.legend(fontsize='small')
         ax.invert_yaxis()
         ax.set_xlabel("Tyre age [laps]")
         ax.set_ylabel("Lap Time [s]")

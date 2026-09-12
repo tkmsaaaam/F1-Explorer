@@ -20,12 +20,14 @@ class SessionCategory(Enum):
 
 class Config:
     def __init__(self, year: int, race_number: int, session: str, corners: dict[str, list[float]],
-                 separator: list[int], comparison: list[list[dict[str, Any]]]):
+                 separator: list[int], comparison: list[list[dict[str, Any]]],
+                 separator_boundaries: list[dict[str, Any]] | None = None):
         self.year = year
         self.round = race_number
         self.session = session
         self.corners = corners
         self.separator = separator
+        self.separator_boundaries = list(separator_boundaries or [])
         self.comparison = comparison
         if session in {'FP1', 'FP2', 'FP3'}:
             self.session_category = SessionCategory.FreePractice
@@ -54,6 +56,18 @@ class Config:
     def get_separator(self):
         return self.separator
 
+    def get_separator_boundaries(self):
+        return self.separator_boundaries
+
+    def set_separator(
+        self,
+        separator: list[float],
+        boundaries: list[dict[str, Any]] | None = None,
+    ) -> None:
+        """Replace the active separator list after session-specific loading."""
+        self.separator = list(separator)
+        self.separator_boundaries = list(boundaries or [])
+
     def get_comparison(self):
         return self.comparison
 
@@ -81,9 +95,20 @@ def load_config() -> Config:
     if config is None:
         raise Exception("Config must be provided")
     validate_config(config)
-    separator = config['Separator'] if 'Separator' in config else []
-    corners = config['Corners'] if 'Corners' in config else {}
-    comparison = config['Comparison'] if 'Comparison' in config else []
+    # Older sample files use lower-case keys while the original loader only
+    # accepted the title-cased spelling.  Accept both spellings so a config
+    # can be migrated incrementally without losing user settings.
+    separator = config.get('Separator', config.get('separator', []))
+    corners = config.get('Corners', config.get('corners', {}))
+    comparison = config.get('Comparison', config.get('comparison', []))
+    if not isinstance(separator, list):
+        # A scoped map belongs to the automatic estimator, not the active
+        # legacy fallback list.
+        separator = []
+    if not isinstance(corners, dict):
+        corners = {}
+    if not isinstance(comparison, list):
+        comparison = []
     return Config(config['Year'], config['Round'], config['Session'], corners, separator, comparison)
 
 

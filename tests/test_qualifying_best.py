@@ -1,10 +1,11 @@
 from types import SimpleNamespace
 from unittest.mock import patch
+import warnings
 
 import pandas as pd
 import pytest
 
-from visualizations.qualifying_best import make_qualifying_best
+from visualizations.qualifying_best import _valid_laps, make_qualifying_best
 
 
 @pytest.mark.parametrize("name,prefix", [("Qualifying", "Q"), ("Sprint Qualifying", "SQ")])
@@ -45,3 +46,14 @@ def test_independent_bests_ratios_and_missing_sessions(name, prefix):
     assert fig.data[0].marker.color == ("gray", "gray")
     assert list(fig.layout.yaxis.range) == pytest.approx([98.93, 108.07])
     assert fig.layout.height == 1500
+
+
+def test_valid_filter_handles_nullable_object_flags_without_future_warning():
+    laps = pd.DataFrame({
+        "IsAccurate": pd.Series([True, None], dtype=object),
+        "Deleted": pd.Series([False, None], dtype=object),
+    })
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", FutureWarning)
+        result = _valid_laps(laps)
+    assert len(result) == 1

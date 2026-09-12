@@ -21,9 +21,14 @@ def _speed_range(values):
     return [max(0, min(values) - 5), max(values) + 5]
 
 
+def _truthy(values):
+    """Convert nullable object values without pandas' deprecated fillna downcast."""
+    return values.map(lambda value: False if pd.isna(value) else bool(value))
+
+
 def _valid(laps):
-    result = laps.loc[laps["IsAccurate"].fillna(False).astype(bool)]
-    return result.loc[~result["Deleted"].fillna(False).astype(bool)] if "Deleted" in result else result
+    result = laps.loc[_truthy(laps["IsAccurate"])]
+    return result.loc[~_truthy(result["Deleted"])] if "Deleted" in result else result
 
 
 def _best(session, key):

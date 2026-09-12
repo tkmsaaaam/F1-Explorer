@@ -14,6 +14,18 @@ def _team_colors(drivers, teams, session):
             if teams.get(driver, "") else "gray" for driver in drivers]
 
 
+def _truthy(values):
+    """Convert nullable object values without pandas' deprecated fillna downcast."""
+    return values.map(lambda value: False if pd.isna(value) else bool(value))
+
+
+def _valid_laps(laps):
+    valid = laps.loc[_truthy(laps["IsAccurate"])]
+    if "Deleted" in valid:
+        valid = valid.loc[~_truthy(valid["Deleted"])]
+    return valid
+
+
 def make_qualifying_best(session):
     parts = session.laps.split_qualifying_sessions()
     prefix = "SQ" if session.name.startswith("Sprint") else "Q"
@@ -28,9 +40,7 @@ def make_qualifying_best(session):
             best = pd.Series(dtype=float)
             teams = {}
             if laps is not None and not laps.empty:
-                valid = laps.loc[laps["IsAccurate"].fillna(False).astype(bool)]
-                if "Deleted" in valid:
-                    valid = valid.loc[~valid["Deleted"].fillna(False).astype(bool)]
+                valid = _valid_laps(laps)
                 seconds = valid[key].dt.total_seconds()
                 timed = valid.assign(seconds=seconds).loc[seconds > 0]
                 best = timed.groupby("Driver")["seconds"].min().sort_values()

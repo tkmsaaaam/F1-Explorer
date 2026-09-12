@@ -1,9 +1,10 @@
 from types import SimpleNamespace
 from unittest.mock import patch
+import warnings
 
 import pandas as pd
 
-from visualizations.practice_comparison import make_practice_best, make_practice_speed
+from visualizations.practice_comparison import _valid, make_practice_best, make_practice_speed
 
 
 def _session(with_team=True):
@@ -51,3 +52,14 @@ def test_practice_comparisons_handle_missing_team_and_empty_data():
     empty = SimpleNamespace(laps=_session().laps.iloc[0:0], name="Practice 1")
     make_practice_best(empty)
     make_practice_speed(empty)
+
+
+def test_practice_valid_filter_handles_nullable_object_flags_without_future_warning():
+    laps = pd.DataFrame({
+        "IsAccurate": pd.Series([True, None], dtype=object),
+        "Deleted": pd.Series([False, None], dtype=object),
+    })
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", FutureWarning)
+        result = _valid(laps)
+    assert len(result) == 1

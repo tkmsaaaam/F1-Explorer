@@ -1,12 +1,19 @@
 import unittest
+import warnings
 from types import SimpleNamespace
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pandas
 from fastf1.core import Laps
 
 from visualizations.domain.driver import Driver
-from visualizations.long_runs import LongRunCriteria, _make_interactive_long_run_figure, make_stint_set, Stint
+from visualizations.long_runs import (
+    LongRunCriteria,
+    _make_interactive_long_run_figure,
+    make_stint_set,
+    plot_by_tyre_age_and_tyre,
+    Stint,
+)
 
 
 class LongRuns(unittest.TestCase):
@@ -221,6 +228,22 @@ class LongRuns(unittest.TestCase):
         )
         self.assertEqual("gray", fallback.data[0].line.color)
         self.assertEqual("solid", fallback.data[0].line.dash)
+
+    def test_empty_compound_does_not_call_empty_legend(self):
+        session = SimpleNamespace(
+            event=SimpleNamespace(year=2026),
+            laps=pandas.DataFrame({"Compound": ["SOFT"]}),
+        )
+        with (
+            warnings.catch_warnings(),
+            patch("visualizations.long_runs.fastf1.plotting.setup_mpl"),
+            patch("visualizations.long_runs.make_stint_set", return_value=[]),
+            patch("visualizations.long_runs.save_matplotlib") as save,
+        ):
+            warnings.simplefilter("error", UserWarning)
+            plot_by_tyre_age_and_tyre(session, MagicMock(), output_dir="plots")
+
+        save.assert_called_once()
 
 
 if __name__ == '__main__':
