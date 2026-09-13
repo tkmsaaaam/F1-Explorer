@@ -70,7 +70,77 @@ python analyze_qualifying.py
 
 # For Season points and trends
 python analyze_season.py
+
+# Run multiple sessions from a JSON plan
+python analyze_batch.py sample.analysis-plan.json
 ```
+
+### Batch analysis
+
+`analyze_batch.py` accepts a JSON array of years, rounds and sessions. It
+updates only `Year`, `Round` and `Session` in `config.json`, runs each analyzer
+sequentially, and restores those three fields afterwards. Other changes made
+by an analyzer, such as newly generated circuit separators, are retained.
+
+```json
+[
+  {
+    "year": 2026,
+    "gp": [
+      {"number": 13, "sessions": ["FP1", "FP2", "Q", "R"]}
+    ]
+  }
+]
+```
+
+Supported session names are `FP1`, `FP2`, `FP3`, `Q`, `SQ`, `S` and `R`.
+Useful options are `--dry-run`, `--force`, `--refresh-separators`,
+`--fail-fast` and `--keep-last-config`.
+
+To explicitly re-estimate a saved circuit separator, use
+`python analyze_practice.py --refresh-separators` (or the qualifying
+entrypoint).  Automatic boundaries are stored in the `separators` object by
+year and `session.event.Location` and are shared by Practice and Qualifying:
+
+```json
+"separators": {
+  "2025": {
+    "Yas Marina Circuit": {
+      "schema_version": 1,
+      "boundaries": [
+        {"distance": 412.3, "sector": 0, "segment": 7},
+        {"distance": 887.1, "sector": 1, "segment": 3}
+      ]
+    }
+  }
+}
+```
+
+Each structured boundary retains its Live Timing sector and mini-segment
+identity. Older locations containing a flat distance array remain readable.
+The mini-segment map and all three segment tables derive their distance list
+from the same structured boundary set. Sector markers use the final stored
+boundary in sector 0 or 1; only legacy arrays use the FastF1 telemetry
+position fallback.
+
+Existing `separator`/`Separator` and `corners`/`Corners` settings remain
+supported as legacy fallbacks. A saved year/location value is not changed by
+`--force`; only `--refresh-separators` can replace it. Failed or insufficient
+archive data leaves the configuration untouched and uses corner-based
+boundaries.
+
+Live Timing and FastF1 clocks are not joined by their absolute timestamps.
+Each sector of a valid driver/lap is normalized independently to 0–100% of
+sector elapsed time; a Live Timing mini-sector completion percentage is
+interpolated within the matching FastF1 sector telemetry to obtain distance.
+When TimingData exposes an explicit sector completion update, it defines that
+sector's end time; the last mini-segment completion is used only when the
+explicit update is absent. FastF1 interpolation is clamped to the matching
+sector's start/end distance, so a preceding sector's pace cannot move a later
+sector boundary.
+The stored separator values are distances in metres. Live Timing laps are accepted only
+when consecutive lap boundaries agree with the reported lap time (within 5%
+or 2 seconds) and mini-sector progress is monotonic.
 
 ## Implementation Details
 
