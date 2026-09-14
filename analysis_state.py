@@ -21,7 +21,8 @@ import tempfile
 from typing import Iterable, Mapping, TypeAlias
 
 
-SCHEMA_VERSION = 1
+# Version 2 adds the configuration fingerprint used by circuit separators.
+SCHEMA_VERSION = 2
 MANIFEST_FILENAME = ".analysis-manifest.json"
 MISSING_VERSION = "<missing>"
 _IDENTITY_KEYS = frozenset({"year", "round", "session", "entrypoint"})
@@ -41,6 +42,7 @@ class Fingerprint:
     environment_hash: str
     git_commit: str | None
     git_dirty: bool | None
+    configuration_hash: str | None = None
 
     def to_dict(self) -> dict[str, object]:
         """Return the stable JSON representation used by manifests."""
@@ -58,6 +60,9 @@ class Fingerprint:
             "git": {
                 "commit": self.git_commit,
                 "dirty": self.git_dirty,
+            },
+            "configuration": {
+                "hash": self.configuration_hash,
             },
         }
 
@@ -83,7 +88,10 @@ def _source_paths(entrypoint: Path, repo_root: Path) -> list[Path]:
         repo_root / "setup.py",
         repo_root / "constants.py",
     ]
-    candidates.extend(repo_root / name for name in ("util.py", "requirements.txt"))
+    candidates.extend(
+        repo_root / name
+        for name in ("util.py", "requirements.txt", "separator_estimator.py")
+    )
     candidates.extend((repo_root / "visualizations").glob("**/*.py"))
 
     unique: dict[str, Path] = {}
@@ -145,7 +153,7 @@ def _git_metadata(repo_root: Path) -> tuple[str | None, bool | None]:
     return commit_result.stdout.strip(), bool(status_result.stdout.strip())
 
 
-def build_fingerprint(entrypoint: Path, repo_root: Path) -> Fingerprint:
+def build_fingerprint(entrypoint: Path, repo_root: Path, config_path: Path | None = None) -> Fingerprint:
     """Build a content and environment fingerprint for an analysis script."""
 
     root = repo_root.resolve()
@@ -162,6 +170,15 @@ def build_fingerprint(entrypoint: Path, repo_root: Path) -> Fingerprint:
         {"python_version": python_version, "dependencies": dependencies}
     )
     git_commit, git_dirty = _git_metadata(root)
+    configuration_hash: str | None = None
+    if config_path is not None:
+        path = config_path if config_path.is_absolute() else root / config_path
+        try:
+            # Hash parsed JSON rather than formatting so atomic rewrites and
+            # harmless whitespace changes do not create different cache keys.
+            configuration_hash = _canonical_hash(json.loads(path.read_text(encoding="utf-8")))
+        except (OSError, UnicodeError, json.JSONDecodeError):
+            configuration_hash = MISSING_VERSION
     return Fingerprint(
         source_files=source_files,
         source_hash=source_hash,
@@ -170,6 +187,7 @@ def build_fingerprint(entrypoint: Path, repo_root: Path) -> Fingerprint:
         environment_hash=environment_hash,
         git_commit=git_commit,
         git_dirty=git_dirty,
+        configuration_hash=configuration_hash,
     )
 
 
@@ -234,6 +252,10 @@ def should_skip(
         return False
     if environment.get("hash") != fingerprint.environment_hash:
         return False
+    if fingerprint.configuration_hash is not None:
+        configuration = fingerprints.get("configuration")
+        if not isinstance(configuration, dict) or configuration.get("hash") != fingerprint.configuration_hash:
+            return False
     return _recorded_outputs_exist(path, payload.get("output_files"))
 
 

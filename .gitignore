@@ -1,9 +1,11 @@
+batch.json
 cache
 .coverage
 config.json
 examples
 htmlcov
 images
+reports
 live
 tmp
 .venv
