@@ -212,17 +212,26 @@ def __main():
             series.append((v.Abbreviation, y, '#' + get_color(v), determine_linestyle(config.get_year(), k)))
         charts.append((title, __line_plot(title, x, series, invert_y=invert)))
 
-    scatter = go.Figure()
+    grid_to_result = go.Figure()
     for k, v in drivers.items():
-        y = [results[i].get_grid_position(v.Abbreviation) - results[i].get_position(v.Abbreviation) for i in x]
+        positions = [results[i].get_position(v.Abbreviation) for i in x]
+        grids = [results[i].get_grid_position(v.Abbreviation) for i in x]
+        y = [grid - position for grid, position in zip(grids, positions)]
+        hover_text = [f'{difference:+.0f} ({grid:.0f} - {position:.0f})'
+                      for difference, grid, position in zip(y, grids, positions)]
         filled = constants.camera.get(config.get_year(), {}).get(k, 'black') == 'black'
-        scatter.add_trace(go.Scatter(x=x, y=y, mode='markers', name=v.Abbreviation,
-                                     marker={'size': 7, 'color': '#' + get_color(v) if filled else 'white',
-                                             'line': {'color': '#' + get_color(v), 'width': 1}}))
-    scatter.update_layout(title='Grid to result', template='plotly_white', hovermode='x unified',
-                          xaxis={'title': 'Round', 'dtick': 1}, yaxis={'title': 'Grid - result'},
-                          legend={'font': {'size': 10}})
-    charts.append(('Grid to result', scatter))
+        color = '#' + get_color(v)
+        grid_to_result.add_trace(go.Scatter(
+            x=x, y=y, text=hover_text, mode='lines+markers', name=v.Abbreviation,
+            line={'color': color, 'width': 1, 'dash': determine_linestyle(config.get_year(), k)},
+            marker={'size': 7, 'color': color if filled else 'white',
+                    'line': {'color': color, 'width': 1}},
+            hovertemplate='%{fullData.name}: %{text}<extra></extra>',
+        ))
+    grid_to_result.update_layout(title='Grid to result', template='plotly_white', hovermode='x unified',
+                                 xaxis={'title': 'Round', 'dtick': 1}, yaxis={'title': 'Grid - result'},
+                                 legend={'font': {'size': 10}})
+    charts.append(('Grid to result', grid_to_result))
 
     values_map = {}
     sum_map = {}
