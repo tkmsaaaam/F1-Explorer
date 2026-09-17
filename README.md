@@ -75,6 +75,10 @@ python analyze_season.py
 python analyze_batch.py sample.analysis-plan.json
 ```
 
+Season analysis is written as a self-contained offline report at
+`reports/<year>/season.html`. Interactive charts and the points/events table
+images are embedded in that single HTML file.
+
 ### Batch analysis
 
 `analyze_batch.py` accepts a JSON array of years, rounds and sessions. It

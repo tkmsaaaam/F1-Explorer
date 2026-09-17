@@ -1,13 +1,11 @@
 import datetime
+import base64
 import os
 import zoneinfo
 from itertools import accumulate
-from logging import Logger
 from typing import Final, cast
 
-import fastf1.plotting
-import matplotlib.pyplot as plt
-import numpy
+import fastf1
 import plotly.graph_objects as go
 import structlog.stdlib
 from fastf1.core import DriverResult
@@ -75,13 +73,10 @@ def determine_linestyle(year: int, driver: int) -> str:
     if constants.camera.get(year, {}).get(driver, 'black') == "black":
         return "solid"
     else:
-        return "dashed"
+        return "dash"
 
 
-def __save_events(base_dir: str, log: structlog.stdlib.BoundLogger, schedule: EventSchedule):
-    output_path = f"{base_dir}/events.png"
-    if os.path.exists(output_path):
-        return
+def __render_events(schedule: EventSchedule) -> bytes:
     fig = go.Figure(
         data=[go.Table(
             header=go.table.Header(
@@ -99,9 +94,53 @@ def __save_events(base_dir: str, log: structlog.stdlib.BoundLogger, schedule: Ev
                 align='center'))],
         layout=go.Layout(autosize=True, margin=go.layout.Margin(autoexpand=True)))
 
-    os.makedirs(os.path.dirname(output_path), exist_ok=True)
-    fig.write_image(output_path, width=1920, height=2160)
-    log.info(f"Saved plot to {output_path}")
+    return cast(bytes, fig.to_image(format="png", width=1920, height=2160))
+
+
+def __plot_html(fig: go.Figure, include_plotlyjs: bool = False) -> str:
+    return fig.to_html(full_html=False, include_plotlyjs=include_plotlyjs,
+                       config={"responsive": True, "displaylogo": False})
+
+
+def __line_plot(title: str, x: list[int], series: list[tuple[str, list[float], str, str]],
+                invert_y: bool = False) -> go.Figure:
+    fig = go.Figure()
+    for name, y, color, linestyle in series:
+        fig.add_trace(go.Scatter(x=x, y=y, mode="lines", name=name,
+                                 line={"color": color, "width": 1, "dash": linestyle}))
+    fig.update_layout(title=title, template="plotly_white", hovermode="x unified",
+                      xaxis={"title": "Round", "dtick": 1}, yaxis={"title": "Position" if invert_y else "Points",
+                                                                   "autorange": "reversed" if invert_y else True},
+                      legend={"font": {"size": 10}}, margin={"l": 50, "r": 20, "t": 50, "b": 45})
+    return fig
+
+
+def __save_season_report(year: int, image_dir: str, schedule: EventSchedule,
+                         charts: list[tuple[str, go.Figure]], points: bytes | None,
+                         log: structlog.stdlib.BoundLogger) -> None:
+    """Write the season dashboard, keeping the generated charts self-contained."""
+    report_dir = f"./reports/{year}"
+    output_path = f"{report_dir}/season.html"
+    sections: list[str] = []
+    for index, (title, chart) in enumerate(charts):
+        sections.append(f'<section><h2>{title}</h2>{__plot_html(chart, include_plotlyjs=index == 0)}</section>')
+    if points is not None:
+        encoded = base64.b64encode(points).decode("ascii")
+        sections.append(f'<section><h2>Season summary</h2><img src="data:image/png;base64,{encoded}" alt="Season summary"></section>')
+    event_encoded = base64.b64encode(__render_events(schedule)).decode("ascii")
+    sections.insert(0, f'<section><h2>Race calendar</h2><img src="data:image/png;base64,{event_encoded}" alt="Race calendar"></section>')
+    html = """<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>F1 season report</title>
+<style>body{font-family:system-ui,sans-serif;margin:2rem;background:#f7f7f7;color:#222}section{background:#fff;margin:1rem auto;padding:1rem;max-width:1400px;box-shadow:0 1px 4px #bbb}img{display:block;max-width:100%;height:auto;margin:auto}h1,h2{margin-top:0}</style></head>
+<body><h1>F1 season report: YEAR</h1>CONTENT</body></html>""".replace("YEAR", str(year)).replace("CONTENT", "\n".join(sections))
+    os.makedirs(report_dir, exist_ok=True)
+    with open(output_path, "w", encoding="utf-8") as report_file:
+        report_file.write(html)
+    for filename in ("standings.png", "results.png", "diffs.png", "grid_positions.png", "grid_to_results.png"):
+        old_path = f"{image_dir}/{filename}"
+        if os.path.exists(old_path):
+            os.remove(old_path)
+    log.info("Saved season report", path=output_path)
 
 
 @tracer.start_as_current_span("main")
@@ -146,106 +185,44 @@ def __main():
     if len(results) == 0:
         if config.get_year() > now.year:
             return
-        __save_events(base_dir, log, schedule)
+        __save_season_report(config.get_year(), base_dir, schedule, [], None, log)
         return
 
     latest = len(results) + 1
 
-    fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
-    for k, v in drivers.items():
-        y = [results[i].get_point(v.Abbreviation) + results[i].get_sprint_point(v.Abbreviation) for i in
-             range(1, latest)]
-        ax.plot([i for i in range(1, latest)], [sum(y[:i + 1]) for i in range(len(y))], label=v.Abbreviation,
-                color='#' + get_color(v), linewidth=1,
-                linestyle=determine_linestyle(config.get_year(), k))
-    ax.legend(fontsize='small')
-    ax.grid(True)
-    output_path = f"{base_dir}/standings.png"
-    os.makedirs(os.path.dirname(output_path), exist_ok=True)
-    fig.savefig(output_path, bbox_inches='tight')
-    plt.close(fig)
-    log.info(f"Saved plot", path=output_path)
+    x = list(range(1, latest))
+    charts: list[tuple[str, go.Figure]] = []
+    for title, value_fn, invert in (
+            ("Championship standings", lambda v, i: sum(
+                results[j].get_point(v.Abbreviation) + results[j].get_sprint_point(v.Abbreviation)
+                for j in range(1, i + 1)), False),
+            ("Race points", lambda v, i: results[i].get_point(v.Abbreviation) + results[i].get_sprint_point(v.Abbreviation), False),
+            ("Gap to champion", None, False),
+            ("Grid positions", lambda v, i: results[i].get_grid_position(v.Abbreviation), True)):
+        series = []
+        for k, v in drivers.items():
+            if value_fn is None:
+                own = [results[i].get_point(v.Abbreviation) + results[i].get_sprint_point(v.Abbreviation) for i in x]
+                champion = max(([
+                    results[i].get_point(other.Abbreviation) + results[i].get_sprint_point(other.Abbreviation)
+                    for i in x] for other in drivers.values()), key=sum)
+                y = [a - b for a, b in zip(accumulate(own), accumulate(champion))]
+            else:
+                y = [value_fn(v, i) for i in x]
+            series.append((v.Abbreviation, y, '#' + get_color(v), determine_linestyle(config.get_year(), k)))
+        charts.append((title, __line_plot(title, x, series, invert_y=invert)))
 
-    fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
+    scatter = go.Figure()
     for k, v in drivers.items():
-        y = [results[i].get_point(v.Abbreviation) + results[i].get_sprint_point(v.Abbreviation) for i in
-             range(1, latest)]
-        ax.plot([i for i in range(1, latest)], y, label=v.Abbreviation, color='#' + get_color(v), linewidth=1,
-                linestyle=determine_linestyle(config.get_year(), k))
-    ax.legend(fontsize='small')
-    ax.grid(True)
-    output_path = f"{base_dir}/results.png"
-    os.makedirs(os.path.dirname(output_path), exist_ok=True)
-    fig.savefig(output_path, bbox_inches='tight')
-    plt.close(fig)
-    log.info(f"Saved plot", path=output_path)
-
-    champion_points = max(
-        (
-            [results[i].get_point(v.Abbreviation) + results[i].get_sprint_point(v.Abbreviation)
-             for i in range(1, latest)]
-            for v in drivers.values()
-        ),
-        key=sum,
-    )
-    fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout="tight")
-    for k, v in drivers.items():
-        y = [results[i].get_point(v.Abbreviation) + results[i].get_sprint_point(v.Abbreviation) for i in
-             range(1, latest)]
-        diff = [a - b for a, b in zip(accumulate(y), accumulate(champion_points))]
-        ax.plot([i for i in range(1, latest)], diff, label=v.Abbreviation, color="#" + get_color(v), linewidth=1,
-                linestyle=determine_linestyle(config.get_year(), k))
-    ax.legend(fontsize='small')
-    ax.grid(True)
-    output_path = f"{base_dir}/diffs.png"
-    os.makedirs(os.path.dirname(output_path), exist_ok=True)
-    fig.savefig(output_path, bbox_inches='tight')
-    plt.close(fig)
-    log.info(f"Saved plot", path=output_path)
-
-    fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
-    x = [i for i in range(1, latest)]
-    for k, v in drivers.items():
-        y = [results[i].get_grid_position(v.Abbreviation) for i in range(1, latest)]
-        ax.plot(x, y, label=v.Abbreviation, color='#' + get_color(v), linewidth=1,
-                linestyle=determine_linestyle(config.get_year(), k))
-    ax.legend(fontsize='small')
-    ax.grid(True)
-    ax.invert_yaxis()
-    output_path = f"{base_dir}/grid_positions.png"
-    os.makedirs(os.path.dirname(output_path), exist_ok=True)
-    fig.savefig(output_path, bbox_inches='tight')
-    plt.close(fig)
-    log.info(f"Saved plot", path=output_path)
-
-    fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
-    for k, v in drivers.items():
-        x_j = numpy.array(x) + numpy.random.uniform(-0.15, 0.15, len(x))
-        y = [
-            results[i].get_grid_position(v.Abbreviation)
-            - results[i].get_position(v.Abbreviation)
-            for i in range(1, latest)
-        ]
-        y_j = numpy.array(y) + numpy.random.uniform(-0.15, 0.15, len(y))
-        is_black = constants.camera.get(config.get_year(), {}).get(k, 'black') == "black"
-        ax.scatter(
-            x_j, y_j,
-            label=v.Abbreviation,
-            s=20,
-            marker='o',
-            facecolors=('#' + get_color(v)) if is_black else 'none',
-            edgecolors='#' + get_color(v),
-            linewidths=1,
-            alpha=0.8,
-        )
-
-    ax.legend(fontsize='small')
-    ax.grid(True)
-    output_path = f"{base_dir}/grid_to_results.png"
-    os.makedirs(os.path.dirname(output_path), exist_ok=True)
-    fig.savefig(output_path, bbox_inches='tight')
-    plt.close(fig)
-    log.info(f"Saved plot", path=output_path)
+        y = [results[i].get_grid_position(v.Abbreviation) - results[i].get_position(v.Abbreviation) for i in x]
+        filled = constants.camera.get(config.get_year(), {}).get(k, 'black') == 'black'
+        scatter.add_trace(go.Scatter(x=x, y=y, mode='markers', name=v.Abbreviation,
+                                     marker={'size': 7, 'color': '#' + get_color(v) if filled else 'white',
+                                             'line': {'color': '#' + get_color(v), 'width': 1}}))
+    scatter.update_layout(title='Grid to result', template='plotly_white', hovermode='x unified',
+                          xaxis={'title': 'Round', 'dtick': 1}, yaxis={'title': 'Grid - result'},
+                          legend={'font': {'size': 10}})
+    charts.append(('Grid to result', scatter))
 
     values_map = {}
     sum_map = {}
@@ -313,14 +290,11 @@ def __main():
                 font=go.table.cells.Font(color='darkgrey')))],
         layout=go.Layout(autosize=True, margin=go.layout.Margin(autoexpand=True)))
 
-    output_path = f"{base_dir}/points.png"
-    os.makedirs(os.path.dirname(output_path), exist_ok=True)
-    fig.write_image(output_path, width=1920, height=2160)
-    log.info(f"Saved plot", path=output_path)
+    points = cast(bytes, fig.to_image(format="png", width=1920, height=2160))
 
     if config.get_year() > now.year:
         return
-    __save_events(base_dir, log, schedule)
+    __save_season_report(config.get_year(), base_dir, schedule, charts, points, log)
 
 
 if __name__ == "__main__":
