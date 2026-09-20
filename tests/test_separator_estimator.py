@@ -7,7 +7,7 @@ from types import SimpleNamespace
 import pytest
 import pandas as pd
 
-from separator_estimator import (
+from f1_explorer.separator_estimator import (
     SeparatorEstimationError,
     SeparatorBoundary,
     SeparatorResolution,

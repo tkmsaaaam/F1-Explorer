@@ -82,16 +82,8 @@ def _canonical_hash(value: object) -> str:
 
 
 def _source_paths(entrypoint: Path, repo_root: Path) -> list[Path]:
-    candidates = [
-        entrypoint,
-        repo_root / "analysis_state.py",
-        repo_root / "setup.py",
-        repo_root / "constants.py",
-    ]
-    candidates.extend(
-        repo_root / name
-        for name in ("util.py", "requirements.txt", "separator_estimator.py")
-    )
+    candidates = [entrypoint, repo_root / "requirements.txt"]
+    candidates.extend((repo_root / "f1_explorer").glob("**/*.py"))
     candidates.extend((repo_root / "visualizations").glob("**/*.py"))
 
     unique: dict[str, Path] = {}

@@ -14,7 +14,7 @@ from plotly.subplots import make_subplots
 # noinspection PyPackageRequirements
 from opentelemetry import trace
 
-import constants
+from f1_explorer import constants
 from visualizations.output import resolve_output_dir, save_matplotlib, save_plotly
 from visualizations.report import current_report
 from visualizations.session_order import driver_order, driver_sort_key

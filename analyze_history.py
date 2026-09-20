@@ -8,7 +8,7 @@ import plotly.graph_objects as go
 # noinspection PyPackageRequirements
 from opentelemetry import trace
 
-import setup
+from f1_explorer import config
 
 
 def load_gp_data() -> dict:
@@ -57,8 +57,8 @@ tracer = trace.get_tracer(__name__)
 
 @tracer.start_as_current_span("main")
 def __main():
-    log = setup.log()
-    setup.fast_f1()
+    log = config.log()
+    config.fast_f1()
     end_year = datetime.datetime.now().year - 1
     __save_cache(log, False, end_year=end_year, interval=1)
     __save_winners(log, end_year=end_year)

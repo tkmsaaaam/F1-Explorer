@@ -8,7 +8,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from analysis_state import (
+from f1_explorer.analysis_state import (
     MISSING_VERSION,
     SCHEMA_VERSION,
     build_fingerprint,
@@ -30,9 +30,11 @@ class AnalysisStateTest(unittest.TestCase):
     def _repo(self, root: Path) -> Path:
         (root / "visualizations/domain").mkdir(parents=True)
         (root / "analyze_race.py").write_text("print('race')\n", encoding="utf-8")
-        (root / "setup.py").write_text("# setup\n", encoding="utf-8")
-        (root / "constants.py").write_text("YEAR = 2026\n", encoding="utf-8")
-        (root / "util.py").write_text("# util\n", encoding="utf-8")
+        package = root / "f1_explorer"
+        package.mkdir()
+        (package / "config.py").write_text("# config\n", encoding="utf-8")
+        (package / "constants.py").write_text("YEAR = 2026\n", encoding="utf-8")
+        (package / "util.py").write_text("# util\n", encoding="utf-8")
         (root / "requirements.txt").write_text(
             "present-package==1.0\nmissing_package>=2\n", encoding="utf-8"
         )
@@ -50,7 +52,7 @@ class AnalysisStateTest(unittest.TestCase):
                 raise PackageNotFoundError(name)
             return versions[name]
 
-        with patch("analysis_state.metadata.version", side_effect=version):
+        with patch("f1_explorer.analysis_state.metadata.version", side_effect=version):
             return build_fingerprint(root / "analyze_race.py", root)
 
     def test_fingerprint_is_deterministic_and_uses_relative_sorted_paths(self) -> None:

@@ -12,8 +12,8 @@ from fastf1.mvapi import CircuitInfo
 from opentelemetry import trace
 from pandas.core.interchange.dataframe_protocol import DataFrame
 
-import constants
-import setup
+from f1_explorer import constants
+from f1_explorer import config
 
 tracer = trace.get_tracer(__name__)
 
@@ -416,14 +416,14 @@ def summary(log: structlog.stdlib.BoundLogger, comparison: Comparison):
 
 @tracer.start_as_current_span("main")
 def __main():
-    log = setup.log()
+    log = config.log()
     config = None
     with open('./config.json', 'r', encoding='utf-8') as file:
         config = json.load(file)
     if config is None:
         raise Exception("Config must be provided")
 
-    setup.fast_f1()
+    config.fast_f1()
 
     year = config['Year']
     race = config['RoundName']

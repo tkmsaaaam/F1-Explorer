@@ -8,7 +8,7 @@ import structlog
 # noinspection PyPackageRequirements
 from opentelemetry import trace
 
-import constants
+from f1_explorer import constants
 from visualizations.output import save_plotly
 
 tracer = trace.get_tracer(__name__)

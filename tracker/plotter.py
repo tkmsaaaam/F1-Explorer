@@ -6,7 +6,7 @@ from typing import Final
 from matplotlib import pyplot
 from plotly import graph_objects
 
-import constants
+from f1_explorer import constants
 from tracker.domain.lap import Lap
 from tracker.domain.stint import Stint
 from tracker.domain.weather import Weather

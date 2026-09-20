@@ -6,11 +6,11 @@ import fastf1
 # noinspection PyPackageRequirements
 from opentelemetry import trace
 
-import setup
+from f1_explorer import config
 from visualizations import weekend, run_volume, weather, race
 from visualizations.output import session_output_dir, session_report_dir
 from visualizations.report import SessionReport
-from analysis_state import build_fingerprint, manifest_path, should_skip, write_success_manifest
+from f1_explorer.analysis_state import build_fingerprint, manifest_path, should_skip, write_success_manifest
 
 tracer = trace.get_tracer(__name__)
 
@@ -25,17 +25,17 @@ def start_at(session: fastf1.core.Session) -> None | datetime.datetime:
 
 @tracer.start_as_current_span("main")
 def main(*, force: bool = False):
-    log = setup.log()
+    log = config.log()
     try:
-        config = setup.load_config()
+        config = config.load_config()
     except Exception as exception:
         log.warning('setup is failed', args=exception.args)
         return
 
-    if config.get_session_category() != setup.SessionCategory.Race:
+    if config.get_session_category() != config.SessionCategory.Race:
         log.warning(f"{config.get_session()} is not R or S. \"Session\" needs to be set to R or S.")
         return
-    setup.fast_f1()
+    config.fast_f1()
     try:
         session = fastf1.get_session(config.get_year(), config.get_round(), config.get_session())
     except Exception as exception:

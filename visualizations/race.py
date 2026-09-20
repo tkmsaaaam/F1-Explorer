@@ -14,8 +14,8 @@ from fastf1.core import Session, Laps
 # noinspection PyPackageRequirements
 from opentelemetry import trace
 
-import constants
-import util
+from f1_explorer import constants
+from f1_explorer import util
 from visualizations.domain.driver import Driver
 from visualizations.domain.driver_laps import DriverLaps
 from visualizations.domain.lap import Lap

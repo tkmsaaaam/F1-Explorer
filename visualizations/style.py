@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-import constants
+from f1_explorer import constants
 
 
 def driver_linestyle(year: int, driver_number: int) -> str:

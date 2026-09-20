@@ -13,7 +13,7 @@ from matplotlib.collections import LineCollection
 import pandas as pd
 import numpy as np
 
-from separator_estimator import SeparatorBoundary
+from f1_explorer.separator_estimator import SeparatorBoundary
 from visualizations.short_runs import plot_flat_out, plot_speed_on_track
 from visualizations.short_runs import (
     CORNER_SPEED_COLORS,

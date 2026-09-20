@@ -1,6 +1,6 @@
 import unittest
 
-from util import join_with_colon
+from f1_explorer.util import join_with_colon
 
 
 class Util(unittest.TestCase):
