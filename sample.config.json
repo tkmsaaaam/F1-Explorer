@@ -1,0 +1,14 @@
+{
+  "Year": 2026,
+  "Round": 1,
+  "Session": "FP1",
+  "FileName": "2026_Australia_Race.txt",
+  "Race": {
+    "LapTimeRange": 10,
+    "GapTopRange": 35,
+    "GapAheadRange": 8
+  },
+  "corners": {},
+  "separator": [],
+  "Comparison": []
+}

@@ -9,7 +9,7 @@ tools for both historical session analysis and real-time telemetry tracking duri
 
 The repository is organized into the following components:
 
-### Analysis Scripts
+### Analysis entrypoints
 
 * **[analyze_practice.py](analyze_practice.py)**: Script for analyzing Free Practice sessions. It focuses on long-run
   pace and consistency.
@@ -17,11 +17,12 @@ The repository is organized into the following components:
   comparisons.
 * **[analyze_season.py](analyze_season.py)**: Script for visualizing season-long trends, such as championship points
   transitions.
+* **[f1_explorer/](f1_explorer/)**: Shared configuration, analysis state, constants and separator logic.
 * **[visualizations/](visualizations/)**: A directory containing core visualization methods. The analysis scripts above
   call functions from
   this directory to generate plots.
 
-### Live Tracking System
+### Live tracking
 
 * **[live.py](live.py)**: Subscribes to the live data stream during race sessions, receiving JSON-like text information.
 * **[tracker/](tracker)**: Contains tools to parse the data received by live.py and visualize it as graphs in real-time.
@@ -32,11 +33,11 @@ The repository is organized into the following components:
 
 ### Prerequisites
 
-This project requires Python 3.8 or higher. The primary dependency is the **FastF1** library.
+Use a Python version compatible with the pinned dependencies in `requirements.txt`. The primary dependency is the **FastF1** library.
 
 ### Installation
 
-Clone the repository and install the dependencies listed in [requirements.txt](requirements.txtgi):
+Clone the repository and install the dependencies listed in [requirements.txt](requirements.txt):
 
 ```bash
 pip install -r requirements.txt
@@ -44,7 +45,7 @@ pip install -r requirements.txt
 
 ## Configuration
 
-Before running the scripts, you must set up your local configuration file:
+Before running the scripts, create a local configuration file:
 
 1. Locate the [sample.config.json](sample.config.json) file in the root directory.
 2. Create a copy of it and rename it to [config.json](config.json).
@@ -59,7 +60,7 @@ cp sample.config.json config.json
 
 ### Historical Data Analysis
 
-To analyze completed sessions or season-wide data, run the corresponding script:
+Run entrypoints from the repository root so relative paths for `config.json`, `cache/`, and outputs resolve correctly:
 
 ```bash
 # For Free Practice analysis
