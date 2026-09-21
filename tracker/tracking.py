@@ -5,7 +5,7 @@ import os
 import time
 from pathlib import Path
 
-from f1_explorer import config
+from f1_explorer import config as config_module
 from f1_explorer import util
 from tracker import plotter
 from tracker.domain.lap import Lap
@@ -398,7 +398,7 @@ def __main():
         - Log files: logs/race_control.txt, logs/track_status.txt, logs/timestamp.txt
         - Plot files: images/ directory with lap time, position, gap, tyres, and weather plots.
     """
-    log = config.log()
+    log = config_module.log()
 
     results_path = Path(__file__).resolve().parents[1] / 'live' / 'data' / 'results'
     logs_path = results_path / 'logs'

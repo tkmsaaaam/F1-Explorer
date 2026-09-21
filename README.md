@@ -21,6 +21,7 @@ The repository is organized into the following components:
 * **[visualizations/](visualizations/)**: A directory containing core visualization methods. The analysis scripts above
   call functions from
   this directory to generate plots.
+* **[templates/template.html](templates/template.html)**: Shared HTML layout and browser behavior for session reports.
 
 ### Live tracking
 
@@ -79,6 +80,12 @@ python analyze_batch.py sample.analysis-plan.json
 Season analysis is written as a self-contained offline report at
 `reports/<year>/season.html`. Interactive charts and the points/events table
 images are embedded in that single HTML file.
+
+Session analyses write independent offline reports to
+`reports/<year>/<round>_<location>/<session>/report.html`. Open
+`reports/index.html` to select a year, Grand Prix, and session. The index is
+updated when a session report is written. To rebuild it from existing reports,
+run `python -m visualizations.report_index` from the repository root.
 
 ### Batch analysis
 

@@ -85,6 +85,7 @@ def _source_paths(entrypoint: Path, repo_root: Path) -> list[Path]:
     candidates = [entrypoint, repo_root / "requirements.txt"]
     candidates.extend((repo_root / "f1_explorer").glob("**/*.py"))
     candidates.extend((repo_root / "visualizations").glob("**/*.py"))
+    candidates.extend((repo_root / "templates").glob("**/*.html"))
 
     unique: dict[str, Path] = {}
     for candidate in candidates:
