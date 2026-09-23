@@ -14,7 +14,7 @@ from fastf1.events import EventSchedule
 from opentelemetry import trace
 
 from f1_explorer import constants
-from f1_explorer import config
+from f1_explorer import config as config_module
 
 tracer = trace.get_tracer(__name__)
 
@@ -145,14 +145,14 @@ def __save_season_report(year: int, image_dir: str, schedule: EventSchedule,
 
 @tracer.start_as_current_span("main")
 def __main():
-    log = config.log()
+    log = config_module.log()
     try:
-        config = config.load_config()
+        config = config_module.load_config()
     except Exception as exception:
         log.warning('setup is failed', args=exception.args)
         return
     config.set_attribute_to_span()
-    config.fast_f1()
+    config_module.fast_f1()
     schedule = fastf1.get_event_schedule(config.get_year(), include_testing=False).sort_values(by='RoundNumber')
 
     drivers: dict[int, DriverResult] = {}
