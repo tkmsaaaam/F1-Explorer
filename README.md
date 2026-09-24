@@ -3,6 +3,11 @@
 F1-Explorer is a data analysis and visualization toolkit for Formula 1 data, leveraging the FastF1 library. It provides
 tools for both historical session analysis and real-time telemetry tracking during live race sessions.
 
+## Data sources
+
+* [FastF1](https://docs.fastf1.dev/) provides session results, lap timing, and telemetry used by the analysis tools.
+* The [Formula 1 Live Timing archive (2025 season index)](https://livetiming.formula1.com/static/2025/Index.json) provides timing data used to estimate mini-segment boundaries. The code selects the season index for the year being analyzed.
+
 ---
 
 ## Project Structure
