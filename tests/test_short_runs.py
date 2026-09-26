@@ -45,8 +45,8 @@ def test_sector_boundary_distances_interpolate_fastest_lap_telemetry() -> None:
         "Distance": [0.0, 1000.0, 2000.0, 3000.0, 4000.0, 5000.0],
     })
     lap = SimpleNamespace(
-        Sector1Time=pd.Timedelta(seconds=30),
-        Sector2Time=pd.Timedelta(seconds=40),
+        Sector1Time=pd.to_timedelta(30, unit="s"),
+        Sector2Time=pd.to_timedelta(40, unit="s"),
     )
     assert _sector_boundary_distances(lap, telemetry) == [1500.0, 3500.0]
 
@@ -86,7 +86,7 @@ def test_mini_segment_map_uses_structured_markers_instead_of_fastest_lap_times(t
     })
     telemetry.add_distance = lambda: telemetry
     lap = SimpleNamespace(
-        Driver="VER", Sector1Time=pd.Timedelta(seconds=15), Sector2Time=pd.Timedelta(seconds=15),
+        Driver="VER", Sector1Time=pd.to_timedelta(15, unit="s"), Sector2Time=pd.to_timedelta(15, unit="s"),
         get_telemetry=lambda: telemetry,
     )
     session = SimpleNamespace(laps=SimpleNamespace(pick_fastest=lambda: lap))
@@ -161,7 +161,7 @@ def test_summary_scatter_values_and_interactive_report(tmp_path):
         "Time": pd.to_timedelta([0, 1, 2], unit="s"), "Speed": [200, 300, 250],
     })
     lap = SimpleNamespace(Driver="VER", Team="Red Bull", TyreLife=3,
-                          LapTime=pd.Timedelta(seconds=90), telemetry=telemetry,
+                          LapTime=pd.to_timedelta(90, unit="s"), telemetry=telemetry,
                           get_car_data=lambda: telemetry)
     laps = MagicMock()
     laps.DriverNumber.unique.return_value = np.array(["1"])
@@ -172,9 +172,9 @@ def test_summary_scatter_values_and_interactive_report(tmp_path):
     laps.empty = False
     laps.__len__.return_value = 1
     laps.iloc = pd.DataFrame({
-        "Sector1Time": [pd.Timedelta(seconds=29)],
-        "Sector2Time": [pd.Timedelta(seconds=30)],
-        "Sector3Time": [pd.Timedelta(seconds=30)],
+        "Sector1Time": [pd.to_timedelta(29, unit="s")],
+        "Sector2Time": [pd.to_timedelta(30, unit="s")],
+        "Sector3Time": [pd.to_timedelta(30, unit="s")],
     }).iloc
     laps.Driver = pd.Series(["VER"])
     laps.Team = pd.Series(["Red Bull"])

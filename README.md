@@ -49,6 +49,25 @@ Clone the repository and install the dependencies listed in [requirements.txt](r
 pip install -r requirements.txt
 ```
 
+## Tests and coverage
+
+From the repository root, run the full test suite through Coverage.py, then
+print the coverage summary:
+
+```bash
+coverage run -m pytest tests -q -W error::DeprecationWarning
+coverage report -m
+```
+
+To generate a detailed HTML coverage report, run:
+
+```bash
+coverage html
+```
+
+Open `htmlcov/index.html` in a browser to view it. The `-W` option makes
+deprecation warnings fail the test run.
+
 ## Configuration
 
 Before running the scripts, create a local configuration file:

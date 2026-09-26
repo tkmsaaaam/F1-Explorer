@@ -15,7 +15,7 @@ def session_fixture(name="Race"):
     times = pd.to_timedelta(np.arange(99, 122), unit="s")
     car = pd.DataFrame({"SessionTime": times, "Speed": [36.] * len(times)})
     return SimpleNamespace(
-        name=name, session_start_time=pd.Timedelta(seconds=100),
+        name=name, session_start_time=pd.to_timedelta(100, unit="s"),
         event=SimpleNamespace(year=2026), drivers=["1", "2"],
         car_data={"1": car, "2": car.copy()},
         pos_data={str(driver): pd.DataFrame({
@@ -60,7 +60,7 @@ def test_missing_start_or_position_is_not_replaced_with_fastest_lap():
     session = session_fixture()
     session.session_start_time = None
     assert start_samples(session, "1") is None
-    session.session_start_time = pd.Timedelta(seconds=100)
+    session.session_start_time = pd.to_timedelta(100, unit="s")
     session.pos_data = {}
     assert start_samples(session, "1", until_turn1=True) is None
     assert start_samples(session, "1") is not None
