@@ -22,16 +22,15 @@ def _finite_series(data: Any, key: str) -> tuple[np.ndarray, np.ndarray] | None:
     return x[valid], y[valid]
 
 
-def _lap_data(lap: Any, key: str) -> tuple[np.ndarray, np.ndarray] | None:
+def _lap_data(data: Any, key: str) -> tuple[np.ndarray, np.ndarray] | None:
     try:
-        return _finite_series(lap.get_car_data().add_distance(), key)
+        return _finite_series(data, key)
     except (AttributeError, KeyError, TypeError, ValueError):
         return None
 
 
-def _distance_time(lap: Any) -> tuple[np.ndarray, np.ndarray] | None:
+def _distance_time(data: Any) -> tuple[np.ndarray, np.ndarray] | None:
     try:
-        data = lap.get_car_data().add_distance()
         distance = np.asarray(data.Distance, dtype=float)
         times = np.asarray([value.total_seconds() for value in data.Time], dtype=float)
     except (AttributeError, KeyError, TypeError, ValueError):
@@ -58,7 +57,14 @@ def make_telemetry_comparison(session: Any) -> go.Figure:
         if lap is not None:
             laps[str(number)] = lap
 
-    time_data = {number: _distance_time(lap) for number, lap in laps.items()}
+    # Scope reuse to this figure: car data and merged position telemetry differ.
+    car_data = {}
+    for number, lap in laps.items():
+        try:
+            car_data[number] = lap.get_car_data().add_distance()
+        except (AttributeError, KeyError, TypeError, ValueError):
+            car_data[number] = None
+    time_data = {number: _distance_time(data) for number, data in car_data.items()}
     time_data = {number: value for number, value in time_data.items() if value is not None}
     reference_number = min(
         laps,
@@ -115,7 +121,7 @@ def make_telemetry_comparison(session: Any) -> go.Figure:
             values_by_tab[0].extend(delta.tolist())
 
         for tab_index, (_, label, key, step) in enumerate(tabs[1:], start=1):
-            series = _lap_data(lap, key)
+            series = _lap_data(car_data[str(number)], key)
             if series is None:
                 continue
             distance, values = series
