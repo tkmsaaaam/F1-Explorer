@@ -81,6 +81,12 @@ Before running the scripts, create a local configuration file:
 cp sample.config.json config.json
 ```
 
+Set `F1_LOG_LEVEL` to a Python logging level such as `DEBUG`, `INFO`, or
+`WARNING` to control standard Python logging, including FastF1, Kaleido, and
+Choreographer. This does not change the application's structlog output. Without this
+environment variable, FastF1, Kaleido, and Choreographer logs default to
+`WARNING`.
+
 ## Usage
 
 ### Historical Data Analysis
@@ -132,6 +138,59 @@ by an analyzer, such as newly generated circuit separators, are retained.
 Supported session names are `FP1`, `FP2`, `FP3`, `Q`, `SQ`, `S` and `R`.
 Useful options are `--dry-run`, `--force`, `--refresh-separators`,
 `--fail-fast` and `--keep-last-config`.
+
+### Exporting OpenTelemetry data
+
+The Practice, Qualifying, and Race entrypoints create OpenTelemetry spans. To
+export them, install
+`opentelemetry-distro` and `opentelemetry-exporter-otlp` in the same virtual
+environment as the project, then run the analyzer through
+`opentelemetry-instrument`. The OpenTelemetry API and SDK in
+`requirements.txt` alone do not provide that command or an OTLP exporter.
+Install the additional packages if they are not already in `.venv`:
+
+```bash
+.venv/bin/python -m pip install opentelemetry-distro opentelemetry-exporter-otlp
+```
+
+The following example sends traces, metrics, and standard Python logging to a
+local OTLP/HTTP receiver on port 4318:
+
+```bash
+OTEL_SERVICE_NAME=f1-explorer \
+OTEL_TRACES_EXPORTER=otlp \
+OTEL_METRICS_EXPORTER=otlp \
+OTEL_LOGS_EXPORTER=otlp \
+OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf \
+OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318 \
+OTEL_PYTHON_LOG_AUTO_INSTRUMENTATION=true \
+PYTHONUNBUFFERED=1 \
+.venv/bin/opentelemetry-instrument .venv/bin/python \
+analyze_batch.py batch.json --refresh-separators --force
+```
+
+Run this from the repository root with the OTLP receiver already listening.
+Replace `batch.json` with your plan file, or replace the final command with an
+individual analyzer such as `analyze_practice.py --force`. The base endpoint
+above sends each signal to `/v1/traces`, `/v1/metrics`, or `/v1/logs`.
+If using signal-specific `OTEL_EXPORTER_OTLP_*_ENDPOINT` variables instead,
+include the corresponding `/v1/...` path in each HTTP URL. For a receiver that
+accepts gRPC traces on port 4317, set
+`OTEL_EXPORTER_OTLP_TRACES_PROTOCOL=grpc` and
+`OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=http://localhost:4317`; the other signals
+can remain on HTTP/4318.
+
+The configured exporter sends metrics only when an instrument creates them.
+The existing analysis spans provide trace timings, but the scripts do not yet
+record phase-duration metrics. Standard Python logging can be exported; the
+application's `structlog` JSON messages are written to stdout and are not
+automatically included in OTLP logs. Use `F1_LOG_LEVEL=INFO` for more library
+logging, or `DEBUG` only when diagnosing a problem because Matplotlib and
+Kaleido can produce large volumes of debug logs.
+
+See the [OpenTelemetry Python zero-code setup](https://opentelemetry.io/docs/zero-code/python/),
+[agent configuration](https://opentelemetry.io/docs/zero-code/python/configuration/),
+and [OTLP endpoint rules](https://opentelemetry.io/docs/specs/otel/protocol/exporter/).
 
 To explicitly re-estimate a saved circuit separator, use
 `python analyze_practice.py --refresh-separators` (or the qualifying
