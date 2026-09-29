@@ -65,7 +65,8 @@ def main(*, force: bool = False, refresh_separators: bool = False):
     report_dir = session_report_dir(session)
     # Load before deciding whether the report can be skipped: an unsaved
     # circuit separator is an input to this report and may need estimating.
-    session.load(messages=False)
+    with tracer.start_as_current_span("session.load"):
+        session.load(messages=False)
     start = start_at(session)
     if start is None:
         log.warning(f"{session.name} is not Practice 1 or Practice 2 or Practice 3.")
@@ -75,12 +76,13 @@ def main(*, force: bool = False, refresh_separators: bool = False):
             f"{session.event.year} Race {session.event.RoundNumber} {session.event.EventName} Practice is not started."
         )
         return
-    separator_resolution = resolve_separators(
-        session,
-        Path("config.json"),
-        refresh=refresh_separators,
-        log=log,
-    )
+    with tracer.start_as_current_span("resolve_separators"):
+        separator_resolution = resolve_separators(
+            session,
+            Path("config.json"),
+            refresh=refresh_separators,
+            log=log,
+        )
     config.set_separator(separator_resolution.separators, separator_resolution.boundaries)
     log.info("mini segment separator source", source=separator_resolution.source,
              separators=separator_resolution.separators)
@@ -112,8 +114,12 @@ def main(*, force: bool = False, refresh_separators: bool = False):
 
     long_runs.plot_by_tyre_age_and_tyre(session, log)
 
-    save_plotly(make_practice_best(session), output_dir / 'LapTime.png', log, width=1920, height=1080)
-    save_plotly(make_practice_speed(session), output_dir / 'SpeedFL.png', log, width=1920, height=1080)
+    with tracer.start_as_current_span("make_practice_best"):
+        best_figure = make_practice_best(session)
+    save_plotly(best_figure, output_dir / 'LapTime.png', log, width=1920, height=1080)
+    with tracer.start_as_current_span("make_practice_speed"):
+        speed_figure = make_practice_speed(session)
+    save_plotly(speed_figure, output_dir / 'SpeedFL.png', log, width=1920, height=1080)
 
     base_path = f"./images/{session.event.year}/{session.event['RoundNumber']}_{session.event.Location}/{session.name.replace(' ', '')}"
     circuit = _circuit_info_or_none(session, log)

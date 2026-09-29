@@ -14,7 +14,9 @@ import pandas as pd
 import numpy as np
 
 from f1_explorer.separator_estimator import SeparatorBoundary
-from visualizations.short_runs import plot_flat_out, plot_speed_on_track
+from visualizations.short_runs import (
+    compute_and_save_segment_tables_plotly, plot_flat_out, plot_speed_on_track,
+)
 from visualizations.short_runs import (
     CORNER_SPEED_COLORS,
     _corner_segment_colors,
@@ -37,6 +39,39 @@ def test_corner_speed_color_boundaries() -> None:
     assert _corner_speed_color(200) == CORNER_SPEED_COLORS["medium_high"]
     assert _corner_speed_color(200.1) == CORNER_SPEED_COLORS["high"]
     assert _corner_speed_color(None) == CORNER_SPEED_COLORS["unavailable"]
+
+
+def test_segment_tables_save_two_figures_when_session_fastest_is_missing() -> None:
+    car_data = pd.DataFrame({
+        "Distance": [0.0, 50.0, 100.0, 150.0],
+        "Time": pd.to_timedelta([0, 1, 2, 3], unit="s"),
+    })
+    lap = MagicMock()
+    lap.empty = False
+    lap.get_car_data.return_value.add_distance.return_value = car_data
+    quick = MagicMock()
+    quick.sort_values.return_value = quick
+    quick.DriverNumber = pd.Series(["1"])
+    session = MagicMock()
+    session.drivers = ["1"]
+    session.laps.pick_drivers.return_value.pick_fastest.return_value = lap
+    session.laps.pick_quicklaps.return_value = quick
+    session.laps.pick_fastest.return_value = None
+    session.get_circuit_info.return_value.corners = pd.DataFrame({
+        "Distance": [100.0], "Number": [1],
+    })
+    session.get_driver.return_value.Abbreviation = "AAA"
+
+    with patch("visualizations.short_runs.save_plotly_batch") as save:
+        compute_and_save_segment_tables_plotly(
+            session, "plots/corners", [0.0, 100.0, 200.0], MagicMock(),
+        )
+
+    save.assert_called_once()
+    figures, paths = save.call_args.args[:2]
+    assert len(figures) == 2
+    assert paths == ["plots/corners_durations.png", "plots/corners_ranks.png"]
+    assert save.call_args.kwargs == {"width": 1920, "height": 1080}
 
 
 def test_sector_boundary_distances_interpolate_fastest_lap_telemetry() -> None:

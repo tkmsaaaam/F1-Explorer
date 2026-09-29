@@ -61,7 +61,8 @@ def main(*, force: bool = False, refresh_separators: bool = False):
 
     output_dir = session_output_dir(session)
     report_dir = session_report_dir(session)
-    session.load(messages=False)
+    with tracer.start_as_current_span("session.load"):
+        session.load(messages=False)
     start = start_at(session)
     if start is None:
         log.warning(f"{session.name} is not Sprint Qualifying or Qualifying.")
@@ -71,12 +72,13 @@ def main(*, force: bool = False, refresh_separators: bool = False):
             f"{session.event.year} Race {session.event.RoundNumber} {session.event.EventName} Qualifying is not started."
         )
         return
-    separator_resolution = resolve_separators(
-        session,
-        Path("config.json"),
-        refresh=refresh_separators,
-        log=log,
-    )
+    with tracer.start_as_current_span("resolve_separators"):
+        separator_resolution = resolve_separators(
+            session,
+            Path("config.json"),
+            refresh=refresh_separators,
+            log=log,
+        )
     config.set_separator(separator_resolution.separators, separator_resolution.boundaries)
     log.info("mini segment separator source", source=separator_resolution.source,
              separators=separator_resolution.separators)
@@ -105,8 +107,12 @@ def main(*, force: bool = False, refresh_separators: bool = False):
     run_volume.plot_laptime_by_timing(session, log, exclude_pit_laps=True)
     run_volume.plot_laptime_by_lap_number(session, log)
 
-    save_plotly(make_qualifying_best(session), output_dir / 'LapTime.png', log, width=1920, height=1500)
-    save_plotly(make_qualifying_speed(session), output_dir / 'SpeedFL.png', log, width=1920, height=1080)
+    with tracer.start_as_current_span("make_qualifying_best"):
+        best_figure = make_qualifying_best(session)
+    save_plotly(best_figure, output_dir / 'LapTime.png', log, width=1920, height=1500)
+    with tracer.start_as_current_span("make_qualifying_speed"):
+        speed_figure = make_qualifying_speed(session)
+    save_plotly(speed_figure, output_dir / 'SpeedFL.png', log, width=1920, height=1080)
 
     base_path = f"./images/{session.event.year}/{session.event['RoundNumber']}_{session.event.Location}/{session.name.replace(' ', '')}"
     circuit = _circuit_info_or_none(session, log)

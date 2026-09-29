@@ -8,14 +8,18 @@ from types import SimpleNamespace
 import unittest
 from unittest.mock import Mock, patch
 
+import plotly.graph_objects as go
+
 from visualizations.output import (
     resolve_output_dir,
     save_matplotlib,
     save_plotly,
+    save_plotly_batch,
     session_output_dir,
     session_report_dir,
 )
 from visualizations.style import driver_linestyle
+from visualizations.report import SessionReport
 
 
 def _session() -> SimpleNamespace:
@@ -97,6 +101,49 @@ class VisualizationCommon(unittest.TestCase):
         self.assertEqual(result, output_path)
         fig.write_image.assert_called_once_with(result, width=1200, height=800)
         log.info.assert_called_once()
+
+
+    def test_save_plotly_batch_registers_three_images_in_order(self) -> None:
+        figures = [go.Figure(data=[go.Table(header=dict(values=[name]))])
+                   for name in ("durations", "ranks", "gaps")]
+        log = Mock()
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            paths = [root / f"corners_{name}.png"
+                     for name in ("durations", "ranks", "gaps_to_best")]
+
+            def write_images(*, fig, file, width, height):
+                self.assertEqual(fig, figures)
+                self.assertEqual(file, paths)
+                self.assertEqual((width, height), (1920, 1080))
+                for path in file:
+                    path.write_bytes(b"png")
+
+            with SessionReport(SimpleNamespace(name="Practice 1"), root) as report:
+                with patch("visualizations.output.pio.write_images", side_effect=write_images) as write:
+                    self.assertEqual(
+                        save_plotly_batch(figures, paths, log, width=1920, height=1080), paths,
+                    )
+                self.assertEqual({item.path for item in report._ordered_items()},
+                                 {path.resolve() for path in paths})
+                self.assertTrue(all(item.figure_json for item in report._ordered_items()))
+                html = report.write(scan_existing=False).read_text(encoding="utf-8")
+                self.assertTrue(all(path.name in html for path in paths))
+                self.assertEqual(html.count('<script type="application/json"'), 3)
+                self.assertTrue(all(f'"values":["{name}"]' in html
+                                    for name in ("durations", "ranks", "gaps")))
+            write.assert_called_once()
+            self.assertEqual(log.info.call_count, 3)
+
+
+    def test_save_plotly_batch_propagates_write_failure(self) -> None:
+        log = Mock()
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "corners_durations.png"
+            with patch("visualizations.output.pio.write_images", side_effect=RuntimeError("failed")):
+                with self.assertRaisesRegex(RuntimeError, "failed"):
+                    save_plotly_batch([go.Figure()], [path], log, width=1920, height=1080)
+            log.info.assert_not_called()
 
 
     def test_driver_linestyle_uses_camera_and_safe_defaults(self) -> None:

@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, Mapping, Protocol
+from typing import Any, Mapping, Protocol, Sequence
 
 import matplotlib.pyplot as plt
+import plotly.io as pio
 from opentelemetry import trace
 
 from visualizations.report import current_report
@@ -133,3 +134,42 @@ def save_plotly(
             report.register_plotly(fig, output_path)
     log.info(f"Saved plot to {output_path}")
     return output_path
+
+
+def save_plotly_batch(
+    figures: Sequence[PlotlyFigure],
+    paths: Sequence[str | Path],
+    log: LoggerLike,
+    *,
+    width: int,
+    height: int,
+) -> list[Path]:
+    """Write related Plotly images together, then register each report figure."""
+    if len(figures) != len(paths):
+        raise ValueError("figures and paths must have the same length")
+    report = current_report()
+    accepted = [
+        (fig, Path(path)) for fig, path in zip(figures, paths)
+        if report is None or report.accepts_output(path)
+    ]
+    if not accepted:
+        return []
+    for _, path in accepted:
+        path.parent.mkdir(parents=True, exist_ok=True)
+    with tracer.start_as_current_span("plotly.write_images") as span:
+        span.set_attribute("plot.count", len(accepted))
+        span.set_attribute("plot.width", width)
+        span.set_attribute("plot.height", height)
+        pio.write_images(
+            fig=[fig for fig, _ in accepted],
+            file=[path for _, path in accepted],
+            width=width,
+            height=height,
+        )
+    for fig, path in accepted:
+        if report is not None:
+            with tracer.start_as_current_span("plotly.register_report") as span:
+                span.set_attribute("plot.name", path.name)
+                report.register_plotly(fig, path)
+        log.info(f"Saved plot to {path}")
+    return [path for _, path in accepted]

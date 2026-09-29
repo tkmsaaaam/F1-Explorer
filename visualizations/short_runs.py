@@ -17,7 +17,7 @@ from fastf1.core import Session, Lap, Telemetry
 from opentelemetry import trace
 
 from f1_explorer import constants
-from visualizations.output import resolve_output_dir, save_matplotlib, save_plotly
+from visualizations.output import resolve_output_dir, save_matplotlib, save_plotly, save_plotly_batch
 from visualizations.segment_metrics import deltas_to_reference, rank_segment_durations, segment_durations
 from visualizations.style import driver_linestyle
 from f1_explorer.separator_estimator import SeparatorBoundary
@@ -194,7 +194,11 @@ def compute_and_save_segment_tables_plotly(
                     align='center',
                 )
             )])
-    save_plotly(fig_segment, f"{filename_base}_durations.png", log, width=1920, height=1080)
+    table_figures = [fig_segment]
+    table_paths = [f"{filename_base}_durations.png"]
+
+    def save_tables():
+        save_plotly_batch(table_figures, table_paths, log, width=1920, height=1080)
 
     ranks_by_driver = rank_segment_durations(durations_by_driver)
     segment_rank_rows = []
@@ -222,15 +226,18 @@ def compute_and_save_segment_tables_plotly(
                     ),
                     align='center',
                 ))])
-    save_plotly(fig_ranks, f"{filename_base}_ranks.png", log, width=1920, height=1080)
+    table_figures.append(fig_ranks)
+    table_paths.append(f"{filename_base}_ranks.png")
 
     best = session.laps.pick_fastest()
     if best is None:
+        save_tables()
         return
     best_driver_number = best.DriverNumber
     best_durations = durations_by_driver.get(best_driver_number)
     if not best_durations:
         log.warning("Fastest lap driver has insufficient segment data.")
+        save_tables()
         return
     deltas_by_driver = deltas_to_reference(durations_by_driver, best_driver_number)
     gap_rows = []
@@ -264,7 +271,9 @@ def compute_and_save_segment_tables_plotly(
                 align='center',
             )
         )])
-    save_plotly(fig_gap, f"{filename_base}_gaps_to_best.png", log, width=1920, height=1080)
+    table_figures.append(fig_gap)
+    table_paths.append(f"{filename_base}_gaps_to_best.png")
+    save_tables()
 
 
 @tracer.start_as_current_span("plot_best_laptime")
