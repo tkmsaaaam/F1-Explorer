@@ -6,8 +6,11 @@ from pathlib import Path
 from typing import Any, Mapping, Protocol
 
 import matplotlib.pyplot as plt
+from opentelemetry import trace
 
 from visualizations.report import current_report
+
+tracer = trace.get_tracer(__name__)
 
 
 class _EventLike(Protocol):
@@ -118,9 +121,15 @@ def save_plotly(
     if report is not None and not report.accepts_output(output_path):
         return output_path
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    fig.write_image(output_path, width=width, height=height)
+    with tracer.start_as_current_span("plotly.write_image") as span:
+        span.set_attribute("plot.name", output_path.name)
+        span.set_attribute("plot.width", width)
+        span.set_attribute("plot.height", height)
+        fig.write_image(output_path, width=width, height=height)
     report = current_report()
     if report is not None:
-        report.register_plotly(fig, output_path)
+        with tracer.start_as_current_span("plotly.register_report") as span:
+            span.set_attribute("plot.name", output_path.name)
+            report.register_plotly(fig, output_path)
     log.info(f"Saved plot to {output_path}")
     return output_path

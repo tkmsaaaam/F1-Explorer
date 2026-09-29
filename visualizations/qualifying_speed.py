@@ -3,6 +3,9 @@
 import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
+from opentelemetry import trace
+
+tracer = trace.get_tracer(__name__)
 
 
 _MEASUREMENTS = (
@@ -75,7 +78,9 @@ def _lap_telemetry(lap):
     return data if not data.empty else None
 
 
+@tracer.start_as_current_span("speed.telemetry_cache")
 def _telemetry_cache(laps):
+    trace.get_current_span().set_attribute("speed.valid_lap_count", len(laps))
     cache = {}
     for lap_index, lap in _iter_laps(laps):
         telemetry = _lap_telemetry(lap)
@@ -107,12 +112,76 @@ def _tow_mask(lap_index, telemetry_cache):
     return tow
 
 
-def _tow_at_measurement(lap_index, key, telemetry_cache, session):
+def _indexed_laps(laps):
+    """Build a first-row lookup, matching the first-duplicate behavior of iteration."""
+    rows = {}
+    for lap_index, lap in _iter_laps(laps):
+        rows.setdefault(lap_index, lap)
+    return rows
+
+
+def _prepared_telemetry(telemetry_cache):
+    """Cache numeric distance and nanosecond timestamp arrays for one figure build."""
+    prepared = {}
+    for lap_index, (driver, telemetry) in telemetry_cache.items():
+        prepared[lap_index] = (
+            driver,
+            telemetry,
+            telemetry["Distance"].to_numpy(dtype=float),
+            telemetry["Date"].astype("int64").to_numpy(dtype=float),
+        )
+    return prepared
+
+
+class _TowContext:
+    """Per-figure lookups and lazy tow decisions shared by all measurements."""
+
+    def __init__(self, laps, telemetry_cache, row_source=None):
+        self.lap_rows = _indexed_laps(laps if row_source is None else row_source)
+        self.prepared = _prepared_telemetry(telemetry_cache)
+        self.measurements = {}
+        self.masks = {}
+
+    def mask(self, lap_index):
+        if lap_index not in self.masks:
+            self.masks[lap_index] = _tow_mask_prepared(lap_index, self.prepared)
+        return self.masks[lap_index]
+
+    def at_measurement(self, lap_index, key, telemetry_cache, session):
+        cache_key = (lap_index, key)
+        if cache_key not in self.measurements:
+            self.measurements[cache_key] = _tow_at_measurement(
+                lap_index, key, telemetry_cache, session,
+                lap_rows=self.lap_rows, prepared=self.prepared,
+            )
+        return self.measurements[cache_key]
+
+
+def _tow_mask_prepared(lap_index, prepared):
+    """Classify samples using prebuilt distance/time arrays."""
+    driver, telemetry, target_distance, target_time = prepared[lap_index]
+    tow = np.zeros(len(telemetry), dtype=bool)
+    threshold_ns = _TOW_THRESHOLD_SECONDS * 1_000_000_000
+    for other_index, (other_driver, _, other_distance, other_time) in prepared.items():
+        if other_index == lap_index or other_driver == driver or len(other_distance) < 2:
+            continue
+        overlap = ((target_distance >= other_distance[0]) &
+                   (target_distance <= other_distance[-1]))
+        if not overlap.any():
+            continue
+        passage_time = np.interp(target_distance[overlap], other_distance, other_time)
+        gap = target_time[overlap] - passage_time
+        tow[overlap] |= (gap > 0) & (gap <= threshold_ns)
+    return tow
+
+
+def _tow_at_measurement(lap_index, key, telemetry_cache, session, lap_rows=None,
+                        prepared=None):
     """Return tow context at FL/I1/I2; SpeedST intentionally has no context."""
     if key == "SpeedST" or lap_index not in telemetry_cache:
         return None
     _, telemetry = telemetry_cache[lap_index]
-    lap = next((row for index, row in _iter_laps(session.laps) if index == lap_index), None)
+    lap = (lap_rows or _indexed_laps(session.laps)).get(lap_index)
     if lap is None:
         return None
     if key == "SpeedFL":
@@ -124,31 +193,37 @@ def _tow_at_measurement(lap_index, key, telemetry_cache, session):
             return None
         target = session.t0_date + when
         sample = telemetry.iloc[(telemetry["Date"] - target).abs().argmin()]
-    distances = telemetry["Distance"].to_numpy(dtype=float)
-    times = telemetry["Date"].astype("int64").to_numpy(dtype=float)
+    if prepared is None:
+        prepared = _prepared_telemetry(telemetry_cache)
     best = None
     for other_index, (other_driver, other) in telemetry_cache.items():
-        if other_index == lap_index or other_driver == lap.get("Driver") or len(other) < 2:
+        _, _, other_distances, other_times = prepared[other_index]
+        if other_index == lap_index or other_driver == lap.get("Driver") or len(other_distances) < 2:
             continue
         distance = float(sample["Distance"])
-        if distance < other["Distance"].min() or distance > other["Distance"].max():
+        if distance < other_distances[0] or distance > other_distances[-1]:
             continue
-        other_time = np.interp(distance, other["Distance"].to_numpy(dtype=float), other["Date"].astype("int64").to_numpy(dtype=float))
+        other_time = np.interp(distance, other_distances, other_times)
         gap = (float(sample["Date"].value) - other_time) / 1_000_000_000
         if 0 < gap <= _TOW_THRESHOLD_SECONDS and (best is None or gap < best[1]):
             best = (other_driver, gap)
     return best
 
 
-def _measurement_values(laps, key, telemetry_cache, session=None):
+@tracer.start_as_current_span("speed.measurement_values")
+def _measurement_values(laps, key, telemetry_cache, session=None, tow_context=None):
+    span = trace.get_current_span()
+    span.set_attribute("speed.measurement", key)
+    span.set_attribute("speed.lap_count", len(laps))
     rows = []
+    context = tow_context or _TowContext(laps, telemetry_cache)
     if key.startswith("Telemetry"):
         wants_tow = key == "TelemetryTow"
         for lap_index, lap in _iter_laps(laps):
             if lap_index not in telemetry_cache:
                 continue
-            _, telemetry = telemetry_cache[lap_index]
-            mask = _tow_mask(lap_index, telemetry_cache)
+            _, telemetry, _, _ = context.prepared[lap_index]
+            mask = context.mask(lap_index)
             selected = telemetry.loc[mask if wants_tow else ~mask, "Speed"]
             maximum = selected.max()
             if pd.notna(maximum) and maximum > 0:
@@ -157,7 +232,9 @@ def _measurement_values(laps, key, telemetry_cache, session=None):
         for lap_index, lap in _iter_laps(laps):
             speed = pd.to_numeric(pd.Series([lap.get(key)]), errors="coerce").iloc[0]
             if pd.notna(speed) and speed > 0:
-                tow = _tow_at_measurement(lap_index, key, telemetry_cache, session) if session is not None else None
+                tow = None
+                if session is not None:
+                    tow = context.at_measurement(lap_index, key, telemetry_cache, session)
                 rows.append((lap.get("Driver"), lap.get("Team", ""), float(speed), lap_index, tow is not None))
 
     if not rows:
@@ -174,6 +251,7 @@ def make_qualifying_speed(session):
 
     valid = _valid_laps(session.laps)
     telemetry_cache = _telemetry_cache(valid)
+    tow_context = _TowContext(valid, telemetry_cache, row_source=session.laps)
     parts = session.laps.split_qualifying_sessions()
     prefix = "SQ" if session.name.startswith("Sprint") else "Q"
     scopes = [("全有効ラップ", valid)]
@@ -185,7 +263,9 @@ def make_qualifying_speed(session):
     combinations = []
     for scope_label, laps in scopes:
         for key, measurement_label in _MEASUREMENTS:
-            drivers, speeds, teams, tow = _measurement_values(laps, key, telemetry_cache, session)
+            drivers, speeds, teams, tow = _measurement_values(
+                laps, key, telemetry_cache, session, tow_context=tow_context,
+            )
             label = f"{scope_label} · {measurement_label}"
             combinations.append((label, key, drivers, speeds, _team_colors(drivers, teams, session), tow))
 

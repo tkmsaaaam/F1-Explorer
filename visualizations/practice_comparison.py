@@ -6,7 +6,7 @@ import pandas as pd
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 from visualizations.chart_ranges import bar_range
-from visualizations.qualifying_speed import _measurement_values, _telemetry_cache
+from visualizations.qualifying_speed import _TowContext, _measurement_values, _telemetry_cache
 
 
 def _colors(drivers, teams, session):
@@ -94,6 +94,7 @@ def make_practice_speed(session):
                ("SpeedI2", "第2中間計測地点"), ("SpeedST", "スピードトラップ"))
     laps = _valid(session.laps)
     telemetry_cache = _telemetry_cache(laps)
+    tow_context = _TowContext(laps, telemetry_cache, row_source=session.laps)
     fig = go.Figure()
     choices = []
     for key, label in metrics:
@@ -102,7 +103,9 @@ def make_practice_speed(session):
         if valid.empty:
             choices.append((label, [], [], [], {}, {}))
             continue
-        drivers, speeds, teams, tow = _measurement_values(valid, key, telemetry_cache, session)
+        drivers, speeds, teams, tow = _measurement_values(
+            valid, key, telemetry_cache, session, tow_context=tow_context,
+        )
         choices.append((label, drivers, speeds, _colors(drivers, teams, session), tow, key))
     for index, (label, drivers, values, colors, tow, key) in enumerate(choices):
         text = [f"<b>{value:.1f}</b>" if tow.get(driver, False) and key != "SpeedST" else f"{value:.1f}"

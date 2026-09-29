@@ -126,19 +126,23 @@ def compute_and_save_segment_tables_plotly(
         segment_boundaries: セグメントの境界値一覧
         log: ロガー
     """
+    trace.get_current_span().set_attribute("segment.table_kind", Path(filename_base).name)
     if isinstance(segment_boundaries, MiniSegmentLayout):
         segment_boundaries = segment_boundaries.distances
     segment_boundaries = sorted(segment_boundaries)
     driver_times: dict[str, list[float | None]] = {}
 
-    for driver_number in session.drivers:
-        laps = session.laps.pick_drivers(driver_number).pick_fastest()
-        if laps is None or laps.empty:
-            continue
-        car_data = laps.get_car_data().add_distance()
-        driver_times[driver_number] = [
-            None if (last_point := car_data[car_data.Distance < dist]).empty else
-            last_point.iloc[-1].Time.total_seconds() for dist in segment_boundaries]
+    with tracer.start_as_current_span("segment_table.driver_times") as span:
+        span.set_attribute("segment.boundary_count", len(segment_boundaries))
+        span.set_attribute("segment.driver_count", len(session.drivers))
+        for driver_number in session.drivers:
+            laps = session.laps.pick_drivers(driver_number).pick_fastest()
+            if laps is None or laps.empty:
+                continue
+            car_data = laps.get_car_data().add_distance()
+            driver_times[driver_number] = [
+                None if (last_point := car_data[car_data.Distance < dist]).empty else
+                last_point.iloc[-1].Time.total_seconds() for dist in segment_boundaries]
 
     circuit = session.get_circuit_info()
     if circuit is None:
@@ -174,20 +178,22 @@ def compute_and_save_segment_tables_plotly(
         else:
             log.warning("Fastest lap telemetry unavailable for corner speed colors.")
 
-    fig_segment = go.Figure(
-        data=[go.Table(
-            header=go.table.Header(
-                values=["segment", "distance", "corners"] + abbreviations,
-                fill=go.table.header.Fill(color='lightgrey'),
-                align='center'),
-            cells=go.table.Cells(
-                values=list(zip(*segment_rows)),
-                fill=go.table.cells.Fill(
-                    color=_table_fill_colors(3 + len(abbreviations), row_colors),
-                ),
-                align='center',
-            )
-        )])
+    with tracer.start_as_current_span("segment_table.build_figure") as span:
+        span.set_attribute("segment.output", "durations")
+        fig_segment = go.Figure(
+            data=[go.Table(
+                header=go.table.Header(
+                    values=["segment", "distance", "corners"] + abbreviations,
+                    fill=go.table.header.Fill(color='lightgrey'),
+                    align='center'),
+                cells=go.table.Cells(
+                    values=list(zip(*segment_rows)),
+                    fill=go.table.cells.Fill(
+                        color=_table_fill_colors(3 + len(abbreviations), row_colors),
+                    ),
+                    align='center',
+                )
+            )])
     save_plotly(fig_segment, f"{filename_base}_durations.png", log, width=1920, height=1080)
 
     ranks_by_driver = rank_segment_durations(durations_by_driver)
@@ -201,19 +207,21 @@ def compute_and_save_segment_tables_plotly(
             ],
         ])
 
-    fig_ranks = go.Figure(
-        data=[go.Table(
-            header=go.table.Header(
-                values=["segment", "distance"] + abbreviations,
-                fill=go.table.header.Fill(color='lightgrey'),
-                align='center'),
-            cells=go.table.Cells(
-                values=list(zip(*segment_rank_rows)),
-                fill=go.table.cells.Fill(
-                    color=_table_fill_colors(2 + len(abbreviations), row_colors),
-                ),
-                align='center',
-            ))])
+    with tracer.start_as_current_span("segment_table.build_figure") as span:
+        span.set_attribute("segment.output", "ranks")
+        fig_ranks = go.Figure(
+            data=[go.Table(
+                header=go.table.Header(
+                    values=["segment", "distance"] + abbreviations,
+                    fill=go.table.header.Fill(color='lightgrey'),
+                    align='center'),
+                cells=go.table.Cells(
+                    values=list(zip(*segment_rank_rows)),
+                    fill=go.table.cells.Fill(
+                        color=_table_fill_colors(2 + len(abbreviations), row_colors),
+                    ),
+                    align='center',
+                ))])
     save_plotly(fig_ranks, f"{filename_base}_ranks.png", log, width=1920, height=1080)
 
     best = session.laps.pick_fastest()
@@ -241,19 +249,21 @@ def compute_and_save_segment_tables_plotly(
                 for delta in [deltas_by_driver.get(driver_number, [None] * len(best_durations))[i - 1]]
             ]
         )
-    fig_gap = go.Figure(data=[go.Table(
-        header=go.table.Header(
-            values=["segment", "distance", "corners"] + abbreviations,
-            fill=go.table.header.Fill(color='lightgrey'),
-            align='center'),
-        cells=go.table.Cells(
-            values=list(zip(*gap_rows)),
-            fill=go.table.cells.Fill(
-                color=_table_fill_colors(3 + len(abbreviations), row_colors),
-            ),
-            align='center',
-        )
-    )])
+    with tracer.start_as_current_span("segment_table.build_figure") as span:
+        span.set_attribute("segment.output", "gaps_to_best")
+        fig_gap = go.Figure(data=[go.Table(
+            header=go.table.Header(
+                values=["segment", "distance", "corners"] + abbreviations,
+                fill=go.table.header.Fill(color='lightgrey'),
+                align='center'),
+            cells=go.table.Cells(
+                values=list(zip(*gap_rows)),
+                fill=go.table.cells.Fill(
+                    color=_table_fill_colors(3 + len(abbreviations), row_colors),
+                ),
+                align='center',
+            )
+        )])
     save_plotly(fig_gap, f"{filename_base}_gaps_to_best.png", log, width=1920, height=1080)
 
 

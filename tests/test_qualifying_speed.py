@@ -5,7 +5,10 @@ import warnings
 import pandas as pd
 import pytest
 
-from visualizations.qualifying_speed import _valid_laps, make_qualifying_speed, _tow_mask
+from visualizations.qualifying_speed import (
+    _TowContext, _indexed_laps, _lap_telemetry, _valid_laps,
+    make_qualifying_speed, _tow_mask,
+)
 
 
 def _telemetry(times, speeds):
@@ -24,6 +27,48 @@ def test_tow_is_classified_at_each_telemetry_distance():
     }
     assert _tow_mask(0, cache).tolist() == [True, True, True]
     assert _tow_mask(1, cache).tolist() == [False, False, False]
+
+
+def test_tow_context_preserves_threshold_and_caches_each_decision(monkeypatch):
+    cache = {
+        0: ("AAA", _telemetry([10, 11, 12], [200, 310, 290])),
+        1: ("BBB", _telemetry([7, 8, 9], [190, 300, 280])),
+        2: ("CCC", _telemetry([10, 10, 10], [180, 290, 270])),
+    }
+    context = _TowContext(pd.DataFrame(index=[0, 1, 2]), cache)
+    calls = 0
+    original = __import__("visualizations.qualifying_speed", fromlist=["_tow_mask_prepared"])._tow_mask_prepared
+
+    def counted(index, prepared):
+        nonlocal calls
+        calls += 1
+        return original(index, prepared)
+
+    monkeypatch.setattr("visualizations.qualifying_speed._tow_mask_prepared", counted)
+    first = context.mask(0)
+    second = context.mask(0)
+    assert first.tolist() == [False, True, True]
+    assert second is first
+    assert calls == 1
+
+
+def test_lap_telemetry_drops_missing_and_keeps_first_duplicate_distance():
+    class Lap:
+        def get_car_data(self):
+            return pd.DataFrame({
+                "Date": pd.to_datetime([0, 1, 2, 3], unit="s"),
+                "Distance": [0, 100, 100, 200],
+                "Speed": [200, 250, 999, None],
+            })
+
+    result = _lap_telemetry(Lap())
+    assert result["Distance"].tolist() == [0.0, 100.0]
+    assert result["Speed"].tolist() == [200.0, 250.0]
+
+
+def test_indexed_lap_lookup_keeps_first_duplicate_index():
+    laps = pd.DataFrame({"Driver": ["AAA", "BBB"]}, index=[7, 7])
+    assert _indexed_laps(laps)[7]["Driver"] == "AAA"
 
 
 @pytest.mark.parametrize("name,prefix", [("Qualifying", "Q"), ("Sprint Qualifying", "SQ")])

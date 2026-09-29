@@ -1,5 +1,6 @@
 import json
 import logging
+import os
 from enum import Enum
 from logging import Logger
 from typing import Any
@@ -119,6 +120,13 @@ def fast_f1():
 
 @tracer.start_as_current_span("log")
 def log() -> structlog.stdlib.BoundLogger:
+    level_name = os.environ.get('F1_LOG_LEVEL', '').upper()
+    level = logging.getLevelNamesMapping().get(level_name)
+    if level_name and level is None:
+        raise ValueError(f'Invalid F1_LOG_LEVEL: {level_name}')
+    if level is not None:
+        logging.basicConfig(level=level)
+        logging.getLogger().setLevel(level)
     structlog.configure(
         processors=[
             structlog.processors.TimeStamper(fmt="iso"),
@@ -126,8 +134,8 @@ def log() -> structlog.stdlib.BoundLogger:
             structlog.processors.JSONRenderer(),
         ]
     )
-    logging.getLogger('choreographer').setLevel(logging.WARNING)
+    logging.getLogger('choreographer').setLevel(level if level is not None else logging.WARNING)
     # noinspection SpellCheckingInspection
-    logging.getLogger('fastf1').setLevel(logging.WARNING)
-    logging.getLogger('kaleido').setLevel(logging.WARNING)
+    logging.getLogger('fastf1').setLevel(level if level is not None else logging.WARNING)
+    logging.getLogger('kaleido').setLevel(level if level is not None else logging.WARNING)
     return structlog.get_logger(__name__)
