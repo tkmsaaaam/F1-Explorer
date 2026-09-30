@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import json
+import warnings
 from pathlib import Path
 from types import SimpleNamespace
+from unittest.mock import Mock
 
 import pytest
 import pandas as pd
@@ -212,6 +214,113 @@ def test_fastf1_sector_ranges_are_built_from_sector_times() -> None:
     }
 
 
+@pytest.mark.parametrize("frequency", ["original", 2])
+def test_fastf1_distance_lookup_skips_driver_ahead_and_preserves_telemetry(
+    monkeypatch, frequency
+) -> None:
+    from fastf1.core import Lap, Session, Telemetry
+
+    monkeypatch.setattr(Telemetry, "TELEMETRY_FREQUENCY", frequency)
+
+    session_date = pd.Timestamp("2026-01-01", tz="UTC")
+
+    class Event(dict):
+        def get_session_date(self, *_args, **_kwargs):
+            return session_date
+
+    session = Session(
+        Event(EventName="Test", EventDate=session_date), "Practice 1"
+    )
+    session._t0_date = session_date
+    car_times = pd.to_timedelta([0, 2, 4, 6, 8, 10, 12], unit="s")
+    position_times = pd.to_timedelta([0, 3, 6, 9, 12], unit="s")
+    session._car_data = {
+        "1": Telemetry({
+            "Date": session_date + car_times,
+            "SessionTime": car_times,
+            "Time": car_times,
+            "Speed": [100, 110, 120, 130, 140, 150, 160],
+            "Throttle": [100] * 7,
+            "Brake": [False] * 7,
+            "nGear": [3] * 7,
+            "RPM": [10000] * 7,
+            "Source": ["car"] * 7,
+        }, session=session, driver="1")
+    }
+    session._pos_data = {
+        "1": Telemetry({
+            "Date": session_date + position_times,
+            "SessionTime": position_times,
+            "Time": position_times,
+            "X": [0, 3, 6, 9, 12],
+            "Y": [0] * 5,
+            "Z": [0] * 5,
+            "Status": ["OnTrack"] * 5,
+            "Source": ["pos"] * 5,
+        }, session=session, driver="1")
+    }
+    lap = Lap({
+        "DriverNumber": "1", "LapNumber": 1,
+        "LapStartTime": pd.to_timedelta(1, unit="s"),
+        "Time": pd.to_timedelta(11, unit="s"),
+        "LapTime": pd.to_timedelta(10, unit="s"),
+        "Sector1Time": pd.to_timedelta(3, unit="s"),
+        "Sector2Time": pd.to_timedelta(3, unit="s"),
+        "Sector3Time": pd.to_timedelta(4, unit="s"),
+    })
+    lap.session = session
+
+    ahead_calls = []
+
+    def add_driver_ahead(telemetry):
+        ahead_calls.append(True)
+        return telemetry.assign(DriverAhead="", DistanceToDriverAhead=float("nan"))
+
+    monkeypatch.setattr(Telemetry, "add_driver_ahead", add_driver_ahead)
+    # FastF1 currently constructs Timedelta(seconds=...) without an explicit
+    # unit when using a numeric telemetry frequency; pandas warns on that
+    # dependency code path.
+    with warnings.catch_warnings():
+        warnings.filterwarnings(
+            "ignore",
+            message="The 'generic' unit for NumPy timedelta is deprecated.*",
+            category=DeprecationWarning,
+            module=r"fastf1\.core",
+        )
+        expected = lap.get_telemetry().add_distance()
+    assert ahead_calls
+    ahead_calls.clear()
+
+    def unexpected_get_telemetry():
+        raise AssertionError("raw FastF1 path must avoid get_telemetry")
+
+    monkeypatch.setattr(lap, "get_telemetry", unexpected_get_telemetry)
+
+    class Laps:
+        iloc = [lap]
+
+        def __len__(self):
+            return 1
+
+    with warnings.catch_warnings():
+        warnings.filterwarnings(
+            "ignore",
+            message="The 'generic' unit for NumPy timedelta is deprecated.*",
+            category=DeprecationWarning,
+            module=r"fastf1\.core",
+        )
+        lookup, track_length = build_distance_lookup(SimpleNamespace(laps=Laps()))
+    result = lookup[("1", 1)]
+    assert not ahead_calls
+    assert track_length == pytest.approx(float(expected["Distance"].iloc[-1]))
+    expected_times = [value.total_seconds() for value in expected["SessionTime"]]
+    expected_distances = expected["Distance"].tolist()
+    assert result["SessionTime"] == expected_times
+    assert result["Distance"] == expected_distances
+    assert expected_times[0] == 1.0
+    assert expected_times[-1] == 11.0
+
+
 def test_inconsistent_fastf1_sector_times_do_not_create_sector_mapping() -> None:
     telemetry = pd.DataFrame({
         "SessionTime": pd.to_timedelta([0, 10, 20, 30, 40], unit="s"),
@@ -234,6 +343,76 @@ def test_inconsistent_fastf1_sector_times_do_not_create_sector_mapping() -> None
     lookup, track_length = build_distance_lookup(SimpleNamespace(laps=Laps()))
     assert track_length == 400
     assert "SectorTimePercent" not in lookup[("1", 1)]
+
+
+def test_invalid_laps_are_skipped_before_raw_telemetry_access() -> None:
+    invalid_laps = [
+        SimpleNamespace(
+            DriverNumber="1", LapNumber=1, IsAccurate=False,
+            get_car_data=Mock(), get_pos_data=Mock(), get_telemetry=Mock(),
+        ),
+        SimpleNamespace(
+            DriverNumber="2", LapNumber=2, PitInTime=pd.to_timedelta(1, unit="s"),
+            get_car_data=Mock(), get_pos_data=Mock(), get_telemetry=Mock(),
+        ),
+    ]
+
+    class Laps:
+        iloc = invalid_laps
+
+        def __len__(self):
+            return len(self.iloc)
+
+    assert build_distance_lookup(SimpleNamespace(laps=Laps())) == ({}, None)
+    for lap in invalid_laps:
+        lap.get_car_data.assert_not_called()
+        lap.get_pos_data.assert_not_called()
+        lap.get_telemetry.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    "failure", ["empty_car", "raw_accessor", "missing_session_time"]
+)
+def test_fastf1_raw_telemetry_failures_skip_lap_without_fallback(failure) -> None:
+    from fastf1.core import Telemetry
+
+    get_telemetry = Mock()
+    lap = SimpleNamespace(
+        DriverNumber="1", LapNumber=1, IsAccurate=True, Deleted=False,
+        PitInTime=None, PitOutTime=None,
+        get_telemetry=get_telemetry,
+    )
+    if failure == "empty_car":
+        empty = Telemetry(pd.DataFrame(columns=["Date", "Time", "SessionTime", "Speed", "Source"]))
+        get_car_data = Mock(return_value=empty)
+        get_pos_data = Mock(return_value=empty)
+    elif failure == "missing_session_time":
+        malformed = Telemetry(pd.DataFrame({
+            "Date": pd.date_range("2026-01-01", periods=3, freq="s", tz="UTC"),
+            "Time": pd.to_timedelta([0, 1, 2], unit="s"),
+            "Speed": [100, 110, 120],
+            "Source": ["car"] * 3,
+        }))
+        empty = Telemetry(pd.DataFrame(columns=["Date", "Time", "SessionTime", "X", "Y", "Z", "Source"]))
+        get_car_data = Mock(return_value=malformed)
+        get_pos_data = Mock(return_value=empty)
+    else:
+        empty = Telemetry(pd.DataFrame(columns=["Date", "Time", "SessionTime", "X", "Y", "Z", "Source"]))
+        get_car_data = Mock(side_effect=ValueError("synthetic telemetry failure"))
+        get_pos_data = Mock(return_value=empty)
+    lap.get_car_data = get_car_data
+    lap.get_pos_data = get_pos_data
+
+    class Laps:
+        iloc = [lap]
+
+        def __len__(self):
+            return 1
+
+    assert build_distance_lookup(SimpleNamespace(laps=Laps())) == ({}, None)
+    get_pos_data.assert_called_once_with(pad=1, pad_side="both")
+    get_car_data.assert_called_once_with(pad=1, pad_side="both")
+    get_telemetry.assert_not_called()
 
 
 def test_live_timing_lap_validation_rejects_inconsistent_duration() -> None:

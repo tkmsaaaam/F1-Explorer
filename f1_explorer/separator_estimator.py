@@ -996,6 +996,30 @@ def _lap_value(lap: Any, name: str) -> Any:
     return getattr(lap, name, None)
 
 
+def _lap_telemetry_without_driver_ahead(lap: Any) -> Any:
+    """Build lap telemetry while skipping FastF1's expensive traffic scan.
+
+    Keep FastF1's normal telemetry path for lightweight lap doubles and
+    compatible implementations that do not expose the raw car/position APIs.
+    """
+    get_car_data = getattr(lap, "get_car_data", None)
+    get_pos_data = getattr(lap, "get_pos_data", None)
+    if not callable(get_car_data) or not callable(get_pos_data):
+        return lap.get_telemetry().add_distance()
+
+    pos_data = get_pos_data(pad=1, pad_side="both")
+    car_data = get_car_data(pad=1, pad_side="both")
+    # get_telemetry() normally adds the timestamps from the unpadded
+    # driver-ahead result back to car data before merging position channels.
+    # Keep that merge's time base and resampling behavior without calculating
+    # any traffic information.
+    timestamp_rows = car_data.iloc[1:-1].loc[:, ("Date", "Time", "SessionTime")]
+    car_data = car_data.add_distance().add_relative_distance()
+    car_data = car_data.merge_channels(timestamp_rows)
+    merged = pos_data.merge_channels(car_data)
+    return merged.slice_by_lap(lap, interpolate_edges=True).add_distance()
+
+
 def build_distance_lookup(session: Any) -> tuple[dict[tuple[str, int], dict[str, list[float]]], float | None]:
     """Build an interpolating lookup from FastF1 laps without guessing gaps."""
     laps = getattr(session, "laps", None)
@@ -1021,7 +1045,7 @@ def build_distance_lookup(session: Any) -> tuple[dict[tuple[str, int], dict[str,
         except (TypeError, ValueError):
             continue
         try:
-            telemetry = lap.get_telemetry().add_distance()
+            telemetry = _lap_telemetry_without_driver_ahead(lap)
         except Exception:
             continue
         if telemetry is None or "Distance" not in telemetry:
