@@ -87,14 +87,24 @@ def save_matplotlib(
     fig: MatplotlibFigure,
     path: str | Path,
     log: LoggerLike,
+    *,
+    report_interactive: bool = False,
     **savefig_kwargs: Any,
 ) -> Path:
-    """Save a Matplotlib figure and close it exactly once, including on failure."""
+    """Save a static report image, closing unused interactive counterparts."""
     output_path = Path(path)
     report = current_report()
-    if report is not None and not report.accepts_output(output_path):
+    if report is not None and (report_interactive or not report.accepts_output(output_path)):
         plt.close(fig)
         return output_path
+    if report is not None and not report.requires_png(output_path):
+        from visualizations.embedded_matplotlib import embed_matplotlib
+
+        try:
+            report.register_plotly(embed_matplotlib(fig), output_path)
+            return output_path
+        finally:
+            plt.close(fig)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     savefig_kwargs.setdefault("bbox_inches", "tight")
     try:
@@ -116,23 +126,24 @@ def save_plotly(
     width: int,
     height: int,
 ) -> Path:
-    """Save a Plotly figure at the requested dimensions."""
+    """Embed report figure data; export PNGs only when independently needed."""
     output_path = Path(path)
     report = current_report()
     if report is not None and not report.accepts_output(output_path):
         return output_path
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    with tracer.start_as_current_span("plotly.write_image") as span:
-        span.set_attribute("plot.name", output_path.name)
-        span.set_attribute("plot.width", width)
-        span.set_attribute("plot.height", height)
-        fig.write_image(output_path, width=width, height=height)
+    if report is None or report.requires_png(output_path):
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        with tracer.start_as_current_span("plotly.write_image") as span:
+            span.set_attribute("plot.name", output_path.name)
+            span.set_attribute("plot.width", width)
+            span.set_attribute("plot.height", height)
+            fig.write_image(output_path, width=width, height=height)
+        log.info(f"Saved plot to {output_path}")
     report = current_report()
     if report is not None:
         with tracer.start_as_current_span("plotly.register_report") as span:
             span.set_attribute("plot.name", output_path.name)
             report.register_plotly(fig, output_path)
-    log.info(f"Saved plot to {output_path}")
     return output_path
 
 
@@ -144,7 +155,7 @@ def save_plotly_batch(
     width: int,
     height: int,
 ) -> list[Path]:
-    """Write related Plotly images together, then register each report figure."""
+    """Register related figures and batch export their required PNG artifacts."""
     if len(figures) != len(paths):
         raise ValueError("figures and paths must have the same length")
     report = current_report()
@@ -154,22 +165,26 @@ def save_plotly_batch(
     ]
     if not accepted:
         return []
-    for _, path in accepted:
+    static = [(fig, path) for fig, path in accepted
+              if report is None or report.requires_png(path)]
+    for _, path in static:
         path.parent.mkdir(parents=True, exist_ok=True)
-    with tracer.start_as_current_span("plotly.write_images") as span:
-        span.set_attribute("plot.count", len(accepted))
-        span.set_attribute("plot.width", width)
-        span.set_attribute("plot.height", height)
-        pio.write_images(
-            fig=[fig for fig, _ in accepted],
-            file=[path for _, path in accepted],
-            width=width,
-            height=height,
-        )
+    if static:
+        with tracer.start_as_current_span("plotly.write_images") as span:
+            span.set_attribute("plot.count", len(static))
+            span.set_attribute("plot.width", width)
+            span.set_attribute("plot.height", height)
+            pio.write_images(
+                fig=[fig for fig, _ in static],
+                file=[path for _, path in static],
+                width=width,
+                height=height,
+            )
+        for _, path in static:
+            log.info(f"Saved plot to {path}")
     for fig, path in accepted:
         if report is not None:
             with tracer.start_as_current_span("plotly.register_report") as span:
                 span.set_attribute("plot.name", path.name)
                 report.register_plotly(fig, path)
-        log.info(f"Saved plot to {path}")
     return [path for _, path in accepted]

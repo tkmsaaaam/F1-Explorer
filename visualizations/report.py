@@ -1,6 +1,6 @@
 """Generate a self-contained, offline HTML report for one session.
 
-Declared PNG outputs remain available, while Plotly figures are captured for
+Plotly figures are captured without requiring PNG files for
 interactive rendering and static images are embedded. Fresh analysis runs do
 not scan old outputs; an explicit rebuild can still import declared PNGs.
 """
@@ -167,9 +167,14 @@ class SessionReport:
     def accepts_output(self, path: str | Path) -> bool:
         return is_spec_output(str(getattr(self.session, "name", "")), self._relative(path))
 
+    def requires_png(self, path: str | Path) -> bool:
+        """Keep only the explicitly requested standalone session images."""
+        name = Path(path).name
+        return name == "laptime_table.png" or (name == "laptime_graph.png" and self._is_race_session())
+
     def _add(self, path: str | Path, *, figure_json: str | None = None) -> None:
         candidate = Path(path).resolve()
-        if not candidate.is_file():
+        if figure_json is None and not candidate.is_file():
             return
         relative = self._relative(candidate)
         if not self.accepts_output(candidate):
@@ -191,7 +196,7 @@ class SessionReport:
         self._items[key] = ReportItem(candidate, title, section, anchor, figure_json)
 
     def register_plotly(self, figure: Any, path: str | Path) -> None:
-        """Register a Plotly figure while preserving its normal PNG output."""
+        """Register interactive figure data independently of a PNG file."""
 
         figure_json = figure.to_json(validate=False, pretty=False)
         self._add(path, figure_json=figure_json)
@@ -200,6 +205,12 @@ class SessionReport:
         """Register an existing image as a static report item."""
 
         self._add(path)
+
+    def image_paths(self) -> tuple[Path, ...]:
+        """Return PNG artifacts required by this report or explicitly retained."""
+        return tuple(item.path for item in self._items.values()
+                     if item.path.is_file() and
+                     (not item.interactive or item.path.name == "laptime_table.png"))
 
     def scan_images(self, extra_paths: Iterable[str | Path] = ()) -> None:
         """Add PNGs not already registered by a save helper."""

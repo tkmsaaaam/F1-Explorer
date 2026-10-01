@@ -87,8 +87,9 @@ def main(*, force: bool = False):
         report_dir,
         fingerprint,
         identity,
-        extra_output_paths=(output_dir.parent / "tyres.png",),
+        extra_output_paths=report.image_paths(),
         extra_output_dirs=(output_dir,),
+        exclude_extra_suffixes=(".png",),
     )
 
 

@@ -225,7 +225,7 @@ def plot_by_tyre_age_and_tyre(
         ax.set_ylabel("Lap Time [s]")
         ax.grid(True)
         output_path = resolve_output_dir(session, output_dir) / "long_runs" / f"{compound}.png"
-        save_matplotlib(fig, output_path, log)
+        save_matplotlib(fig, output_path, log, report_interactive=True)
         report = current_report()
         if report is not None:
             report.register_plotly(

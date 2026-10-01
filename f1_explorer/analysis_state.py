@@ -266,6 +266,7 @@ def write_success_manifest(
     identity: AnalysisIdentity,
     extra_output_paths: Iterable[str | Path] = (),
     extra_output_dirs: Iterable[str | Path] = (),
+    exclude_extra_suffixes: tuple[str, ...] = (),
 ) -> Path:
     """Atomically record a successful analysis and all existing output files."""
 
@@ -285,6 +286,7 @@ def write_success_manifest(
             path.resolve()
             for path in extra_directory.rglob("*")
             if path.is_file() and path.name != MANIFEST_FILENAME
+            and path.suffix.lower() not in exclude_extra_suffixes
         )
     output_paths.update(
         Path(path).resolve() for path in extra_output_paths if Path(path).is_file()

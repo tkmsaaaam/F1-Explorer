@@ -379,7 +379,7 @@ def plot_laptime_by_lap_number(session: Session, log: structlog.stdlib.BoundLogg
     ax.legend(fontsize='small')
     ax.grid(True)
     output_path = resolve_output_dir(session, output_dir) / "laptime_by_lap_number.png"
-    save_matplotlib(fig, output_path, log)
+    save_matplotlib(fig, output_path, log, report_interactive=True)
     report = current_report()
     if report is not None:
         report.register_plotly(_make_interactive_laptime_by_lap_number(session), output_path)
@@ -522,7 +522,7 @@ def plot_laptime_by_timing(
     output_path = resolve_output_dir(session, output_dir) / "laptime_by_timing.png"
     ax.legend(fontsize='small')
     ax.grid(True)
-    save_matplotlib(fig, output_path, log)
+    save_matplotlib(fig, output_path, log, report_interactive=True)
     report = current_report()
     if report is not None:
         report.register_plotly(_make_interactive_laptime_by_timing(session, laps), output_path)

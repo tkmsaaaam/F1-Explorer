@@ -127,13 +127,78 @@ class VisualizationCommon(unittest.TestCase):
                 self.assertEqual({item.path for item in report._ordered_items()},
                                  {path.resolve() for path in paths})
                 self.assertTrue(all(item.figure_json for item in report._ordered_items()))
+                self.assertFalse(any(path.exists() for path in paths))
                 html = report.write(scan_existing=False).read_text(encoding="utf-8")
                 self.assertTrue(all(path.name in html for path in paths))
                 self.assertEqual(html.count('<script type="application/json"'), 3)
                 self.assertTrue(all(f'"values":["{name}"]' in html
                                     for name in ("durations", "ranks", "gaps")))
-            write.assert_called_once()
-            self.assertEqual(log.info.call_count, 3)
+            write.assert_not_called()
+            log.info.assert_not_called()
+
+    def test_report_preserves_old_png_without_using_it_for_interactive_figure(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            path = root / "SpeedFL.png"
+            path.write_bytes(b"old image")
+            fig = go.Figure(go.Scatter(x=[1], y=[2]))
+            with SessionReport(SimpleNamespace(name="Practice 1"), root) as report:
+                with patch.object(fig, "write_image") as write:
+                    save_plotly(fig, path, Mock(), width=1920, height=1080)
+                write.assert_not_called()
+                self.assertEqual(path.read_bytes(), b"old image")
+                self.assertEqual(report.image_paths(), ())
+                html = report.write().read_text()
+                self.assertIn('"x":[1]', html)
+                self.assertFalse('<img class="zoomable-image"' in html)
+
+    def test_report_saves_only_required_plotly_png_and_preserves_figure_data(self) -> None:
+        for name in ("Practice 1", "Practice 2", "Practice 3", "Qualifying",
+                     "Sprint Qualifying", "Sprint Shootout", "Race", "Sprint", "Sprint Race"):
+            with self.subTest(session=name), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                table = go.Figure(go.Table(header=dict(values=["Lap"])))
+                graph = go.Figure(go.Scatter(x=[1, 2], y=[3, 4]))
+                with SessionReport(SimpleNamespace(name=name), root) as report:
+                    table_path = root / "laptime_table.png"
+                    graph_path = root / "laptime_by_lap_number.png"
+                    with patch.object(table, "write_image", side_effect=lambda path, **kw: path.write_bytes(b"png")) as write_table, \
+                         patch.object(graph, "write_image") as write_graph:
+                        save_plotly(table, table_path, Mock(), width=1920, height=1200)
+                        save_plotly(graph, graph_path, Mock(), width=1920, height=1080)
+                    write_table.assert_called_once()
+                    write_graph.assert_not_called()
+                    self.assertTrue(table_path.is_file())
+                    self.assertFalse(graph_path.exists())
+                    html = report.write(scan_existing=False).read_text()
+                    self.assertIn('"x":[1,2]', html)
+                    self.assertIn('"values":["Lap"]', html)
+                    self.assertEqual(len(report._ordered_items()), 2)
+                    self.assertEqual(report.image_paths(), (table_path.resolve(),))
+
+    def test_interactive_matplotlib_counterpart_is_closed_without_saving(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            with SessionReport(SimpleNamespace(name="Practice 1"), root):
+                fig = Mock()
+                with patch("visualizations.output.plt.close") as close:
+                    save_matplotlib(fig, root / "long_runs/SOFT.png", Mock(), report_interactive=True)
+                fig.savefig.assert_not_called()
+                close.assert_called_once_with(fig)
+
+    def test_report_keeps_static_images_and_race_graph(self) -> None:
+        for name, filename in (("Race", "laptime_graph.png"),
+                               ("Sprint", "laptime_graph.png")):
+            with self.subTest(session=name), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                path = root / filename
+                fig = Mock()
+                fig.savefig.side_effect = lambda output, **kw: output.write_bytes(b"png")
+                with SessionReport(SimpleNamespace(name=name), root) as report:
+                    with patch("visualizations.output.plt.close"):
+                        save_matplotlib(fig, path, Mock())
+                    self.assertTrue('<img class="zoomable-image"' in report.write(scan_existing=False).read_text())
+                fig.savefig.assert_called_once()
 
 
     def test_save_plotly_batch_propagates_write_failure(self) -> None:

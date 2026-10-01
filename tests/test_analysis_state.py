@@ -27,6 +27,32 @@ IDENTITY = {
 
 
 class AnalysisStateTest(unittest.TestCase):
+    def test_manifest_excludes_unused_pngs_but_tracks_retained_images_and_logs(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = self._repo(Path(temporary) / "repo")
+            report_dir = Path(temporary) / "reports"
+            image_dir = Path(temporary) / "images"
+            image_dir.mkdir()
+            retained = image_dir / "laptime_table.png"
+            stale = image_dir / "SpeedFL.png"
+            log = image_dir / "messages.txt"
+            for path in (retained, stale, log):
+                path.write_bytes(b"output")
+            fingerprint = self._fingerprint(root)
+            manifest = write_success_manifest(
+                report_dir, fingerprint, IDENTITY,
+                extra_output_paths=(retained,), extra_output_dirs=(image_dir,),
+                exclude_extra_suffixes=(".png",),
+            )
+            files = json.loads(manifest.read_text())["output_files"]
+            self.assertIn(str(retained.resolve()), files)
+            self.assertIn(str(log.resolve()), files)
+            self.assertNotIn(str(stale.resolve()), files)
+            stale.unlink()
+            self.assertTrue(should_skip(manifest, fingerprint, IDENTITY))
+            retained.unlink()
+            self.assertFalse(should_skip(manifest, fingerprint, IDENTITY))
+
     def _repo(self, root: Path) -> Path:
         (root / "visualizations/domain").mkdir(parents=True)
         (root / "analyze_race.py").write_text("print('race')\n", encoding="utf-8")
