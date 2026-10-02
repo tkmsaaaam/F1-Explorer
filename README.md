@@ -117,6 +117,21 @@ Session analyses write independent offline reports to
 updated when a session report is written. To rebuild it from existing reports,
 run `python -m visualizations.report_index` from the repository root.
 
+Session analyses save only `laptime_table.png` for every session and
+`laptime_graph.png` for Sprint/Race.
+The retained PNGs are written directly to `images/<year>/` as
+`<round>_<session>_laptime_table.png` and
+`<round>_<session>_laptime_graph.png`. Session names use the existing directory
+names with spaces removed, for example `images/2026/15_Practice1_laptime_table.png`
+and `images/2026/15_Race_laptime_graph.png`.
+
+All other charts, including weather,
+segment maps, and race tyre history, are embedded as interactive Plotly figure
+data without generating PNGs. Images can be downloaded from the charts'
+camera button while viewing the report offline. Existing PNG files are retained, but unused PNGs
+are excluded from the new success manifest. Visualization calls outside an
+active session report continue to save their images.
+
 ### Batch analysis
 
 `analyze_batch.py` accepts a JSON array of years, rounds and sessions. It

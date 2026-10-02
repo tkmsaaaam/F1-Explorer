@@ -152,6 +152,10 @@ class SessionReport:
 
     def _relative(self, path: str | Path) -> Path:
         candidate = Path(path).resolve()
+        for name in ("laptime_table.png", "laptime_graph.png"):
+            original = self.output_dir / name
+            if candidate == self.png_output_path(original).resolve():
+                return Path(name)
         try:
             return candidate.relative_to(self.output_dir.resolve())
         except ValueError:
@@ -169,8 +173,23 @@ class SessionReport:
 
     def requires_png(self, path: str | Path) -> bool:
         """Keep only the explicitly requested standalone session images."""
-        name = Path(path).name
+        name = self._relative(path).name
         return name == "laptime_table.png" or (name == "laptime_graph.png" and self._is_race_session())
+
+    def png_output_path(self, path: str | Path) -> Path:
+        """Place retained PNGs directly in the year directory."""
+        path = Path(path)
+        if path.name not in {"laptime_table.png", "laptime_graph.png"}:
+            return path
+        event = getattr(self.session, "event", None)
+        if event is None or not hasattr(event, "year") or not hasattr(event, "RoundNumber"):
+            return path
+        year = str(event.year)
+        directory = self.output_dir.parent.parent
+        if directory.name != year:
+            directory = self.output_dir / year
+        session_name = str(self.session.name).replace(" ", "")
+        return directory / f"{event.RoundNumber}_{session_name}_{path.name}"
 
     def _add(self, path: str | Path, *, figure_json: str | None = None) -> None:
         candidate = Path(path).resolve()
@@ -210,7 +229,7 @@ class SessionReport:
         """Return PNG artifacts required by this report or explicitly retained."""
         return tuple(item.path for item in self._items.values()
                      if item.path.is_file() and
-                     (not item.interactive or item.path.name == "laptime_table.png"))
+                     (not item.interactive or self.requires_png(item.path)))
 
     def scan_images(self, extra_paths: Iterable[str | Path] = ()) -> None:
         """Add PNGs not already registered by a save helper."""

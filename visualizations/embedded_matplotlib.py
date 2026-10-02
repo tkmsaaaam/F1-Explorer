@@ -39,7 +39,7 @@ def embed_matplotlib(fig) -> go.Figure:
         array = np.asarray(values)
         if x_dates and np.issubdtype(array.dtype, np.number):
             return [dates.num2date(value).isoformat() for value in array]
-        return values
+        return array.tolist()
 
     for line in ax.lines:
         label = line.get_label()
@@ -54,7 +54,7 @@ def embed_matplotlib(fig) -> go.Figure:
             low, high = ax.get_xlim()
             x = low + np.asarray(x) * (high - low)
         result.add_trace(go.Scatter(
-            x=x_values(x), y=y, mode="lines", name=label,
+            x=x_values(x), y=np.asarray(y).tolist(), mode="lines", name=label,
             showlegend=visible_label,
             line=dict(color=_color(line.get_color()), width=line.get_linewidth(),
                       dash=dash.get(line.get_linestyle(), "solid")),
@@ -67,7 +67,7 @@ def embed_matplotlib(fig) -> go.Figure:
             widths = collection.get_linewidths()
             for index, segment in enumerate(segments):
                 result.add_trace(go.Scatter(
-                    x=x_values(segment[:, 0]), y=segment[:, 1], mode="lines",
+                    x=x_values(segment[:, 0]), y=segment[:, 1].tolist(), mode="lines",
                     showlegend=False,
                     line=dict(color=_color(palette[index % len(palette)]),
                               width=float(widths[index % len(widths)])),
@@ -79,7 +79,7 @@ def embed_matplotlib(fig) -> go.Figure:
             sizes = collection.get_sizes()
             widths = collection.get_linewidths()
             result.add_trace(go.Scatter(
-                x=x_values(points[:, 0]), y=points[:, 1], mode="markers", showlegend=False,
+                x=x_values(points[:, 0]), y=points[:, 1].tolist(), mode="markers", showlegend=False,
                 marker=dict(
                     size=[float(np.sqrt(sizes[i % len(sizes)])) for i in range(len(points))],
                     color=[_color(faces[i % len(faces)]) for i in range(len(points))],
@@ -105,7 +105,8 @@ def embed_matplotlib(fig) -> go.Figure:
         x, y = text.xy if isinstance(text, Annotation) else text.get_position()
         result.add_annotation(
             x=x_values([x])[0], y=y, text=text.get_text(), showarrow=False,
-            font=dict(size=text.get_fontsize(), color=_color(text.get_color())),
+            font=dict(size=text.get_fontsize(), color=_color(text.get_color()),
+                      weight=700 if text.get_fontweight() == "bold" else 400),
             xanchor={"left": "left", "right": "right"}.get(text.get_ha(), "center"),
             yanchor={"top": "top", "bottom": "bottom"}.get(text.get_va(), "middle"),
             xshift=text.get_position()[0] if isinstance(text, Annotation) and text.anncoords == "offset points" else 0,
@@ -124,6 +125,7 @@ def embed_matplotlib(fig) -> go.Figure:
 
     result.update_layout(
         title=ax.get_title(), template="plotly_white",
+        legend=dict(title=dict(text=legend.get_title().get_text() if legend is not None else "")),
         xaxis=dict(title=ax.get_xlabel(), range=list(x_values(ax.get_xlim())),
                    visible=ax.axison, showgrid=any(line.get_visible() for line in ax.get_xgridlines())),
         yaxis=dict(title=ax.get_ylabel(), range=list(ax.get_ylim()),

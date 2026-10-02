@@ -91,7 +91,7 @@ def save_matplotlib(
     report_interactive: bool = False,
     **savefig_kwargs: Any,
 ) -> Path:
-    """Save a static report image, closing unused interactive counterparts."""
+    """Embed chart data, retain requested PNGs, and close the source figure."""
     output_path = Path(path)
     report = current_report()
     if report is not None and (report_interactive or not report.accepts_output(output_path)):
@@ -105,13 +105,17 @@ def save_matplotlib(
             return output_path
         finally:
             plt.close(fig)
+    if report is not None:
+        output_path = report.png_output_path(output_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     savefig_kwargs.setdefault("bbox_inches", "tight")
     try:
         fig.savefig(output_path, **savefig_kwargs)
         report = current_report()
         if report is not None:
-            report.register_image(output_path)
+            from visualizations.embedded_matplotlib import embed_matplotlib
+
+            report.register_plotly(embed_matplotlib(fig), output_path)
         log.info(f"Saved plot to {output_path}")
         return output_path
     finally:
@@ -132,6 +136,8 @@ def save_plotly(
     if report is not None and not report.accepts_output(output_path):
         return output_path
     if report is None or report.requires_png(output_path):
+        if report is not None:
+            output_path = report.png_output_path(output_path)
         output_path.parent.mkdir(parents=True, exist_ok=True)
         with tracer.start_as_current_span("plotly.write_image") as span:
             span.set_attribute("plot.name", output_path.name)
@@ -167,6 +173,8 @@ def save_plotly_batch(
         return []
     static = [(fig, path) for fig, path in accepted
               if report is None or report.requires_png(path)]
+    if report is not None:
+        static = [(fig, report.png_output_path(path)) for fig, path in static]
     for _, path in static:
         path.parent.mkdir(parents=True, exist_ok=True)
     if static:
@@ -183,8 +191,11 @@ def save_plotly_batch(
         for _, path in static:
             log.info(f"Saved plot to {path}")
     for fig, path in accepted:
+        if report is not None and report.requires_png(path):
+            path = report.png_output_path(path)
         if report is not None:
             with tracer.start_as_current_span("plotly.register_report") as span:
                 span.set_attribute("plot.name", path.name)
                 report.register_plotly(fig, path)
-    return [path for _, path in accepted]
+    return [report.png_output_path(path) if report is not None and report.requires_png(path) else path
+            for _, path in accepted]

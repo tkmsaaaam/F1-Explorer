@@ -9,6 +9,7 @@ import unittest
 from unittest.mock import Mock, patch
 
 import plotly.graph_objects as go
+import matplotlib.pyplot as plt
 
 from visualizations.output import (
     resolve_output_dir,
@@ -30,6 +31,56 @@ def _session() -> SimpleNamespace:
 
 
 class VisualizationCommon(unittest.TestCase):
+    def test_batch_retained_png_uses_year_path_while_other_figures_stay_embedded(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            output = root / "images/2026/15_Baku/Practice1"
+            session = SimpleNamespace(name="Practice 1", event=SimpleNamespace(year=2026, RoundNumber=15))
+            expected = root / "images/2026/15_Practice1_laptime_table.png"
+            paths = [output / "laptime_table.png", output / "SpeedFL.png"]
+            figures = [go.Figure(go.Table(header=dict(values=["Lap"]))), go.Figure(go.Scatter(x=[1], y=[2]))]
+
+            def write_images(*, fig, file, **kwargs):
+                self.assertEqual(file, [expected])
+                self.assertEqual(fig, figures[:1])
+                for path in file:
+                    path.write_bytes(b"png")
+
+            with SessionReport(session, output) as report:
+                with patch("visualizations.output.pio.write_images", side_effect=write_images):
+                    result = save_plotly_batch(figures, paths, Mock(), width=1920, height=1080)
+                self.assertEqual(result, [expected, paths[1]])
+                self.assertEqual(report.image_paths(), (expected.resolve(),))
+                self.assertEqual(len(report._ordered_items()), 2)
+
+    def test_retained_images_use_year_directory_and_keep_report_registration(self) -> None:
+        for name, folder, image in (("Practice 1", "Practice1", "laptime_table.png"),
+                                   ("Qualifying", "Qualifying", "laptime_table.png"),
+                                   ("Sprint", "Sprint", "laptime_graph.png"),
+                                   ("Race", "Race", "laptime_graph.png")):
+            with self.subTest(session=name), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                output = root / "images/2026/15_Baku" / folder
+                session = SimpleNamespace(name=name, event=SimpleNamespace(year=2026, RoundNumber=15))
+                expected = root / "images/2026" / f"15_{folder}_{image}"
+                with SessionReport(session, output) as report:
+                    if image == "laptime_table.png":
+                        fig = go.Figure(go.Table(header=dict(values=["Lap"])))
+                        with patch.object(fig, "write_image", side_effect=lambda path, **kw: path.write_bytes(b"png")):
+                            result = save_plotly(fig, output / image, Mock(), width=1920, height=1200)
+                    else:
+                        fig, ax = plt.subplots()
+                        ax.plot([1, 2], [90, 91])
+                        with patch.object(fig, "savefig", side_effect=lambda path, **kw: path.write_bytes(b"png")):
+                            result = save_matplotlib(fig, output / image, Mock())
+                    self.assertEqual(result, expected)
+                    self.assertTrue(expected.is_file())
+                    self.assertFalse((output / image).exists())
+                    self.assertEqual(report.image_paths(), (expected.resolve(),))
+                    html = report.write(scan_existing=False).read_text()
+                    self.assertTrue('data-plotly-source=' in html)
+                    self.assertEqual(len(report._ordered_items()), 1)
+
     def test_session_output_dir_preserves_session_layout_and_normalizes_root(self) -> None:
         session = _session()
         self.assertEqual(
@@ -192,13 +243,16 @@ class VisualizationCommon(unittest.TestCase):
             with self.subTest(session=name), tempfile.TemporaryDirectory() as directory:
                 root = Path(directory)
                 path = root / filename
-                fig = Mock()
-                fig.savefig.side_effect = lambda output, **kw: output.write_bytes(b"png")
+                fig, ax = plt.subplots()
+                ax.plot([1, 2], [90, 91])
                 with SessionReport(SimpleNamespace(name=name), root) as report:
-                    with patch("visualizations.output.plt.close"):
+                    with patch.object(fig, "savefig", side_effect=lambda output, **kw: output.write_bytes(b"png")) as save:
                         save_matplotlib(fig, path, Mock())
-                    self.assertTrue('<img class="zoomable-image"' in report.write(scan_existing=False).read_text())
-                fig.savefig.assert_called_once()
+                    html = report.write(scan_existing=False).read_text()
+                    self.assertTrue('data-plotly-source=' in html)
+                    self.assertFalse('<img class="zoomable-image"' in html)
+                    self.assertEqual(report.image_paths(), (path.resolve(),))
+                save.assert_called_once()
 
 
     def test_save_plotly_batch_propagates_write_failure(self) -> None:
