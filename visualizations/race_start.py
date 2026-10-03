@@ -1,5 +1,7 @@
 """Race-start samples on a shared clock, with driver-local distance origins."""
 
+from f1_explorer.circuit import circuit_info_or_none
+
 import numpy as np
 import pandas as pd
 
@@ -29,7 +31,7 @@ def start_samples(session, driver, *, until_turn1=False, circuit_info=None):
         laps = session.laps.pick_drivers(driver)
         first = laps[laps.LapNumber == 1]
         position = session.pos_data.get(str(driver))
-        circuit = circuit_info if circuit_info is not None else session.get_circuit_info()
+        circuit = circuit_info if circuit_info is not None else circuit_info_or_none(session)
         if first.empty or position is None or circuit is None or circuit.corners.empty:
             return None
         corners = circuit.corners.sort_values("Distance")

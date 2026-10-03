@@ -3,6 +3,8 @@ import os
 from math import isfinite
 from typing import cast
 
+from f1_explorer.circuit import circuit_info_or_none
+
 import fastf1
 import fastf1.plotting
 import matplotlib as mpl
@@ -457,7 +459,7 @@ def speed_first_10s(log: structlog.stdlib.BoundLogger, filepath: str, session: S
 
 @tracer.start_as_current_span("speed_until_turn1")
 def speed_until_turn1(log: structlog.stdlib.BoundLogger, filepath: str, session: Session) -> None:
-    circuit_info = session.get_circuit_info()
+    circuit_info = circuit_info_or_none(session, log)
     if circuit_info is None:
         log.warning("Circuit positions unavailable; omitting R-11")
         return

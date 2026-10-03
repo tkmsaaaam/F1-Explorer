@@ -268,3 +268,5 @@ or 2 seconds) and mini-sector progress is monotonic.
     * **Real-time Parsing**: The [tracker/](tracker/) module is designed for low-latency parsing of the incoming stream,
       enabling
       the visualization of telemetry and timing data while the session is in progress.
+
+サーキット情報の取得に失敗してもセッションレポートの生成は継続します。コーナー情報が必須の図は省略し、その他の図はコーナー注記なしで生成します。取得例外は警告ログに記録します。

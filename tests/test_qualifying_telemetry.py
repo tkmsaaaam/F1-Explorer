@@ -88,3 +88,12 @@ def test_unavailable_telemetry_is_not_retried(failure):
         frames[1].drop(index=frames[1].index, inplace=True)
     assert len(build(session).data) == 5
     laps[1].get_car_data.assert_called_once_with()
+
+
+def test_circuit_fetch_failure_keeps_telemetry_series():
+    session, _, _ = make_session()
+    session.get_circuit_info = Mock(side_effect=ConnectionError("map unavailable"))
+    figure = build(session)
+    assert len(figure.data) == 10
+    assert len(figure.layout.annotations or ()) == 0
+    session.get_circuit_info.assert_called_once_with()

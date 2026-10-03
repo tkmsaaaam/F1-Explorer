@@ -3,6 +3,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Mapping, Sequence
 
+from f1_explorer.circuit import circuit_info_or_none
+
 import fastf1
 import fastf1.plotting
 import matplotlib as mpl
@@ -144,7 +146,7 @@ def compute_and_save_segment_tables_plotly(
                 None if (last_point := car_data[car_data.Distance < dist]).empty else
                 last_point.iloc[-1].Time.total_seconds() for dist in segment_boundaries]
 
-    circuit = session.get_circuit_info()
+    circuit = circuit_info_or_none(session, log)
     if circuit is None:
         return
     drivers = session.laps.pick_quicklaps().sort_values(by="LapTime").DriverNumber.unique().tolist()
@@ -519,7 +521,7 @@ def plot_speed_distance(session: Session, log: structlog.stdlib.BoundLogger, *, 
         session: 分析対象のセッション
         log: ロガー
     """
-    circuit_info = session.get_circuit_info()
+    circuit_info = circuit_info_or_none(session, log)
     if circuit_info is None:
         return
     for driver_number in session.drivers:
@@ -566,7 +568,7 @@ def plot_speed_distance_comparison(session: Session, log: structlog.stdlib.Bound
     drivers_per_fig = 5
     driver_numbers = session.laps.pick_quicklaps().sort_values(by="LapTime").DriverNumber.unique().tolist()
     num_groups = math.ceil(len(driver_numbers) / drivers_per_fig)
-    circuit_info = session.get_circuit_info()
+    circuit_info = circuit_info_or_none(session, log)
     if circuit_info is None:
         return
     for group_index in range(num_groups):
@@ -668,7 +670,7 @@ def plot_time_distance_comparison(session: Session, log: structlog.stdlib.BoundL
 
     driver_numbers = session.laps.pick_quicklaps().sort_values(by="LapTime").DriverNumber.unique().tolist()
     num_groups = math.ceil(len(driver_numbers) / drivers_per_fig)
-    circuit_info = session.get_circuit_info()
+    circuit_info = circuit_info_or_none(session, log)
     if circuit_info is None:
         return
 
@@ -906,7 +908,7 @@ def _save_interactive_driver_telemetry(
 ) -> None:
     """Save one interactive Plotly telemetry chart containing all drivers."""
 
-    circuit_info = session.get_circuit_info()
+    circuit_info = circuit_info_or_none(session, log)
     if circuit_info is None:
         return
     driver_numbers = _ordered_quicklap_drivers(session)
@@ -1037,7 +1039,7 @@ def _save_interactive_time_distance_delta(
         ))
     if not figure.data:
         return
-    circuit_info = session.get_circuit_info()
+    circuit_info = circuit_info_or_none(session, log)
     if circuit_info is not None:
         for _, corner in circuit_info.corners.iterrows():
             distance = float(corner.Distance)
@@ -1076,7 +1078,7 @@ def _save_interactive_time_distance_delta(
 def _plot_driver_telemetry(session: Session, log: structlog.stdlib.BoundLogger, driver_numbers: list[int], key: str, label, value_func,
                            *, output_dir: str | Path | None = None):
     group_size = 5
-    circuit_info = session.get_circuit_info()
+    circuit_info = circuit_info_or_none(session, log)
     if circuit_info is None:
         return
     for i in range(0, len(driver_numbers), group_size):
@@ -1139,7 +1141,7 @@ def make_mini_segment_layout(
         return MiniSegmentLayout([], [])
 
     segment_boundaries = [0.0, float(car_data.iloc[-1].Distance)]
-    circuit_info = session.get_circuit_info()
+    circuit_info = circuit_info_or_none(session, log)
     if circuit_info is not None:
         corners_df = circuit_info.corners
         for c in range(0, len(corners_df)):
@@ -1435,7 +1437,7 @@ def plot_telemetry(session: Session, log: structlog.stdlib.BoundLogger,
         label: プロットするテレメトリーのラベル
         value_func: プロットするテレメトリー
     """
-    circuit_info = session.get_circuit_info()
+    circuit_info = circuit_info_or_none(session, log)
     if circuit_info is None:
         return
     fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')

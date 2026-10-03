@@ -1,6 +1,8 @@
 from pathlib import Path
 from typing import Any, Callable, NotRequired, TypedDict
 
+from f1_explorer.circuit import circuit_info_or_none
+
 import fastf1
 import fastf1.plotting
 import matplotlib.pyplot as plt
@@ -59,7 +61,7 @@ def execute(
 def _plot_driver_lap_telemetry(session: Session, log: structlog.stdlib.BoundLogger,
                                comparison: list[list[ComparisonTarget]], key: str, label: str,
                                value_func: Callable[[Any], Any], *, output_dir: str | Path | None = None):
-    circuit_info = session.get_circuit_info()
+    circuit_info = circuit_info_or_none(session, log)
     if circuit_info is None:
         return
     for targets in comparison:

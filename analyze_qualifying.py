@@ -6,6 +6,7 @@ import fastf1
 # noinspection PyPackageRequirements
 from opentelemetry import trace
 
+from f1_explorer.circuit import circuit_info_or_none as _circuit_info_or_none
 from f1_explorer import config as config_module
 from visualizations import run_volume, short_runs, weather, weekend
 from visualizations.qualifying_telemetry import make_qualifying_telemetry, make_qualifying_track_map
@@ -18,18 +19,6 @@ from f1_explorer.analysis_state import build_fingerprint, manifest_path, should_
 from f1_explorer.separator_estimator import persist_resolution, resolve_separators
 
 tracer = trace.get_tracer(__name__)
-
-
-def _circuit_info_or_none(session, log):
-    """Load circuit metadata without making it a prerequisite for analysis."""
-    try:
-        circuit = session.get_circuit_info()
-    except Exception as exception:
-        log.warning("circuit info unavailable; skipping circuit-dependent analysis", error=str(exception))
-        return None
-    if circuit is None:
-        log.info("circuit info is None; skipping circuit-dependent analysis")
-    return circuit
 
 
 @tracer.start_as_current_span("start_at")

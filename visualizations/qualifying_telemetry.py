@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from f1_explorer.circuit import circuit_info_or_none
+
 import numpy as np
 import plotly.graph_objects as go
 
@@ -168,7 +170,7 @@ def make_telemetry_comparison(session: Any) -> go.Figure:
     figure.update_yaxes(title=axis_labels[0])
     if reference_number is not None:
         figure.add_hline(y=0, line_dash="dash", line_color="grey")
-    circuit_info = getattr(session, "get_circuit_info", lambda: None)()
+    circuit_info = circuit_info_or_none(session)
     if circuit_info is not None:
         for _, corner in circuit_info.corners.iterrows():
             distance = float(corner.Distance)
