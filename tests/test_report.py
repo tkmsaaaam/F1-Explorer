@@ -11,11 +11,11 @@ import unittest
 
 import plotly.graph_objects as go
 
-from visualizations.report import SessionReport, current_report
-from visualizations.qualifying_layout import QUALIFYING_SECTIONS, organize_qualifying_report_html
-from visualizations.report_layout import PRACTICE_SECTIONS, RACE_SECTIONS, organize_session_report_html
+from f1_explorer.visualizations.report import SessionReport, current_report
+from f1_explorer.visualizations.qualifying_layout import QUALIFYING_SECTIONS, organize_qualifying_report_html
+from f1_explorer.visualizations.report_layout import PRACTICE_SECTIONS, RACE_SECTIONS, organize_session_report_html
 from unittest.mock import MagicMock, patch
-from visualizations.output import save_matplotlib, save_plotly
+from f1_explorer.visualizations.output import save_matplotlib, save_plotly
 
 
 class SessionReportTest(unittest.TestCase):
@@ -25,7 +25,7 @@ class SessionReportTest(unittest.TestCase):
             with SessionReport(SimpleNamespace(name="Practice 1"), root) as report:
                 unknown = root / "unknown.png"
                 figure = MagicMock()
-                with patch("visualizations.output.plt.close") as close:
+                with patch("f1_explorer.visualizations.output.plt.close") as close:
                     save_matplotlib(figure, unknown, MagicMock())
                 figure.savefig.assert_not_called()
                 close.assert_called_once_with(figure)

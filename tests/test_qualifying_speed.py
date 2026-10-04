@@ -5,7 +5,7 @@ import warnings
 import pandas as pd
 import pytest
 
-from visualizations.qualifying_speed import (
+from f1_explorer.visualizations.qualifying_speed import (
     _TowContext, _indexed_laps, _lap_telemetry, _valid_laps,
     make_qualifying_speed, _tow_mask,
 )
@@ -37,14 +37,14 @@ def test_tow_context_preserves_threshold_and_caches_each_decision(monkeypatch):
     }
     context = _TowContext(pd.DataFrame(index=[0, 1, 2]), cache)
     calls = 0
-    original = __import__("visualizations.qualifying_speed", fromlist=["_tow_mask_prepared"])._tow_mask_prepared
+    original = __import__("f1_explorer.visualizations.qualifying_speed", fromlist=["_tow_mask_prepared"])._tow_mask_prepared
 
     def counted(index, prepared):
         nonlocal calls
         calls += 1
         return original(index, prepared)
 
-    monkeypatch.setattr("visualizations.qualifying_speed._tow_mask_prepared", counted)
+    monkeypatch.setattr("f1_explorer.visualizations.qualifying_speed._tow_mask_prepared", counted)
     first = context.mask(0)
     second = context.mask(0)
     assert first.tolist() == [False, True, True]
@@ -91,7 +91,7 @@ def test_lap_selections_and_measurements_are_selectable(name, prefix):
     }
     with (patch.object(pd.DataFrame, "split_qualifying_sessions",
                        return_value=[laps.iloc[[0, 2]], laps.iloc[[1]], None], create=True),
-          patch("visualizations.qualifying_speed._telemetry_cache", return_value=cache),
+          patch("f1_explorer.visualizations.qualifying_speed._telemetry_cache", return_value=cache),
           patch("fastf1.plotting.get_team_color",
                 side_effect=lambda team, session: {"A": "red", "B": "blue"}.get(team, "gray"))):
         figure = make_qualifying_speed(SimpleNamespace(name=name, laps=laps))

@@ -5,8 +5,8 @@ from __future__ import annotations
 import pandas as pd
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
-from visualizations.chart_ranges import bar_range
-from visualizations.qualifying_speed import _TowContext, _measurement_values, _telemetry_cache
+from f1_explorer.visualizations.chart_ranges import bar_range
+from f1_explorer.visualizations.qualifying_speed import _TowContext, _measurement_values, _telemetry_cache
 
 
 def _colors(drivers, teams, session):

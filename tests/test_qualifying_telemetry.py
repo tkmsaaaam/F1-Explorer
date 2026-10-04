@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from visualizations.qualifying_telemetry import make_telemetry_comparison
+from f1_explorer.visualizations.qualifying_telemetry import make_telemetry_comparison
 
 
 def make_session():
@@ -38,7 +38,7 @@ def make_session():
 
 
 def build(session):
-    with patch("visualizations.qualifying_telemetry._ordered_quicklap_drivers", return_value=["1", "2"]), \
+    with patch("f1_explorer.visualizations.qualifying_telemetry._ordered_quicklap_drivers", return_value=["1", "2"]), \
             patch("fastf1.plotting.get_team_color", return_value="gray"):
         return make_telemetry_comparison(session)
 

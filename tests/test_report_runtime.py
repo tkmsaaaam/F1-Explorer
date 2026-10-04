@@ -9,7 +9,7 @@ from unittest.mock import patch
 
 import pytest
 
-from visualizations.report import SessionReport
+from f1_explorer.visualizations.report import SessionReport
 
 
 @pytest.mark.parametrize("axis_range,values", [([94.5, 79.5], [80, 90, 120]),
@@ -19,7 +19,7 @@ from visualizations.report import SessionReport
 def test_slider_initialization_relayout_and_portable_image(tmp_path, axis_range, values):
     if shutil.which("node") is None:
         pytest.skip("Node.js is required for the embedded JavaScript test")
-    with patch("visualizations.report._plotly_js", return_value=""):
+    with patch("f1_explorer.visualizations.report._plotly_js", return_value=""):
         html = SessionReport(SimpleNamespace(name="Sprint"), tmp_path).write().read_text()
     script = re.findall(r"<script>(.*?)</script>", html, re.S)[-1]
     fixture = json.dumps({"data": [{"type": "scatter", "mode": "lines", "y": values}],

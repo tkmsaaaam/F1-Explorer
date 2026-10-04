@@ -5,7 +5,7 @@ from fastf1.core import Session
 # noinspection PyPackageRequirements
 from opentelemetry import trace
 
-from visualizations.output import save_matplotlib
+from f1_explorer.visualizations.output import save_matplotlib
 
 tracer = trace.get_tracer(__name__)
 

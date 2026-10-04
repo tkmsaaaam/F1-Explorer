@@ -5,7 +5,7 @@ import pandas
 import pytest
 from fastf1.core import Laps
 
-from visualizations.run_volume import (
+from f1_explorer.visualizations.run_volume import (
     _laps_without_pit_laps,
     _make_interactive_laptime_by_lap_number,
     _make_interactive_laptime_by_timing,
@@ -44,7 +44,7 @@ def test_qualifying_laptime_table_has_one_section_per_qualifying_period():
         get_driver=lambda driver: SimpleNamespace(Abbreviation=abbreviations[str(driver)]),
     )
 
-    with patch("visualizations.run_volume.save_plotly") as save:
+    with patch("f1_explorer.visualizations.run_volume.save_plotly") as save:
         plot_laptime(session, MagicMock(), split_qualifying=True, output_dir="test-output")
 
     figure = save.call_args.args[0]
@@ -64,7 +64,7 @@ def test_sprint_qualifying_uses_sq_section_labels():
         get_driver=lambda _: SimpleNamespace(Abbreviation="VER"),
     )
 
-    with patch("visualizations.run_volume.save_plotly") as save:
+    with patch("f1_explorer.visualizations.run_volume.save_plotly") as save:
         plot_laptime(session, MagicMock(), split_qualifying=True, output_dir="test-output")
 
     assert [trace.header.values[0] for trace in save.call_args.args[0].data] == ["SQ1 Lap", "SQ2 Lap", "SQ3 Lap"]
@@ -88,7 +88,7 @@ def test_qualifying_laptime_table_excludes_pit_laps_and_packs_remaining_laps():
         get_driver=lambda driver: SimpleNamespace(Abbreviation=abbreviations[str(driver)]),
     )
 
-    with patch("visualizations.run_volume.save_plotly") as save:
+    with patch("f1_explorer.visualizations.run_volume.save_plotly") as save:
         plot_laptime(session, MagicMock(), split_qualifying=True, output_dir="test-output")
 
     table = save.call_args.args[0].data[0]
@@ -133,7 +133,7 @@ def test_laptime_charts_use_team_color_and_camera_dash(name):
         event=SimpleNamespace(year=2025),
     )
 
-    with patch("visualizations.run_volume.fastf1.plotting.get_team_color", return_value="#123456"):
+    with patch("f1_explorer.visualizations.run_volume.fastf1.plotting.get_team_color", return_value="#123456"):
         figures = (
             _make_interactive_laptime_by_timing(session),
             _make_interactive_laptime_by_lap_number(session),

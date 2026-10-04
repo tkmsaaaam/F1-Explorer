@@ -12,8 +12,8 @@ from collections.abc import Iterable, Mapping, Sequence
 from datetime import datetime
 from typing import TypeAlias
 
-from visualizations.domain.driver_laps import DriverLaps
-from visualizations.domain.lap import Lap
+from f1_explorer.visualizations.domain.driver_laps import DriverLaps
+from f1_explorer.visualizations.domain.lap import Lap
 
 LapNumber: TypeAlias = int
 LapSpan: TypeAlias = list[tuple[LapNumber, Lap | None]]

@@ -5,8 +5,8 @@ import re
 from types import SimpleNamespace
 from unittest.mock import patch
 
-from visualizations.report import SessionReport
-from visualizations.report_index import build_index
+from f1_explorer.visualizations.report import SessionReport
+from f1_explorer.visualizations.report_index import build_index
 
 
 def _entries(html: str) -> list[dict[str, str]]:
@@ -41,7 +41,7 @@ def test_session_write_updates_index_and_uses_template(tmp_path):
         name="Qualifying",
         event=SimpleNamespace(year=2026, RoundNumber=7, Location="Test GP", EventName="Test GP"),
     )
-    with patch("visualizations.report._plotly_js", return_value=""):
+    with patch("f1_explorer.visualizations.report._plotly_js", return_value=""):
         html = SessionReport(session, tmp_path / "images", report_dir=report_dir).write().read_text()
 
     assert "@@EVENT_NAME@@" not in html

@@ -12,7 +12,7 @@ from fastf1.core import Session
 from opentelemetry import trace
 
 from f1_explorer import constants
-from visualizations.output import resolve_output_dir, save_matplotlib
+from f1_explorer.visualizations.output import resolve_output_dir, save_matplotlib
 
 tracer = trace.get_tracer(__name__)
 

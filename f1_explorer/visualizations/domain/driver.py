@@ -1,4 +1,4 @@
-"""Driver value object used by the race visualizations."""
+"""Driver value object used by race visualizations."""
 
 from dataclasses import dataclass
 

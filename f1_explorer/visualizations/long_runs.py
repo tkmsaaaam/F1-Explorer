@@ -11,12 +11,12 @@ import structlog
 from fastf1.core import Session, Laps
 from opentelemetry import trace
 
-from visualizations.domain.driver import Driver
-from visualizations.domain.stint import Stint
-from visualizations.output import resolve_output_dir, save_matplotlib
-from visualizations.report import current_report
-from visualizations.session_order import driver_order, driver_sort_key
-from visualizations.style import driver_linestyle
+from f1_explorer.visualizations.domain.driver import Driver
+from f1_explorer.visualizations.domain.stint import Stint
+from f1_explorer.visualizations.output import resolve_output_dir, save_matplotlib
+from f1_explorer.visualizations.report import current_report
+from f1_explorer.visualizations.session_order import driver_order, driver_sort_key
+from f1_explorer.visualizations.style import driver_linestyle
 
 tracer = trace.get_tracer(__name__)
 

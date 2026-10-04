@@ -18,20 +18,20 @@ from opentelemetry import trace
 
 from f1_explorer import constants
 from f1_explorer import util
-from visualizations.domain.driver import Driver
-from visualizations.domain.driver_laps import DriverLaps
-from visualizations.domain.lap import Lap
-from visualizations.domain.tyre import Tyre
-from visualizations.output import save_matplotlib, save_plotly
-from visualizations.report import current_report
-from visualizations.race_metrics import (
+from f1_explorer.visualizations.domain.driver import Driver
+from f1_explorer.visualizations.domain.driver_laps import DriverLaps
+from f1_explorer.visualizations.domain.lap import Lap
+from f1_explorer.visualizations.domain.tyre import Tyre
+from f1_explorer.visualizations.output import save_matplotlib, save_plotly
+from f1_explorer.visualizations.report import current_report
+from f1_explorer.visualizations.race_metrics import (
     gap_to_ahead as calculate_gap_to_ahead,
     gap_to_leader as calculate_gap_to_leader,
     lap_times_by_position,
     top_time_map,
 )
-from visualizations.style import driver_linestyle
-from visualizations.race_start import start_samples
+from f1_explorer.visualizations.style import driver_linestyle
+from f1_explorer.visualizations.race_start import start_samples
 
 tracer = trace.get_tracer(__name__)
 

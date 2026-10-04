@@ -3,7 +3,7 @@
 import pandas as pd
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
-from visualizations.chart_ranges import bar_range
+from f1_explorer.visualizations.chart_ranges import bar_range
 
 
 def _team_colors(drivers, teams, session):

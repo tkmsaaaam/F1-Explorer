@@ -1,6 +1,6 @@
 import unittest
 
-from visualizations.segment_metrics import (
+from f1_explorer.visualizations.segment_metrics import (
     deltas_to_reference,
     rank_segment_durations,
     segment_durations,

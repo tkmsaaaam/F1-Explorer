@@ -4,7 +4,7 @@ import warnings
 
 import pandas as pd
 
-from visualizations.practice_comparison import _valid, make_practice_best, make_practice_speed
+from f1_explorer.visualizations.practice_comparison import _valid, make_practice_best, make_practice_speed
 
 
 def _session(with_team=True):

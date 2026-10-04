@@ -7,9 +7,9 @@ import fastf1
 from opentelemetry import trace
 
 from f1_explorer import config as config_module
-from visualizations import weekend, run_volume, weather, race
-from visualizations.output import session_output_dir, session_report_dir
-from visualizations.report import SessionReport
+from f1_explorer.visualizations import weekend, run_volume, weather, race
+from f1_explorer.visualizations.output import session_output_dir, session_report_dir
+from f1_explorer.visualizations.report import SessionReport
 from f1_explorer.analysis_state import build_fingerprint, manifest_path, should_skip, write_success_manifest
 
 tracer = trace.get_tracer(__name__)

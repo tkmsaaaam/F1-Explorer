@@ -7,7 +7,7 @@ import unittest
 
 import pandas
 
-from visualizations.session_order import driver_order, driver_sort_key
+from f1_explorer.visualizations.session_order import driver_order, driver_sort_key
 
 
 class SessionOrderTest(unittest.TestCase):

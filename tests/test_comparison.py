@@ -3,7 +3,7 @@ from unittest.mock import MagicMock, patch
 
 import pandas
 
-from visualizations.comparison import _plot_driver_lap_telemetry
+from f1_explorer.visualizations.comparison import _plot_driver_lap_telemetry
 
 
 def _session_with_lap():
@@ -40,10 +40,10 @@ def test_measurement_axis_label_is_not_overwritten_by_series_label():
     ax = MagicMock()
 
     with (
-        patch("visualizations.comparison.plt.subplots", return_value=(fig, ax)),
-        patch("visualizations.comparison.plt.tight_layout"),
-        patch("visualizations.comparison.fastf1.plotting.get_team_color", return_value="blue"),
-        patch("visualizations.comparison.save_matplotlib") as save,
+        patch("f1_explorer.visualizations.comparison.plt.subplots", return_value=(fig, ax)),
+        patch("f1_explorer.visualizations.comparison.plt.tight_layout"),
+        patch("f1_explorer.visualizations.comparison.fastf1.plotting.get_team_color", return_value="blue"),
+        patch("f1_explorer.visualizations.comparison.save_matplotlib") as save,
     ):
         _plot_driver_lap_telemetry(
             session,
@@ -64,8 +64,8 @@ def test_empty_comparison_closes_the_created_figure():
     fig = MagicMock()
 
     with (
-        patch("visualizations.comparison.plt.subplots", return_value=(fig, MagicMock())),
-        patch("visualizations.comparison.plt.close") as close,
+        patch("f1_explorer.visualizations.comparison.plt.subplots", return_value=(fig, MagicMock())),
+        patch("f1_explorer.visualizations.comparison.plt.close") as close,
     ):
         _plot_driver_lap_telemetry(
             session,

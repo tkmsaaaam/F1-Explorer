@@ -6,8 +6,8 @@ from unittest.mock import MagicMock, patch
 import pandas
 from fastf1.core import Laps
 
-from visualizations.domain.driver import Driver
-from visualizations.long_runs import (
+from f1_explorer.visualizations.domain.driver import Driver
+from f1_explorer.visualizations.long_runs import (
     LongRunCriteria,
     _make_interactive_long_run_figure,
     make_stint_set,
@@ -213,7 +213,7 @@ class LongRuns(unittest.TestCase):
             laps=pandas.DataFrame(),
         )
 
-        with patch("visualizations.long_runs.fastf1.plotting.get_team_color", return_value="#123456"):
+        with patch("f1_explorer.visualizations.long_runs.fastf1.plotting.get_team_color", return_value="#123456"):
             figure = _make_interactive_long_run_figure(session, "SOFT", stints)
 
         self.assertEqual(["#123456"] * 3, [trace.line.color for trace in figure.data])
@@ -236,9 +236,9 @@ class LongRuns(unittest.TestCase):
         )
         with (
             warnings.catch_warnings(),
-            patch("visualizations.long_runs.fastf1.plotting.setup_mpl"),
-            patch("visualizations.long_runs.make_stint_set", return_value=[]),
-            patch("visualizations.long_runs.save_matplotlib") as save,
+            patch("f1_explorer.visualizations.long_runs.fastf1.plotting.setup_mpl"),
+            patch("f1_explorer.visualizations.long_runs.make_stint_set", return_value=[]),
+            patch("f1_explorer.visualizations.long_runs.save_matplotlib") as save,
         ):
             warnings.simplefilter("error", UserWarning)
             plot_by_tyre_age_and_tyre(session, MagicMock(), output_dir="plots")

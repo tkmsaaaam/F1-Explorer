@@ -9,7 +9,7 @@ import structlog
 from opentelemetry import trace
 
 from f1_explorer import constants
-from visualizations.output import save_plotly
+from f1_explorer.visualizations.output import save_plotly
 
 tracer = trace.get_tracer(__name__)
 

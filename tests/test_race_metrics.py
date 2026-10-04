@@ -1,10 +1,10 @@
 from datetime import datetime, timedelta
 
-from visualizations.domain.driver import Driver
-from visualizations.domain.driver_laps import DriverLaps
-from visualizations.domain.lap import Lap
-from visualizations.domain.tyre import Tyre
-from visualizations.race_metrics import (
+from f1_explorer.visualizations.domain.driver import Driver
+from f1_explorer.visualizations.domain.driver_laps import DriverLaps
+from f1_explorer.visualizations.domain.lap import Lap
+from f1_explorer.visualizations.domain.tyre import Tyre
+from f1_explorer.visualizations.race_metrics import (
     gap_to_ahead,
     gap_to_leader,
     inclusive_lap_span,

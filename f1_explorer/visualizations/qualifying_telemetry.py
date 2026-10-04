@@ -9,8 +9,8 @@ from f1_explorer.circuit import circuit_info_or_none
 import numpy as np
 import plotly.graph_objects as go
 
-from visualizations.short_runs import _plotly_driver_dash, _ordered_quicklap_drivers
-from visualizations.short_runs import _gear_colorscale
+from f1_explorer.visualizations.short_runs import _plotly_driver_dash, _ordered_quicklap_drivers
+from f1_explorer.visualizations.short_runs import _gear_colorscale
 
 
 def _finite_series(data: Any, key: str) -> tuple[np.ndarray, np.ndarray] | None:

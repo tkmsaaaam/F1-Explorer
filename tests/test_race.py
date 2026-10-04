@@ -6,9 +6,9 @@ import matplotlib.pyplot as plt
 import pandas
 from fastf1.core import Laps
 
-from visualizations.domain.driver import Driver
-from visualizations.domain.driver_laps import DriverLaps
-from visualizations.race import (
+from f1_explorer.visualizations.domain.driver import Driver
+from f1_explorer.visualizations.domain.driver_laps import DriverLaps
+from f1_explorer.visualizations.race import (
     gap_to_ahead_graph,
     gap_to_top_graph,
     make_driver_laps_set,
@@ -171,7 +171,7 @@ class Race(unittest.TestCase):
             "FreshTyre": [True, True, True, False, False],
         }))
 
-        with patch("visualizations.race.save_matplotlib") as save:
+        with patch("f1_explorer.visualizations.race.save_matplotlib") as save:
             tyres(MagicMock(), "test-output/tyres.png", laps)
 
         figure = save.call_args.args[0]
@@ -194,11 +194,11 @@ class Race(unittest.TestCase):
 
         with (
             patch(
-                "visualizations.race.calculate_gap_to_ahead",
+                "f1_explorer.visualizations.race.calculate_gap_to_ahead",
                 return_value=[(1, None), (2, 1.25), (3, 3.25)],
             ),
-            patch("visualizations.race.fastf1.plotting.get_team_color", return_value="#123456"),
-            patch("visualizations.race.save_plotly") as save,
+            patch("f1_explorer.visualizations.race.fastf1.plotting.get_team_color", return_value="#123456"),
+            patch("f1_explorer.visualizations.race.save_plotly") as save,
         ):
             gap_to_ahead_graph(MagicMock(), "output", "gap_ahead_graph", session, 15, lap_logs, {})
 
@@ -217,10 +217,10 @@ class Race(unittest.TestCase):
         session = SimpleNamespace(event=SimpleNamespace(year=2026), laps=MagicMock())
 
         with (
-            patch("visualizations.race.make_top_time_map", return_value={}),
-            patch("visualizations.race.calculate_gap_to_leader", return_value=[(1, 0.0)]),
-            patch("visualizations.race.fastf1.plotting.get_team_color", return_value="#123456"),
-            patch("visualizations.race.save_plotly") as save,
+            patch("f1_explorer.visualizations.race.make_top_time_map", return_value={}),
+            patch("f1_explorer.visualizations.race.calculate_gap_to_leader", return_value=[(1, 0.0)]),
+            patch("f1_explorer.visualizations.race.fastf1.plotting.get_team_color", return_value="#123456"),
+            patch("f1_explorer.visualizations.race.save_plotly") as save,
         ):
             gap_to_top_graph(MagicMock(), "output", "gap_top_graph", session, None, lap_logs)
 

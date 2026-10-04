@@ -11,7 +11,7 @@ from unittest.mock import Mock, patch
 import plotly.graph_objects as go
 import matplotlib.pyplot as plt
 
-from visualizations.output import (
+from f1_explorer.visualizations.output import (
     resolve_output_dir,
     save_matplotlib,
     save_plotly,
@@ -19,8 +19,8 @@ from visualizations.output import (
     session_output_dir,
     session_report_dir,
 )
-from visualizations.style import driver_linestyle
-from visualizations.report import SessionReport
+from f1_explorer.visualizations.style import driver_linestyle
+from f1_explorer.visualizations.report import SessionReport
 
 
 def _session() -> SimpleNamespace:
@@ -47,7 +47,7 @@ class VisualizationCommon(unittest.TestCase):
                     path.write_bytes(b"png")
 
             with SessionReport(session, output) as report:
-                with patch("visualizations.output.pio.write_images", side_effect=write_images):
+                with patch("f1_explorer.visualizations.output.pio.write_images", side_effect=write_images):
                     result = save_plotly_batch(figures, paths, Mock(), width=1920, height=1080)
                 self.assertEqual(result, [expected, paths[1]])
                 self.assertEqual(report.image_paths(), (expected.resolve(),))
@@ -119,7 +119,7 @@ class VisualizationCommon(unittest.TestCase):
         log = Mock()
         with tempfile.TemporaryDirectory() as directory:
             output_path = Path(directory) / "plots/figure.png"
-            with patch("visualizations.output.plt.close") as close:
+            with patch("f1_explorer.visualizations.output.plt.close") as close:
                 result = save_matplotlib(fig, output_path, log)
 
         self.assertEqual(result, output_path)
@@ -134,7 +134,7 @@ class VisualizationCommon(unittest.TestCase):
         log = Mock()
         with tempfile.TemporaryDirectory() as directory:
             output_path = Path(directory) / "plots/figure.png"
-            with patch("visualizations.output.plt.close") as close:
+            with patch("f1_explorer.visualizations.output.plt.close") as close:
                 with self.assertRaisesRegex(RuntimeError, "save failed"):
                     save_matplotlib(fig, output_path, log)
 
@@ -171,7 +171,7 @@ class VisualizationCommon(unittest.TestCase):
                     path.write_bytes(b"png")
 
             with SessionReport(SimpleNamespace(name="Practice 1"), root) as report:
-                with patch("visualizations.output.pio.write_images", side_effect=write_images) as write:
+                with patch("f1_explorer.visualizations.output.pio.write_images", side_effect=write_images) as write:
                     self.assertEqual(
                         save_plotly_batch(figures, paths, log, width=1920, height=1080), paths,
                     )
@@ -232,7 +232,7 @@ class VisualizationCommon(unittest.TestCase):
             root = Path(directory)
             with SessionReport(SimpleNamespace(name="Practice 1"), root):
                 fig = Mock()
-                with patch("visualizations.output.plt.close") as close:
+                with patch("f1_explorer.visualizations.output.plt.close") as close:
                     save_matplotlib(fig, root / "long_runs/SOFT.png", Mock(), report_interactive=True)
                 fig.savefig.assert_not_called()
                 close.assert_called_once_with(fig)
@@ -259,7 +259,7 @@ class VisualizationCommon(unittest.TestCase):
         log = Mock()
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "corners_durations.png"
-            with patch("visualizations.output.pio.write_images", side_effect=RuntimeError("failed")):
+            with patch("f1_explorer.visualizations.output.pio.write_images", side_effect=RuntimeError("failed")):
                 with self.assertRaisesRegex(RuntimeError, "failed"):
                     save_plotly_batch([go.Figure()], [path], log, width=1920, height=1080)
             log.info.assert_not_called()

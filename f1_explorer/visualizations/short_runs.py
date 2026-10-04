@@ -19,9 +19,9 @@ from fastf1.core import Session, Lap, Telemetry
 from opentelemetry import trace
 
 from f1_explorer import constants
-from visualizations.output import resolve_output_dir, save_matplotlib, save_plotly, save_plotly_batch
-from visualizations.segment_metrics import deltas_to_reference, rank_segment_durations, segment_durations
-from visualizations.style import driver_linestyle
+from f1_explorer.visualizations.output import resolve_output_dir, save_matplotlib, save_plotly, save_plotly_batch
+from f1_explorer.visualizations.segment_metrics import deltas_to_reference, rank_segment_durations, segment_durations
+from f1_explorer.visualizations.style import driver_linestyle
 from f1_explorer.separator_estimator import SeparatorBoundary
 
 tracer = trace.get_tracer(__name__)

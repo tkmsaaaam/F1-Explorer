@@ -3,7 +3,7 @@
 from dataclasses import dataclass, field
 from typing import Mapping
 
-from visualizations.domain.driver import Driver
+from f1_explorer.visualizations.domain.driver import Driver
 
 
 @dataclass(slots=True, eq=False)

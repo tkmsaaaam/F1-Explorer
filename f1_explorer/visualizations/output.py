@@ -1,4 +1,4 @@
-"""Shared output-path and figure-saving helpers for visualizations."""
+"""Shared output-path and figure-saving helpers for f1_explorer.visualizations."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 import plotly.io as pio
 from opentelemetry import trace
 
-from visualizations.report import current_report
+from f1_explorer.visualizations.report import current_report
 
 tracer = trace.get_tracer(__name__)
 
@@ -98,7 +98,7 @@ def save_matplotlib(
         plt.close(fig)
         return output_path
     if report is not None and not report.requires_png(output_path):
-        from visualizations.embedded_matplotlib import embed_matplotlib
+        from f1_explorer.visualizations.embedded_matplotlib import embed_matplotlib
 
         try:
             report.register_plotly(embed_matplotlib(fig), output_path)
@@ -113,7 +113,7 @@ def save_matplotlib(
         fig.savefig(output_path, **savefig_kwargs)
         report = current_report()
         if report is not None:
-            from visualizations.embedded_matplotlib import embed_matplotlib
+            from f1_explorer.visualizations.embedded_matplotlib import embed_matplotlib
 
             report.register_plotly(embed_matplotlib(fig), output_path)
         log.info(f"Saved plot to {output_path}")

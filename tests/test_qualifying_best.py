@@ -5,7 +5,7 @@ import warnings
 import pandas as pd
 import pytest
 
-from visualizations.qualifying_best import _valid_laps, make_qualifying_best
+from f1_explorer.visualizations.qualifying_best import _valid_laps, make_qualifying_best
 
 
 @pytest.mark.parametrize("name,prefix", [("Qualifying", "Q"), ("Sprint Qualifying", "SQ")])

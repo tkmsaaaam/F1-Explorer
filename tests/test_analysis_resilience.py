@@ -18,7 +18,7 @@ def test_circuit_info_failure_is_non_fatal(loader):
 
 @pytest.mark.parametrize("error", [ConnectionError("offline"), RuntimeError("invalid map")])
 def test_circuit_dependent_charts_skip_when_metadata_fails(error):
-    from visualizations import race, short_runs
+    from f1_explorer.visualizations import race, short_runs
 
     session = MagicMock()
     session.get_circuit_info.side_effect = error
@@ -29,7 +29,7 @@ def test_circuit_dependent_charts_skip_when_metadata_fails(error):
 
 
 def test_optional_circuit_metadata_preserves_telemetry_figure():
-    from visualizations.qualifying_telemetry import make_telemetry_comparison
+    from f1_explorer.visualizations.qualifying_telemetry import make_telemetry_comparison
 
     session = MagicMock()
     session.laps.pick_quicklaps.return_value.empty = True

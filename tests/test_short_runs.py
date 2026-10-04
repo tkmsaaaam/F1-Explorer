@@ -14,10 +14,10 @@ import pandas as pd
 import numpy as np
 
 from f1_explorer.separator_estimator import SeparatorBoundary
-from visualizations.short_runs import (
+from f1_explorer.visualizations.short_runs import (
     compute_and_save_segment_tables_plotly, plot_flat_out, plot_speed_on_track,
 )
-from visualizations.short_runs import (
+from f1_explorer.visualizations.short_runs import (
     CORNER_SPEED_COLORS,
     _corner_segment_colors,
     _corner_speed_color,
@@ -62,7 +62,7 @@ def test_segment_tables_save_two_figures_when_session_fastest_is_missing() -> No
     })
     session.get_driver.return_value.Abbreviation = "AAA"
 
-    with patch("visualizations.short_runs.save_plotly_batch") as save:
+    with patch("f1_explorer.visualizations.short_runs.save_plotly_batch") as save:
         compute_and_save_segment_tables_plotly(
             session, "plots/corners", [0.0, 100.0, 200.0], MagicMock(),
         )
@@ -125,7 +125,7 @@ def test_mini_segment_map_uses_structured_markers_instead_of_fastest_lap_times(t
         get_telemetry=lambda: telemetry,
     )
     session = SimpleNamespace(laps=SimpleNamespace(pick_fastest=lambda: lap))
-    with patch("visualizations.short_runs.save_matplotlib") as save:
+    with patch("f1_explorer.visualizations.short_runs.save_matplotlib") as save:
         plot_mini_segment_on_circuit(
             session, MagicMock(), [0.0, 200.0, 400.0], "mini_segments",
             separator_boundaries=[
@@ -152,7 +152,7 @@ def test_mini_segment_map_skips_sparse_empty_interval(tmp_path: Path) -> None:
     lap = SimpleNamespace(Driver="VER", get_telemetry=lambda: telemetry)
     session = SimpleNamespace(laps=SimpleNamespace(pick_fastest=lambda: lap))
 
-    with patch("visualizations.short_runs.save_matplotlib") as save:
+    with patch("f1_explorer.visualizations.short_runs.save_matplotlib") as save:
         plot_mini_segment_on_circuit(
             session, MagicMock(), [0.0, 50.0, 60.0, 200.0], "mini_segments",
             output_dir=tmp_path,
@@ -188,8 +188,8 @@ def test_corner_segment_colors_use_interpolated_fastest_lap_speed() -> None:
 
 
 def test_summary_scatter_values_and_interactive_report(tmp_path):
-    from visualizations import short_runs
-    from visualizations.report import SessionReport
+    from f1_explorer.visualizations import short_runs
+    from f1_explorer.visualizations.report import SessionReport
 
     telemetry = pd.DataFrame({
         "Throttle": [100, 100, 0], "Distance": [0, 50, 100],
@@ -225,7 +225,7 @@ def test_summary_scatter_values_and_interactive_report(tmp_path):
     report = SessionReport(session, tmp_path / "images", report_dir=tmp_path / "reports")
     with (
         report,
-        patch("visualizations.short_runs.fastf1.plotting.get_team_color", return_value="blue"),
+        patch("f1_explorer.visualizations.short_runs.fastf1.plotting.get_team_color", return_value="blue"),
         patch("plotly.graph_objects.Figure.write_image", autospec=True,
               side_effect=lambda figure, path, **kwargs: Path(path).touch()),
     ):
@@ -258,7 +258,7 @@ def test_flat_out_skips_zero_distance_laps_without_runtime_warning():
 
     with (
         warnings.catch_warnings(),
-        patch("visualizations.short_runs._save_summary_scatter") as save,
+        patch("f1_explorer.visualizations.short_runs._save_summary_scatter") as save,
     ):
         warnings.simplefilter("error", RuntimeWarning)
         plot_flat_out(session, MagicMock())
@@ -290,8 +290,8 @@ def test_speed_on_track_uses_colored_line_collection_and_vertical_colorbar() -> 
     )
 
     with (
-        patch("visualizations.short_runs.save_matplotlib") as save,
-        patch("visualizations.short_runs.save_plotly") as save_plotly,
+        patch("f1_explorer.visualizations.short_runs.save_matplotlib") as save,
+        patch("f1_explorer.visualizations.short_runs.save_plotly") as save_plotly,
     ):
         plot_speed_on_track(session, MagicMock(), output_dir=Path("plots"))
 
@@ -334,7 +334,7 @@ def test_interactive_shift_map_driver_dropdown_uses_session_speed_order() -> Non
         name="Qualifying",
     )
 
-    with patch("visualizations.short_runs.save_plotly") as save:
+    with patch("f1_explorer.visualizations.short_runs.save_plotly") as save:
         _save_interactive_track_map(
             session,
             MagicMock(),
@@ -406,8 +406,8 @@ def test_interactive_driver_telemetry_is_ordered_by_fastest_session_lap() -> Non
     )
 
     with (
-        patch("visualizations.short_runs.fastf1.plotting.get_team_color", return_value="blue"),
-        patch("visualizations.short_runs.save_plotly") as save,
+        patch("f1_explorer.visualizations.short_runs.fastf1.plotting.get_team_color", return_value="blue"),
+        patch("f1_explorer.visualizations.short_runs.save_plotly") as save,
     ):
         _save_interactive_driver_telemetry(
             session,

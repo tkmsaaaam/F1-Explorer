@@ -1,6 +1,6 @@
 """Backward-compatible Qualifying report layout exports."""
 
-from visualizations.report_layout import (
+from f1_explorer.visualizations.report_layout import (
     QUALIFYING_SECTIONS as _QUALIFYING_LAYOUT,
     organize_session_report_html,
 )

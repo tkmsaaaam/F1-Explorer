@@ -15,10 +15,10 @@ from plotly.subplots import make_subplots
 from opentelemetry import trace
 
 from f1_explorer import constants
-from visualizations.output import resolve_output_dir, save_matplotlib, save_plotly
-from visualizations.report import current_report
-from visualizations.session_order import driver_order, driver_sort_key
-from visualizations.style import driver_linestyle
+from f1_explorer.visualizations.output import resolve_output_dir, save_matplotlib, save_plotly
+from f1_explorer.visualizations.report import current_report
+from f1_explorer.visualizations.session_order import driver_order, driver_sort_key
+from f1_explorer.visualizations.style import driver_linestyle
 
 tracer = trace.get_tracer(__name__)
 
@@ -254,7 +254,7 @@ def _make_laptime_table(
 
 
 def _laps_without_pit_laps(laps: Laps) -> Laps:
-    """Return the timed laps shown in qualifying lap-time visualizations."""
+    """Return the timed laps shown in qualifying lap-time charts."""
 
     return laps[laps.PitOutTime.isna() & laps.PitInTime.isna()]
 
@@ -404,7 +404,7 @@ def _interactive_race_laptime_range(session: Session) -> list[float] | None:
     fastest = float(seconds.min())
     fixed_range = [fastest + 14.5, fastest - 0.5]
 
-    # Match visualizations.race.laptime(), which produces laptime_graph.png.
+    # Match race.laptime(), which produces laptime_graph.png.
     # The Plotly graph retains every lap; these values only set its viewport.
     graph_clean = session.laps[
         session.laps["IsAccurate"].fillna(False).astype(bool)

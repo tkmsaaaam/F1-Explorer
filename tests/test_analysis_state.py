@@ -54,18 +54,19 @@ class AnalysisStateTest(unittest.TestCase):
             self.assertFalse(should_skip(manifest, fingerprint, IDENTITY))
 
     def _repo(self, root: Path) -> Path:
-        (root / "visualizations/domain").mkdir(parents=True)
+        root.mkdir(parents=True, exist_ok=True)
         (root / "analyze_race.py").write_text("print('race')\n", encoding="utf-8")
         package = root / "f1_explorer"
         package.mkdir()
+        (package / "visualizations/domain").mkdir(parents=True)
         (package / "config.py").write_text("# config\n", encoding="utf-8")
         (package / "constants.py").write_text("YEAR = 2026\n", encoding="utf-8")
         (package / "util.py").write_text("# util\n", encoding="utf-8")
         (root / "requirements.txt").write_text(
             "present-package==1.0\nmissing_package>=2\n", encoding="utf-8"
         )
-        (root / "visualizations/chart.py").write_text("# chart\n", encoding="utf-8")
-        (root / "visualizations/domain/lap.py").write_text("# lap\n", encoding="utf-8")
+        (package / "visualizations/chart.py").write_text("# chart\n", encoding="utf-8")
+        (package / "visualizations/domain/lap.py").write_text("# lap\n", encoding="utf-8")
         return root
 
     def _fingerprint(self, root: Path):
@@ -91,7 +92,7 @@ class AnalysisStateTest(unittest.TestCase):
         self.assertEqual(first.environment_hash, second.environment_hash)
         self.assertEqual(list(first.source_files), sorted(first.source_files))
         self.assertIn("analyze_race.py", first.source_files)
-        self.assertIn("visualizations/domain/lap.py", first.source_files)
+        self.assertIn("f1_explorer/visualizations/domain/lap.py", first.source_files)
         self.assertNotIn(str(root), first.source_files)
         self.assertEqual(first.dependencies["present-package"], "1.2.3")
         self.assertEqual(first.dependencies["missing-package"], MISSING_VERSION)
@@ -100,7 +101,7 @@ class AnalysisStateTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             root = self._repo(Path(temporary))
             before = self._fingerprint(root)
-            (root / "visualizations/chart.py").write_text("# changed\n", encoding="utf-8")
+            (root / "f1_explorer/visualizations/chart.py").write_text("# changed\n", encoding="utf-8")
             after = self._fingerprint(root)
 
         self.assertNotEqual(before.source_hash, after.source_hash)

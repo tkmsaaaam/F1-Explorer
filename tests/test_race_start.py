@@ -7,8 +7,8 @@ import pandas as pd
 import pytest
 from fastf1.core import Laps
 
-from visualizations.race_start import start_samples
-from visualizations.race import speed_first_10s, speed_until_turn1
+from f1_explorer.visualizations.race_start import start_samples
+from f1_explorer.visualizations.race import speed_first_10s, speed_until_turn1
 
 
 def session_fixture(name="Race"):
@@ -43,7 +43,7 @@ def test_start_clock_and_driver_local_corner_distance(name):
     assert corner1 == pytest.approx(100)
     assert corner2 == pytest.approx(120)
     assert first.Distance.iloc[0] == second.Distance.iloc[0] == 0
-    with patch("visualizations.race.save_matplotlib") as save:
+    with patch("f1_explorer.visualizations.race.save_matplotlib") as save:
         speed_first_10s(MagicMock(), "speed_first_10s.png", session)
         speed_until_turn1(MagicMock(), "speed_until_turn1.png", session)
     assert len(save.call_args_list) == 2

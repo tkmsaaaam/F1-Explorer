@@ -8,7 +8,7 @@ import fastf1
 from fastf1.core import DataNotLoadedError
 from fastf1.livetiming.data import LiveTimingData
 
-from visualizations import race, weather
+from f1_explorer.visualizations import race, weather
 
 logging.basicConfig(
     level=logging.INFO,

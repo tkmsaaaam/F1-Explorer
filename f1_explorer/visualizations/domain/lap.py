@@ -3,7 +3,7 @@
 from dataclasses import dataclass
 from datetime import datetime
 
-from visualizations.domain.tyre import Tyre
+from f1_explorer.visualizations.domain.tyre import Tyre
 
 
 @dataclass(frozen=True, slots=True, init=False)

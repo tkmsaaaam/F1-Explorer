@@ -17,7 +17,7 @@ from pathlib import Path
 import re
 from typing import Any, Iterable
 
-from visualizations.report_layout import organize_session_report_html, is_spec_output
+from f1_explorer.visualizations.report_layout import organize_session_report_html, is_spec_output
 
 
 _CURRENT_REPORT: ContextVar["SessionReport | None"] = ContextVar(
@@ -103,7 +103,7 @@ def _is_interactive_telemetry_path(relative_path: Path) -> bool:
     )
 
 
-_TEMPLATE_PATH = Path(__file__).resolve().parents[1] / "templates" / "template.html"
+_TEMPLATE_PATH = Path(__file__).resolve().parents[2] / "templates" / "template.html"
 
 
 def _render_template(**values: str) -> str:
@@ -323,7 +323,7 @@ class SessionReport:
                     str(getattr(self.session, "name")).replace(" ", ""),
                 )
                 if self.report_dir.parts[-3:] == expected:
-                    from visualizations.report_index import build_index
+                    from f1_explorer.visualizations.report_index import build_index
                     build_index(self.report_dir.parents[2])
             except (AttributeError, IndexError):
                 pass

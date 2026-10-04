@@ -11,10 +11,10 @@ import matplotlib.pyplot as plt
 import pandas as pd
 from fastf1.core import Laps
 
-from visualizations.embedded_matplotlib import embed_matplotlib
-from visualizations.output import save_matplotlib
-from visualizations.report import SessionReport
-from visualizations.race import tyres
+from f1_explorer.visualizations.embedded_matplotlib import embed_matplotlib
+from f1_explorer.visualizations.output import save_matplotlib
+from f1_explorer.visualizations.report import SessionReport
+from f1_explorer.visualizations.race import tyres
 
 
 class EmbeddedMatplotlibTest(unittest.TestCase):
@@ -79,7 +79,7 @@ class EmbeddedMatplotlibTest(unittest.TestCase):
                 self.assertEqual(report.image_paths(), ())
 
     def test_weather_output_embeds_graph_without_image_rendering(self):
-        from visualizations.weather import plot_weather
+        from f1_explorer.visualizations.weather import plot_weather
 
         session = SimpleNamespace(name="Practice 1", date=pd.Timestamp("2026-09-30"),
                                   weather_data=pd.DataFrame({

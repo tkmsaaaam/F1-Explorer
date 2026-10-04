@@ -3,8 +3,8 @@
 from dataclasses import dataclass
 from typing import Mapping
 
-from visualizations.domain.driver import Driver
-from visualizations.domain.lap import Lap
+from f1_explorer.visualizations.domain.driver import Driver
+from f1_explorer.visualizations.domain.lap import Lap
 
 
 @dataclass(slots=True, eq=False)

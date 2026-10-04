@@ -8,13 +8,13 @@ from opentelemetry import trace
 
 from f1_explorer.circuit import circuit_info_or_none as _circuit_info_or_none
 from f1_explorer import config as config_module
-from visualizations import run_volume, short_runs, weather, weekend
-from visualizations.qualifying_telemetry import make_qualifying_telemetry, make_qualifying_track_map
-from visualizations.output import save_plotly
-from visualizations.output import session_output_dir, session_report_dir
-from visualizations.report import SessionReport
-from visualizations.qualifying_best import make_qualifying_best
-from visualizations.qualifying_speed import make_qualifying_speed
+from f1_explorer.visualizations import run_volume, short_runs, weather, weekend
+from f1_explorer.visualizations.qualifying_telemetry import make_qualifying_telemetry, make_qualifying_track_map
+from f1_explorer.visualizations.output import save_plotly
+from f1_explorer.visualizations.output import session_output_dir, session_report_dir
+from f1_explorer.visualizations.report import SessionReport
+from f1_explorer.visualizations.qualifying_best import make_qualifying_best
+from f1_explorer.visualizations.qualifying_speed import make_qualifying_speed
 from f1_explorer.analysis_state import build_fingerprint, manifest_path, should_skip, write_success_manifest
 from f1_explorer.separator_estimator import persist_resolution, resolve_separators
 
