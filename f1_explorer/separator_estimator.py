@@ -22,6 +22,8 @@ from typing import Any, Callable, Iterable, Mapping, Sequence
 import numpy as np
 import pandas as pd
 
+from f1_explorer.telemetry import lap_telemetry_without_driver_ahead
+
 
 DEFAULT_ARCHIVE_URL = "https://livetiming.formula1.com"
 ARCHIVE_TIMEOUT_SECONDS = 15
@@ -1002,22 +1004,7 @@ def _lap_telemetry_without_driver_ahead(lap: Any) -> Any:
     Keep FastF1's normal telemetry path for lightweight lap doubles and
     compatible implementations that do not expose the raw car/position APIs.
     """
-    get_car_data = getattr(lap, "get_car_data", None)
-    get_pos_data = getattr(lap, "get_pos_data", None)
-    if not callable(get_car_data) or not callable(get_pos_data):
-        return lap.get_telemetry().add_distance()
-
-    pos_data = get_pos_data(pad=1, pad_side="both")
-    car_data = get_car_data(pad=1, pad_side="both")
-    # get_telemetry() normally adds the timestamps from the unpadded
-    # driver-ahead result back to car data before merging position channels.
-    # Keep that merge's time base and resampling behavior without calculating
-    # any traffic information.
-    timestamp_rows = car_data.iloc[1:-1].loc[:, ("Date", "Time", "SessionTime")]
-    car_data = car_data.add_distance().add_relative_distance()
-    car_data = car_data.merge_channels(timestamp_rows)
-    merged = pos_data.merge_channels(car_data)
-    return merged.slice_by_lap(lap, interpolate_edges=True).add_distance()
+    return lap_telemetry_without_driver_ahead(lap, add_distance=True)
 
 
 def build_distance_lookup(session: Any) -> tuple[dict[tuple[str, int], dict[str, list[float]]], float | None]:

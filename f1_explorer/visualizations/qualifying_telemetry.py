@@ -11,6 +11,7 @@ import plotly.graph_objects as go
 
 from f1_explorer.visualizations.short_runs import _plotly_driver_dash, _ordered_quicklap_drivers
 from f1_explorer.visualizations.short_runs import _gear_colorscale
+from f1_explorer.telemetry import lap_telemetry_without_driver_ahead
 
 
 def _finite_series(data: Any, key: str) -> tuple[np.ndarray, np.ndarray] | None:
@@ -188,7 +189,7 @@ def make_track_map_comparison(session: Any) -> go.Figure:
     for number in drivers:
         try:
             lap = session.laps.pick_drivers(number).pick_fastest()
-            telemetry = lap.get_telemetry() if lap is not None else None
+            telemetry = lap_telemetry_without_driver_ahead(lap) if lap is not None else None
             x = np.asarray(telemetry.X, dtype=float)
             y = np.asarray(telemetry.Y, dtype=float)
             speed = np.asarray(telemetry.Speed, dtype=float)

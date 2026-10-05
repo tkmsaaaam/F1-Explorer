@@ -113,6 +113,34 @@ def test_mini_segment_layout_projects_structured_boundaries_to_distances() -> No
     assert layout.separator_boundaries[1].sector == 1
 
 
+def test_mini_segment_functions_reuse_supplied_fastest_telemetry(tmp_path: Path) -> None:
+    telemetry = pd.DataFrame({
+        "Distance": [0.0, 100.0, 200.0],
+        "X": [0.0, 100.0, 200.0],
+        "Y": [1.0, 2.0, 3.0],
+    })
+    lap = SimpleNamespace(Driver="VER", get_telemetry=lambda: pytest.fail("must reuse telemetry"))
+    session = SimpleNamespace(
+        laps=SimpleNamespace(pick_fastest=lambda: pytest.fail("must reuse lap")),
+        get_circuit_info=lambda: None,
+    )
+    layout = make_mini_segment_layout(
+        session, MagicMock(), {}, [], fastest_lap=lap, telemetry=telemetry,
+    )
+    assert layout.distances == [0.0, 200.0]
+    with patch("f1_explorer.visualizations.short_runs.save_matplotlib") as save:
+        plot_mini_segment_on_circuit(
+            session, MagicMock(), layout, "mini_segments",
+            fastest_lap=lap, telemetry=telemetry, output_dir=tmp_path,
+        )
+    figure = save.call_args.args[0]
+    try:
+        np.testing.assert_allclose(figure.axes[0].lines[0].get_xdata(), telemetry.X)
+        np.testing.assert_allclose(figure.axes[0].lines[0].get_ydata(), telemetry.Y)
+    finally:
+        plt.close(figure)
+
+
 def test_mini_segment_map_uses_structured_markers_instead_of_fastest_lap_times(tmp_path: Path) -> None:
     telemetry = pd.DataFrame({
         "Distance": [0.0, 100.0, 200.0, 300.0, 400.0],

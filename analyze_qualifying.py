@@ -17,6 +17,7 @@ from f1_explorer.visualizations.qualifying_best import make_qualifying_best
 from f1_explorer.visualizations.qualifying_speed import make_qualifying_speed
 from f1_explorer.analysis_state import build_fingerprint, manifest_path, should_skip, write_success_manifest
 from f1_explorer.separator_estimator import persist_resolution, resolve_separators
+from f1_explorer.telemetry import lap_telemetry_without_driver_ahead
 
 tracer = trace.get_tracer(__name__)
 
@@ -107,8 +108,12 @@ def main(*, force: bool = False, refresh_separators: bool = False):
     circuit = _circuit_info_or_none(session, log)
     fastest = session.laps.pick_fastest()
     if circuit is not None and fastest is not None:
-        corners = [0] + list(circuit.corners['Distance']) + [fastest.get_telemetry().add_distance()['Distance'].iloc[-1]]
-        short_runs.plot_mini_segment_on_circuit(session, log, corners, 'corners')
+        fastest_telemetry = lap_telemetry_without_driver_ahead(fastest, add_distance=True)
+        corners = [0] + list(circuit.corners['Distance']) + [fastest_telemetry['Distance'].iloc[-1]]
+        short_runs.plot_mini_segment_on_circuit(
+            session, log, corners, 'corners',
+            fastest_lap=fastest, telemetry=fastest_telemetry,
+        )
         short_runs.compute_and_save_segment_tables_plotly(
             session,
             base_path + "/corners",
@@ -121,10 +126,14 @@ def main(*, force: bool = False, refresh_separators: bool = False):
         segment_layout = short_runs.make_mini_segment_layout(
             session, log, corner_map,
             config.get_separator_boundaries() or config.get_separator(),
+            fastest_lap=fastest,
+            telemetry=fastest_telemetry,
         )
         short_runs.plot_mini_segment_on_circuit(
             session, log, segment_layout, 'mini_segments',
             show_sector_boundaries=True,
+            fastest_lap=fastest,
+            telemetry=fastest_telemetry,
         )
         short_runs.compute_and_save_segment_tables_plotly(session, base_path + "/mini_segments", segment_layout, log)
     elif fastest is None:

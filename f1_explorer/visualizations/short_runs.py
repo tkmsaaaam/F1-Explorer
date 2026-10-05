@@ -23,6 +23,7 @@ from f1_explorer.visualizations.output import resolve_output_dir, save_matplotli
 from f1_explorer.visualizations.segment_metrics import deltas_to_reference, rank_segment_durations, segment_durations
 from f1_explorer.visualizations.style import driver_linestyle
 from f1_explorer.separator_estimator import SeparatorBoundary
+from f1_explorer.telemetry import lap_telemetry_without_driver_ahead
 
 tracer = trace.get_tracer(__name__)
 
@@ -354,7 +355,7 @@ def plot_flat_out(session: Session, log: structlog.stdlib.BoundLogger, *, output
         lap = session.laps.pick_drivers(driver_number).pick_fastest()
         if lap is None:
             continue
-        tel: Telemetry = lap.telemetry
+        tel: Telemetry = lap_telemetry_without_driver_ahead(lap)
         is_flat_out_prev = (tel.Throttle > float(tel.Throttle.max()) - 3).shift(1, fill_value=False)
         sum_distance = (tel.Distance.diff() * is_flat_out_prev).sum()
         sum_time = (tel.Time.dt.total_seconds().diff() * is_flat_out_prev).sum()
@@ -1131,12 +1132,15 @@ def make_mini_segment_layout(
         log: structlog.stdlib.BoundLogger,
         corner_map: dict[str, list[int]],
         separators: Sequence[Any],
+        *, fastest_lap: Lap | None = None, telemetry: Telemetry | None = None,
 ) -> MiniSegmentLayout:
     """Build one shared distance/identity definition for mini segments."""
-    fastest_lap = session.laps.pick_fastest()
+    fastest_lap = fastest_lap if fastest_lap is not None else session.laps.pick_fastest()
     if fastest_lap is None:
         return MiniSegmentLayout([], [])
-    car_data = fastest_lap.get_telemetry().add_distance()
+    car_data = telemetry if telemetry is not None else lap_telemetry_without_driver_ahead(
+        fastest_lap, add_distance=True
+    )
     if car_data is None or car_data.empty or "Distance" not in car_data:
         return MiniSegmentLayout([], [])
 
@@ -1218,7 +1222,9 @@ def plot_mini_segment_on_circuit(
         image_name: str,
                                  *, output_dir: str | Path | None = None,
                                  separator_boundaries: Sequence[Any] | None = None,
-                                 show_sector_boundaries: bool = False):
+                                 show_sector_boundaries: bool = False,
+                                 fastest_lap: Lap | None = None,
+                                 telemetry: Telemetry | None = None):
     """ミニセグメントをプロットする
     Args:
         session: 分析対象のセッション
@@ -1231,11 +1237,13 @@ def plot_mini_segment_on_circuit(
             separator_boundaries = segment_boundaries.separator_boundaries
         segment_boundaries = segment_boundaries.distances
     # ベストタイムを記録したドライバーのベストラップを取得
-    fastest_lap = session.laps.pick_fastest()
+    fastest_lap = fastest_lap if fastest_lap is not None else session.laps.pick_fastest()
     if fastest_lap is None:
         return
     driver = fastest_lap.Driver
-    car_data = fastest_lap.get_telemetry().add_distance()
+    car_data = telemetry if telemetry is not None else lap_telemetry_without_driver_ahead(
+        fastest_lap, add_distance=True
+    )
 
     segment_boundaries = sorted(float(distance) for distance in segment_boundaries)
     x = car_data.X.values
