@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -51,7 +52,7 @@ def test_run_jobs_updates_sequentially_and_restores_only_selection(tmp_path: Pat
     }), encoding="utf-8")
     observed = []
 
-    def run(command, cwd, check):
+    def run(command, cwd, check, env):
         current = json.loads(config_path.read_text())
         observed.append((current["Year"], current["Round"], current["Session"], command))
         current["separators"].setdefault(str(current["Year"]), {})[current["Session"]] = [123.4]
@@ -77,14 +78,18 @@ def test_run_jobs_updates_sequentially_and_restores_only_selection(tmp_path: Pat
     assert restored["separators"]["2026"] == {"FP1": [123.4], "Q": [123.4]}
 
 
-def test_failed_job_returns_one_and_fail_fast_stops(tmp_path: Path) -> None:
+def test_failed_job_returns_one_and_fail_fast_stops_and_cleans_cache(tmp_path: Path, monkeypatch) -> None:
     config_path = tmp_path / "config.json"
     original = {"Year": 2025, "Round": 1, "Session": "R"}
     config_path.write_text(json.dumps(original), encoding="utf-8")
-    with patch(
-        "analyze_batch.subprocess.run",
-        return_value=SimpleNamespace(returncode=7),
-    ) as run:
+    observed = []
+
+    def run(*args, **kwargs):
+        observed.append(Path(kwargs["env"]["F1_WEEKEND_TYRE_CACHE"]))
+        return SimpleNamespace(returncode=7)
+
+    monkeypatch.setenv("F1_WEEKEND_TYRE_CACHE", "parent-cache")
+    with patch("analyze_batch.subprocess.run", side_effect=run) as run_mock:
         result = run_jobs(
             [AnalysisJob(2026, 1, "FP1"), AnalysisJob(2026, 1, "Q")],
             config_path=config_path,
@@ -92,5 +97,46 @@ def test_failed_job_returns_one_and_fail_fast_stops(tmp_path: Path) -> None:
             fail_fast=True,
         )
     assert result == 1
-    assert run.call_count == 1
+    assert run_mock.call_count == 1
+    assert not observed[0].exists()
+    assert os.environ["F1_WEEKEND_TYRE_CACHE"] == "parent-cache"
     assert json.loads(config_path.read_text()) == original
+
+
+def test_run_jobs_cleans_cache_when_subprocess_raises(tmp_path: Path) -> None:
+    config_path = tmp_path / "config.json"
+    original = {"Year": 2025, "Round": 1, "Session": "R"}
+    config_path.write_text(json.dumps(original), encoding="utf-8")
+    observed = []
+
+    def run(*args, **kwargs):
+        observed.append(Path(kwargs["env"]["F1_WEEKEND_TYRE_CACHE"]))
+        raise RuntimeError("runner stopped")
+
+    with patch("analyze_batch.subprocess.run", side_effect=run), pytest.raises(RuntimeError):
+        run_jobs([AnalysisJob(2026, 1, "FP1")], config_path=config_path, repo_root=tmp_path)
+
+    assert not observed[0].exists()
+    assert json.loads(config_path.read_text()) == original
+
+
+def test_run_jobs_passes_shared_temporary_cache_and_cleans_it(tmp_path: Path) -> None:
+    config_path = tmp_path / "config.json"
+    config_path.write_text(json.dumps({"Year": 2025, "Round": 1, "Session": "FP1"}), encoding="utf-8")
+    observed = []
+
+    def run(command, cwd, check, env):
+        cache_path = Path(env["F1_WEEKEND_TYRE_CACHE"])
+        observed.append(cache_path)
+        assert cache_path.is_dir()
+        return SimpleNamespace(returncode=0)
+
+    with patch("analyze_batch.subprocess.run", side_effect=run):
+        assert run_jobs(
+            [AnalysisJob(2026, 13, "FP1"), AnalysisJob(2026, 13, "Q")],
+            config_path=config_path,
+            repo_root=tmp_path,
+        ) == 0
+
+    assert observed[0] == observed[1]
+    assert not observed[0].exists()

@@ -161,7 +161,7 @@ def main(*, force: bool = False, refresh_separators: bool = False):
 
     weather.execute(session, log, base_path)
 
-    weekend.plot_tyre(config.get_year(), config.get_round(), log)
+    weekend.plot_tyre(config.get_year(), config.get_round(), log, current_session=session)
     report.deactivate()
     report.write(scan_existing=False)
     try:
