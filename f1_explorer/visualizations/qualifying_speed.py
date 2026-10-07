@@ -19,7 +19,7 @@ _MEASUREMENTS = (
 _TOW_THRESHOLD_SECONDS = 2.0
 
 
-def _speed_range(values):
+def _speed_range(values: list[float]) -> list[float] | None:
     if not values:
         return None
     return [max(0, min(values) - 5), max(values) + 5]

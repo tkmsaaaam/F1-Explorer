@@ -7,6 +7,7 @@ from pathlib import Path
 
 from f1_explorer import config as config_module
 from f1_explorer import util
+from f1_explorer.visualizations.output import WarningLoggerLike
 from tracker import plotter
 from tracker.domain.lap import Lap
 from tracker.domain.stint import Stint
@@ -21,7 +22,7 @@ class Config:
         __logs_path: Path to the directory where logs will be written.
     """
 
-    def __init__(self, log: logging.Logger, logs_path: str):
+    def __init__(self, log: WarningLoggerLike, logs_path: str):
         """Initialize Config with logger and logs path.
 
         Args:
@@ -114,7 +115,7 @@ class Race:
             The Lap object with the highest lap number for the driver.
         """
         driver_laps = self.__laptime_map[driver_number]
-        return driver_laps.get(max(driver_laps.keys()))
+        return driver_laps[max(driver_laps.keys())]
 
     def _ensure_driver_laps(self, driver_number: int) -> dict:
         """Ensure driver exists in laptime map, creating if necessary.
@@ -197,7 +198,7 @@ class Race:
             if 'IntervalToPositionAhead' in v:
                 iva = v["IntervalToPositionAhead"].get("Value") if isinstance(v["IntervalToPositionAhead"],
                                                                               dict) else None
-                if iva and 'L' not in iva:
+                if iva is not None and iva and 'L' not in iva:
                     if len(driver_laps) == 0:
                         driver_laps[0] = Lap()
                     self.get_max_lap(driver_number).set_gap_to_top(str_to_seconds(iva.replace("+", "")))
@@ -298,7 +299,7 @@ class Race:
         try:
             msg = json.loads(json_str)
         except (json.JSONDecodeError, ValueError):
-            self.get_config().get_log().warning("Json parse error %s", message)
+            self.get_config().get_log().warning(f"Json parse error {message}")
             return
         category = msg[0]
         if category == "TimingAppData":

@@ -182,7 +182,9 @@ class SessionReport:
         if path.name not in {"laptime_table.png", "laptime_graph.png"}:
             return path
         event = getattr(self.session, "event", None)
-        if event is None or not hasattr(event, "year") or not hasattr(event, "RoundNumber"):
+        if event is None:
+            return path
+        if not hasattr(event, "year") or not hasattr(event, "RoundNumber"):
             return path
         year = str(event.year)
         directory = self.output_dir.parent.parent
@@ -281,14 +283,15 @@ class SessionReport:
             body.append(f'<section class="report-section" id="{section_anchor}"><h2>{escape(section)}</h2>')
             for item in section_items:
                 body.append(f'<article class="figure-card" id="{escape(item.anchor)}"><h3>{escape(item.title)}</h3>')
-                if item.interactive:
+                figure_json = item.figure_json
+                if figure_json is not None:
                     data_id = f"figure-data-{_slug(item.anchor)}"
-                    safe_json = item.figure_json.replace("<", "\\u003c") if item.figure_json else "{}"
-                    is_table = '"type":"table"' in item.figure_json
-                    is_qualifying_best = '"f1ExplorerKind":"qualifyingBest"' in item.figure_json
-                    is_race_laptime = '"f1ExplorerKind":"raceLapTime"' in item.figure_json
-                    is_speed_chart = ('"f1ExplorerKind":"qualifyingSpeed"' in item.figure_json or
-                                      '"f1ExplorerKind":"practiceSpeed"' in item.figure_json)
+                    safe_json = figure_json.replace("<", "\\u003c") if figure_json else "{}"
+                    is_table = '"type":"table"' in figure_json
+                    is_qualifying_best = '"f1ExplorerKind":"qualifyingBest"' in figure_json
+                    is_race_laptime = '"f1ExplorerKind":"raceLapTime"' in figure_json
+                    is_speed_chart = ('"f1ExplorerKind":"qualifyingSpeed"' in figure_json or
+                                      '"f1ExplorerKind":"practiceSpeed"' in figure_json)
                     kind = (" table" if is_table else "") + (" qualifying-best" if is_qualifying_best else "")
                     if is_race_laptime:
                         body.append('''<div class="r02-rules"><strong>マーカーの見方</strong><table><thead><tr><th>ラップ開始時の状況</th><th>クリーンラップ</th><th>非クリーンラップ</th></tr></thead><tbody><tr><th>前走車とのギャップが2.000秒以内</th><td><span class="r02-swatch r02-close-clean"></span>白塗り＋チームカラー枠</td><td><span class="r02-swatch r02-close-unclean"></span>白塗り＋細い黒枠</td></tr><tr><th>2.000秒超またはギャップ不明</th><td><span class="r02-swatch r02-normal-clean"></span>チームカラー塗り</td><td><span class="r02-swatch r02-normal-unclean"></span>チームカラー塗り＋細い黒枠</td></tr></tbody></table><p>前走車は順位ではなく、ラップ開始時点で直前にコントロールラインを通過した車です。非クリーンラップにはSC・VSC・黄旗、ピットイン／アウト、計測精度不足などを含みます。判定はラップ開始時点を基準とし、ラップ途中で追いついたケースは含みません。</p></div>''')

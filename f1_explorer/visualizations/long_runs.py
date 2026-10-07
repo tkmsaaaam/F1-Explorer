@@ -1,5 +1,7 @@
 from dataclasses import dataclass
 from pathlib import Path
+from collections.abc import Hashable
+from f1_explorer.scalars import as_int
 from typing import cast
 
 import fastf1
@@ -64,10 +66,10 @@ def _is_usable_lap(row: pandas.Series) -> bool:
 
 
 def _lap_number(row: pandas.Series) -> int:
-    return int(row.get("LapNumber", row.get("TyreLife")))
+    return as_int(row.get("LapNumber", row.get("TyreLife")))
 
 
-def _slow_lap_indexes(rows: list[tuple[int, pandas.Series]], criteria: LongRunCriteria) -> set[int]:
+def _slow_lap_indexes(rows: list[tuple[Hashable, pandas.Series]], criteria: LongRunCriteria) -> set[int]:
     """Find obvious interior cooldown/traffic blocks conservatively."""
     if len(rows) < 3:
         return set()
@@ -97,7 +99,7 @@ def _make_phases(stint_laps: pandas.DataFrame, driver: Driver, stint_id: object,
                  compound: str, criteria: LongRunCriteria) -> tuple[list[_Phase], list[float]]:
     order_column = "LapNumber" if "LapNumber" in stint_laps.columns else "TyreLife"
     ordered = stint_laps.sort_values(by=order_column).reset_index(drop=True)
-    usable = [(index, row) for index, row in ordered.iterrows() if _is_usable_lap(row)]
+    usable = [(index, row) for index, (_, row) in enumerate(ordered.iterrows()) if _is_usable_lap(row)]
     slow_indexes = _slow_lap_indexes(usable, criteria)
     clean = [(original_index, row) for clean_index, (original_index, row) in enumerate(usable)
              if clean_index not in slow_indexes]

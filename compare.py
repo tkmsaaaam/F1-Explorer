@@ -6,11 +6,12 @@ from typing import Any
 import fastf1
 import matplotlib.pyplot as plt
 import plotly.graph_objects as go
+import structlog
 from fastf1.core import Lap, Session
 from fastf1.mvapi import CircuitInfo
 # noinspection PyPackageRequirements
 from opentelemetry import trace
-from pandas.core.interchange.dataframe_protocol import DataFrame
+from pandas import DataFrame
 
 from f1_explorer import constants
 from f1_explorer import config as config_module

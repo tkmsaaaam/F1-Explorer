@@ -4,7 +4,9 @@ import json
 import os
 from pathlib import Path
 import tempfile
-from typing import Final
+from typing import Final, TypedDict, Mapping
+
+import pandas as pd
 
 import fastf1
 import plotly.graph_objects as go
@@ -20,6 +22,36 @@ tracer = trace.get_tracer(__name__)
 _CACHE_ENV = "F1_WEEKEND_TYRE_CACHE"
 _CACHE_SCHEMA = 1
 
+
+
+class TyreUse(TypedDict):
+    Sessions: list[str]
+    Compounds: list[str]
+
+
+class WeekendEvent(TypedDict):
+    year: int
+    round: int
+    location: str
+
+
+class TyreAggregate(TypedDict):
+    drivers: dict[str, TyreUse]
+    order: list[str]
+    figure_names: list[str]
+    sprint: bool
+    event: WeekendEvent
+    complete: bool
+    inputs: str | None
+    session_signatures: dict[str, str]
+
+
+class CacheFingerprint(TypedDict):
+    fingerprint: str
+    environment: str
+    settings: str
+    inputs: str | None
+    input_files: list[list[object]] | None
 
 def _session_status(session) -> str:
     status = getattr(session, "session_status", None)
@@ -38,7 +70,7 @@ def _session_status(session) -> str:
 
 
 def _session_is_complete(session) -> bool:
-    status = getattr(session, "session_status", None)
+    status: pd.DataFrame | None = getattr(session, "session_status", None)
     if status is None:
         status = getattr(session, "session_status_data", None)
     if status is None:
@@ -105,12 +137,12 @@ def _loaded_session_signature(session) -> str:
         "tyres": records,
     }
     if session.name == "Race":
-        status = getattr(session, "session_status", None)
+        status: pd.DataFrame | None = getattr(session, "session_status", None)
         payload["status"] = list(status["Status"]) if status is not None else []
     return hashlib.sha256(json.dumps(payload, separators=(",", ":")).encode()).hexdigest()
 
 
-def _cache_fingerprint(year: int, race_number: int, current_session=None) -> dict[str, object] | None:
+def _cache_fingerprint(year: int, race_number: int, current_session=None) -> CacheFingerprint | None:
     try:
         from f1_explorer.analysis_state import build_fingerprint
 
@@ -132,7 +164,7 @@ def _cache_fingerprint(year: int, race_number: int, current_session=None) -> dic
         return None
 
 
-def _read_cache(path: Path, fingerprint: dict[str, object]) -> dict[str, object] | None:
+def _read_cache(path: Path, fingerprint: Mapping[str, object]) -> TyreAggregate | None:
     try:
         payload = json.loads(path.read_text(encoding="utf-8"))
         if not isinstance(payload, dict):
@@ -162,13 +194,18 @@ def _read_cache(path: Path, fingerprint: dict[str, object]) -> dict[str, object]
                    and len(data["Sessions"]) == len(data["Compounds"])
                    and all(isinstance(value, str) for value in data["Sessions"] + data["Compounds"])
                    for driver, data in aggregate["drivers"].items())):
-                return aggregate
+                return TyreAggregate(
+                    drivers=aggregate["drivers"], order=aggregate["order"],
+                    figure_names=aggregate["figure_names"], sprint=aggregate["sprint"],
+                    event=aggregate["event"], complete=aggregate["complete"],
+                    inputs=aggregate["inputs"], session_signatures=aggregate["session_signatures"],
+                )
     except (OSError, UnicodeError, json.JSONDecodeError, AttributeError):
         pass
     return None
 
 
-def _write_cache(path: Path, fingerprint: dict[str, object], aggregate: dict[str, object]) -> None:
+def _write_cache(path: Path, fingerprint: Mapping[str, object], aggregate: TyreAggregate) -> None:
     temporary = None
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -191,11 +228,11 @@ def _write_cache(path: Path, fingerprint: dict[str, object], aggregate: dict[str
 
 
 @tracer.start_as_current_span("weekend.tyre.aggregate")
-def aggregate_tyres(year: int, race_number: int, log, current_session=None) -> dict[str, object] | None:
-    drivers: dict[str, dict[str, list[str]]] = {}
+def aggregate_tyres(year: int, race_number: int, log, current_session=None) -> TyreAggregate | None:
+    drivers: dict[str, TyreUse] = {}
     order: list[str] = []
     sprint = False
-    event_info: dict[str, object] = {}
+    event_info: WeekendEvent = {"year": year, "round": race_number, "location": ""}
     race_complete = False
     race_session = None
     session_signatures = {}
@@ -244,7 +281,7 @@ def aggregate_tyres(year: int, race_number: int, log, current_session=None) -> d
                 abbreviation = session.get_driver(driver).Abbreviation
                 data = drivers.setdefault(abbreviation, {'Sessions': [], 'Compounds': []})
                 data['Sessions'].extend([session_name for _ in range(len(laps))])
-                data['Compounds'].extend([lap.Compound for lap in laps.itertuples()])
+                data['Compounds'].extend(laps["Compound"].tolist())
     if not drivers:
         return None
     figure_names = order + list(set(drivers.keys()) - set(order))
@@ -255,12 +292,12 @@ def aggregate_tyres(year: int, race_number: int, log, current_session=None) -> d
             'session_signatures': session_signatures}
 
 
-def _batch_cached_aggregate(year: int, race_number: int, log, current_session=None):
+def _batch_cached_aggregate(year: int, race_number: int, log, current_session=None) -> TyreAggregate | None:
     cache_root = os.environ.get(_CACHE_ENV)
     fingerprint = _cache_fingerprint(year, race_number, current_session) if cache_root else None
     eligible = bool(cache_root and fingerprint is not None and fingerprint.get("inputs") is not None)
     aggregate = None
-    if eligible:
+    if eligible and cache_root is not None and fingerprint is not None:
         with tracer.start_as_current_span("weekend.tyre.cache_lookup") as span:
             span.set_attribute("cache.eligible", True)
             span.set_attribute("year", year)
@@ -286,11 +323,13 @@ def _batch_cached_aggregate(year: int, race_number: int, log, current_session=No
     aggregate = aggregate_tyres(year, race_number, log, current_session=current_session)
     if aggregate is None:
         return None
-    if eligible and aggregate.get("complete") is True:
+    if eligible and cache_root is not None and fingerprint is not None and aggregate.get("complete") is True:
         latest_fingerprint = _cache_fingerprint(year, race_number, current_session)
+        if latest_fingerprint is None:
+            return aggregate
         stable_fingerprint = _cache_fingerprint(year, race_number, current_session)
         initial_files = {
-            tuple(entry) for entry in fingerprint.get("input_files", [])
+            tuple(entry) for entry in (fingerprint.get("input_files") or [])
             if isinstance(entry, list) and len(entry) == 3
         }
         latest_files = (latest_fingerprint or {}).get("input_files")
@@ -309,7 +348,7 @@ def _batch_cached_aggregate(year: int, race_number: int, log, current_session=No
     return aggregate
 
 
-def make_tyre_figure(aggregate: dict[str, object]):
+def make_tyre_figure(aggregate: TyreAggregate):
     drivers = aggregate['drivers']
     order = aggregate['order']
     sprint = aggregate['sprint']

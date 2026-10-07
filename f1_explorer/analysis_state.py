@@ -315,7 +315,7 @@ def write_success_manifest(
             temporary.write("\n")
             temporary.flush()
             os.fsync(temporary.fileno())
-        os.replace(temporary_path, target)
+        os.replace(Path(temporary.name), target)
     finally:
         if temporary_path is not None and temporary_path.exists():
             temporary_path.unlink()

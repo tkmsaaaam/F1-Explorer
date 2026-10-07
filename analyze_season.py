@@ -171,7 +171,7 @@ def __main():
             sprint.load(laps=False, telemetry=False, weather=False, messages=False)
             for driver_row in sprint.results.itertuples(index=False):
                 gp.set_sprint_point(cast(str, driver_row.Abbreviation), cast(int, driver_row.Points))
-        race = fastf1.get_session(config.get_year(), event.EventName, "R")
+        race = fastf1.get_session(config.get_year(), str(event.EventName), "R")
         race.load(laps=False, telemetry=False, weather=False, messages=False)
         for driver_row in race.results.itertuples(index=False):
             abbreviation: str = cast(str, driver_row.Abbreviation)

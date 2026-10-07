@@ -15,7 +15,7 @@ def _colors(drivers, teams, session):
             if teams.get(d, "") else "gray" for d in drivers]
 
 
-def _speed_range(values):
+def _speed_range(values: list[float]) -> list[float] | None:
     if not values:
         return None
     return [max(0, min(values) - 5), max(values) + 5]

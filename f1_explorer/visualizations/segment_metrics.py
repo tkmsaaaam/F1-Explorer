@@ -28,7 +28,7 @@ __all__ = [
 ]
 
 
-def _is_missing(value: object) -> bool:
+def _is_missing(value: MaybeNumeric) -> bool:
     """Return whether *value* should be treated as an unavailable time.
 
     ``None`` is the public missing-value representation.  NaN is treated as
@@ -39,7 +39,7 @@ def _is_missing(value: object) -> bool:
     if value is None:
         return True
     try:
-        return math.isnan(value)  # type: ignore[arg-type]
+        return math.isnan(value)
     except (TypeError, ValueError):
         return False
 
@@ -50,7 +50,7 @@ def _durations_for_boundaries(
     """Convert one cumulative-boundary sequence to adjacent durations."""
 
     return [
-        None if _is_missing(start) or _is_missing(end) else end - start
+        None if start is None or end is None or _is_missing(start) or _is_missing(end) else end - start
         for start, end in zip(boundaries, boundaries[1:])
     ]
 
@@ -117,18 +117,19 @@ def rank_segment_durations(
             durations[segment_index]
             for durations in durations_by_driver.values()
             if segment_index < len(durations)
+            and durations[segment_index] is not None
             and not _is_missing(durations[segment_index])
         ]
         for driver, durations in durations_by_driver.items():
             if segment_index >= len(durations):
                 continue
             value = durations[segment_index]
-            if _is_missing(value):
+            if value is None or _is_missing(value):
                 continue
             # Number of strictly faster values + one is competition rank and
             # naturally gives equal values the same rank.
             ranks[driver][segment_index] = 1 + sum(
-                other < value for other in valid
+                other < value for other in valid if other is not None
             )
 
     return ranks
@@ -157,6 +158,8 @@ def deltas_to_reference(
                 None
                 if reference is None
                 or index >= len(reference)
+                or duration is None
+                or reference[index] is None
                 or _is_missing(duration)
                 or _is_missing(reference[index])
                 else duration - reference[index]

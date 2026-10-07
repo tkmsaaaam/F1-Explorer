@@ -285,6 +285,9 @@ def organize_session_report_html(html: str, session_name: str) -> str:
             )
 
     html = html[:main.start(1)] + ''.join(rendered_sections) + html[main.end(1):]
+    def replace_navigation(match: re.Match[str]) -> str:
+        return '<nav>' + ''.join(nav) + '</nav>'
+
     return re.sub(
-        r'<nav>.*?</nav>', lambda _: '<nav>' + ''.join(nav) + '</nav>', html, count=1, flags=re.S
+        r'<nav>.*?</nav>', replace_navigation, html, count=1, flags=re.S
     )

@@ -18,6 +18,7 @@ from fastf1.core import Session, Lap, Telemetry
 # noinspection PyPackageRequirements
 from opentelemetry import trace
 
+from f1_explorer.scalars import as_float, as_int, as_seconds
 from f1_explorer import constants
 from f1_explorer.visualizations.output import resolve_output_dir, save_matplotlib, save_plotly, save_plotly_batch
 from f1_explorer.visualizations.segment_metrics import deltas_to_reference, rank_segment_durations, segment_durations
@@ -465,7 +466,7 @@ def plot_gear_shift_on_track(session: Session, log: structlog.stdlib.BoundLogger
         gear = tel.nGear.to_numpy().astype(float)
         cmap = mpl.cm.Paired
         lc_comp = mpl.collections.LineCollection(segments,
-                                                 norm=plt.Normalize(1, cmap.N + 1), cmap=cmap, linewidth=4, array=gear)
+                                                 norm=mpl.colors.Normalize(vmin=1, vmax=cmap.N + 1), cmap=cmap, linewidth=4, array=gear)
         fig.gca().add_collection(lc_comp)
         ax.axis('equal')
         ax.tick_params(labelleft=False, left=False, labelbottom=False, bottom=False)
@@ -631,7 +632,7 @@ def plot_speed_on_track(session: Session, log: structlog.stdlib.BoundLogger, *, 
         cmap = mpl.cm.plasma
         lc_comp = mpl.collections.LineCollection(
             segments,
-            norm=plt.Normalize(speed.min(), speed.max()),
+            norm=mpl.colors.Normalize(vmin=float(speed.min()), vmax=float(speed.max())),
             cmap=cmap,
             linewidth=4,
             array=speed,
@@ -817,7 +818,7 @@ def _save_interactive_track_map(
     plot_name = "Shift on Track" if key == "shift_on_track" else "Speed on Track"
     figure = go.Figure()
     for rank, (_, lap, x_data, y_data, values) in enumerate(traces):
-        colorbar = {"title": {"text": value_label}}
+        colorbar = go.scattergl.marker.ColorBar(title={"text": value_label})
         if colorbar_ticks is not None:
             colorbar["tickvals"] = colorbar_ticks
             colorbar["ticktext"] = [str(value) for value in colorbar_ticks]
@@ -847,11 +848,11 @@ def _save_interactive_track_map(
     buttons = []
     for selected, trace in enumerate(figure.data):
         buttons.append({
-            "label": trace.name,
+            "label": trace["name"],
             "method": "update",
             "args": [
                 {"visible": [index == selected for index in range(len(figure.data))]},
-                {"title": f"{event_name} {session.name} — {plot_name} — {trace.name}"},
+                {"title": f"{event_name} {session.name} — {plot_name} — {trace['name']}"},
             ],
         })
     figure.update_layout(
@@ -1130,7 +1131,7 @@ def _plot_driver_telemetry(session: Session, log: structlog.stdlib.BoundLogger, 
 def make_mini_segment_layout(
         session: Session,
         log: structlog.stdlib.BoundLogger,
-        corner_map: dict[str, list[int]],
+        corner_map: dict[str, list[float]],
         separators: Sequence[Any],
         *, fastest_lap: Lap | None = None, telemetry: Telemetry | None = None,
 ) -> MiniSegmentLayout:
@@ -1169,9 +1170,9 @@ def make_mini_segment_layout(
         elif isinstance(item, Mapping):
             try:
                 boundary = SeparatorBoundary(
-                    float(item.get("distance", item.get("Distance"))),
-                    int(item.get("sector", item.get("sector_index", item.get("Sector")))),
-                    int(item.get("segment", item.get("segment_index", item.get("Segment")))),
+                    as_float(item.get("distance", item.get("Distance"))),
+                    as_int(item.get("sector", item.get("sector_index", item.get("Sector")))),
+                    as_int(item.get("segment", item.get("segment_index", item.get("Segment")))),
                 )
             except (TypeError, ValueError):
                 continue
@@ -1201,7 +1202,7 @@ def make_mini_segment_layout(
 def make_mini_segment(
         session: Session,
         log: structlog.stdlib.BoundLogger,
-        corner_map: dict[str, list[int]],
+        corner_map: dict[str, list[float]],
         separators: Sequence[Any],
 ) -> list[float]:
     """ミニセグメント作成する
@@ -1246,8 +1247,8 @@ def plot_mini_segment_on_circuit(
     )
 
     segment_boundaries = sorted(float(distance) for distance in segment_boundaries)
-    x = car_data.X.values
-    y = car_data.Y.values
+    x = car_data["X"].to_numpy()
+    y = car_data["Y"].to_numpy()
     fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150)
     ax.plot(x, y, color='lightgrey', linewidth=2)
 
@@ -1308,9 +1309,9 @@ def _structured_sector_boundary_distances(
             continue
         try:
             parsed.append(SeparatorBoundary(
-                float(item.get("distance", item.get("Distance"))),
-                int(item.get("sector", item.get("sector_index", item.get("Sector")))),
-                int(item.get("segment", item.get("segment_index", item.get("Segment")))),
+                as_float(item.get("distance", item.get("Distance"))),
+                as_int(item.get("sector", item.get("sector_index", item.get("Sector")))),
+                as_int(item.get("segment", item.get("segment_index", item.get("Segment")))),
             ))
         except (TypeError, ValueError):
             continue
@@ -1332,7 +1333,7 @@ def _sector_boundary_distances(lap: Lap, telemetry: Telemetry | pandas.DataFrame
         if value is None or pandas.isna(value):
             return []
         try:
-            seconds = float(value.total_seconds())
+            seconds = as_seconds(value)
         except (AttributeError, TypeError, ValueError):
             return []
         if not math.isfinite(seconds) or seconds <= 0:
@@ -1340,10 +1341,12 @@ def _sector_boundary_distances(lap: Lap, telemetry: Telemetry | pandas.DataFrame
         sector_times.append(seconds)
 
     data = telemetry if telemetry is not None else lap.get_telemetry().add_distance()
-    if data is None or "Distance" not in data or "Time" not in data:
+    if data is None:
+        return []
+    if "Distance" not in data.columns or "Time" not in data.columns:
         return []
     times = np.asarray([
-        value.total_seconds() if hasattr(value, "total_seconds") else float(value)
+        as_seconds(value) if hasattr(value, "total_seconds") else as_float(value)
         for value in data.Time
     ], dtype=float)
     distances = np.asarray(data.Distance, dtype=float)

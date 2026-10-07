@@ -1,7 +1,10 @@
 """Shared axis range calculations for report charts."""
 
 
-def bar_range(values):
+from collections.abc import Sequence
+
+
+def bar_range(values: Sequence[float]) -> list[float] | None:
     """Return a padded non-negative range for time/value bar charts."""
     if not values:
         return None

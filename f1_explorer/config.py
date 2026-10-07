@@ -1,14 +1,19 @@
+from __future__ import annotations
+
 import json
 import logging
 import os
 from enum import Enum
 from logging import Logger
-from typing import Any
+from typing import Any, Mapping, Sequence, TYPE_CHECKING
 
 import fastf1
 import structlog
 # noinspection PyPackageRequirements
 from opentelemetry import trace
+
+if TYPE_CHECKING:
+    from f1_explorer.separator_estimator import SeparatorBoundary
 
 tracer = trace.get_tracer(__name__)
 
@@ -21,8 +26,8 @@ class SessionCategory(Enum):
 
 class Config:
     def __init__(self, year: int, race_number: int, session: str, corners: dict[str, list[float]],
-                 separator: list[int], comparison: list[list[dict[str, Any]]],
-                 separator_boundaries: list[dict[str, Any]] | None = None):
+                 separator: list[float], comparison: list[list[dict[str, Any]]],
+                 separator_boundaries: Sequence[SeparatorBoundary | Mapping[str, float | int]] | None = None):
         self.year = year
         self.round = race_number
         self.session = session
@@ -63,7 +68,7 @@ class Config:
     def set_separator(
         self,
         separator: list[float],
-        boundaries: list[dict[str, Any]] | None = None,
+        boundaries: Sequence[SeparatorBoundary | Mapping[str, float | int]] | None = None,
     ) -> None:
         """Replace the active separator list after session-specific loading."""
         self.separator = list(separator)

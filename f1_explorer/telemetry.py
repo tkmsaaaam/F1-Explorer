@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Callable
+
+from fastf1.core import Telemetry
 
 from opentelemetry import trace
 
@@ -31,12 +33,12 @@ def lap_telemetry_without_driver_ahead(lap: Any, *, add_distance: bool = False) 
         if value is not None:
             span.set_attribute(f"f1.lap.{name.lower()}", str(value))
 
-    get_car_data = getattr(lap, "get_car_data", None)
-    get_pos_data = getattr(lap, "get_pos_data", None)
-    if not callable(get_car_data) or not callable(get_pos_data):
-        get_telemetry = getattr(lap, "get_telemetry", None)
+    get_car_data: Callable[..., Telemetry] | None = getattr(lap, "get_car_data", None)
+    get_pos_data: Callable[..., Telemetry] | None = getattr(lap, "get_pos_data", None)
+    if get_car_data is None or get_pos_data is None or not callable(get_car_data) or not callable(get_pos_data):
+        get_telemetry: Callable[[], Telemetry] | None = getattr(lap, "get_telemetry", None)
         span.set_attribute("f1.telemetry.fallback", True)
-        telemetry = get_telemetry() if callable(get_telemetry) else lap.telemetry
+        telemetry = get_telemetry() if get_telemetry is not None and callable(get_telemetry) else lap.telemetry
         if add_distance:
             telemetry = telemetry.add_distance()
         _record_row_count(telemetry)

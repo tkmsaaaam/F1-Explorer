@@ -1,6 +1,6 @@
 from pathlib import Path
 from bisect import bisect_left
-from typing import cast
+from typing import cast, TypedDict
 
 import fastf1.plotting
 import matplotlib.dates as mdates
@@ -14,6 +14,7 @@ from plotly.subplots import make_subplots
 # noinspection PyPackageRequirements
 from opentelemetry import trace
 
+from f1_explorer.scalars import as_int, as_seconds
 from f1_explorer import constants
 from f1_explorer.visualizations.output import resolve_output_dir, save_matplotlib, save_plotly
 from f1_explorer.visualizations.report import current_report
@@ -25,7 +26,13 @@ tracer = trace.get_tracer(__name__)
 TURBULENCE_GAP_SECONDS = 2.0
 
 
-def _lap_start_context(laps: Laps, threshold: float = TURBULENCE_GAP_SECONDS) -> dict[tuple[str, int], dict[str, object]]:
+
+class LapStartContext(TypedDict):
+    ahead_driver_number: str
+    gap_seconds: float
+    within_threshold: bool
+
+def _lap_start_context(laps: Laps, threshold: float = TURBULENCE_GAP_SECONDS) -> dict[tuple[str, int], LapStartContext]:
     """Return the line-crossing context for each lap's start.
 
     The immediately preceding crossing is used instead of classification
@@ -41,7 +48,7 @@ def _lap_start_context(laps: Laps, threshold: float = TURBULENCE_GAP_SECONDS) ->
     event_times = [event[0] for event in events]
     result = {}
     for row in laps.itertuples():
-        key = (str(row.DriverNumber), int(row.LapNumber)) if not pandas.isna(row.LapNumber) else None
+        key = (str(row.DriverNumber), as_int(row.LapNumber)) if not pandas.isna(row.LapNumber) else None
         if key is None or pandas.isna(getattr(row, "LapStartTime", pandas.NaT)):
             continue
         prior_index = bisect_left(event_times, row.LapStartTime) - 1
@@ -50,7 +57,7 @@ def _lap_start_context(laps: Laps, threshold: float = TURBULENCE_GAP_SECONDS) ->
         crossing_time, ahead_number, _ = events[prior_index]
         if ahead_number == key[0]:
             continue
-        gap = (row.LapStartTime - crossing_time).total_seconds()
+        gap = (pandas.Timedelta(row.LapStartTime) - pandas.Timedelta(crossing_time)).total_seconds()
         if gap < 0:
             continue
         result[key] = {
@@ -153,7 +160,7 @@ def plot_laptime(
             log.warning("Could not split qualifying sessions; using one table", reason=str(exception))
         else:
             prefix = "SQ" if session.name.startswith("Sprint") else "Q"
-            sections = [
+            sections: list[tuple[str, Laps]] = [
                 (f"{prefix}{index}", laps)
                 for index, laps in enumerate(qualifying_laps, start=1)
                 if laps is not None and not laps.empty
@@ -179,7 +186,7 @@ def plot_laptime(
 
 def _make_laptime_table(
         session: Session,
-        laps: Laps,
+        laps: pandas.DataFrame,
         section_label: str,
         *,
         exclude_pit_laps: bool = False,
@@ -253,17 +260,17 @@ def _make_laptime_table(
     ), heights
 
 
-def _laps_without_pit_laps(laps: Laps) -> Laps:
+def _laps_without_pit_laps(laps: pandas.DataFrame) -> pandas.DataFrame:
     """Return the timed laps shown in qualifying lap-time charts."""
 
     return laps[laps.PitOutTime.isna() & laps.PitInTime.isna()]
 
 
-def _lap_start_dates(session: Session, laps: Laps) -> pandas.Series:
+def _lap_start_dates(session: Session, laps: pandas.DataFrame) -> pandas.Series:
     """Return absolute lap-start timestamps, filling from session time when needed."""
 
     starts = pandas.to_datetime(laps["LapStartDate"], errors="coerce")
-    session_start = getattr(session, "t0_date", pandas.NaT)
+    session_start = pandas.to_datetime(getattr(session, "t0_date", pandas.NaT))
     if pandas.notna(session_start):
         fallback = pandas.Timestamp(session_start) + laps["LapStartTime"]
         starts = starts.fillna(fallback)
@@ -413,7 +420,7 @@ def _interactive_race_laptime_range(session: Session) -> list[float] | None:
     ]["LapTime"].dt.total_seconds().dropna()
     graph_max = float(graph_clean.max()) if not graph_clean.empty else float(seconds.max())
     graph_range = [graph_max + 0.1, fastest - 0.1]
-    return min((fixed_range, graph_range), key=lambda item: item[0] - item[1])
+    return fixed_range if fixed_range[0] - fixed_range[1] <= graph_range[0] - graph_range[1] else graph_range
 
 
 def _make_interactive_laptime_by_lap_number(session: Session) -> go.Figure:
@@ -431,7 +438,7 @@ def _make_interactive_laptime_by_lap_number(session: Session) -> go.Figure:
         color, dash = _interactive_driver_style(session, driver_number, team)
         marker_colors, marker_line_colors, marker_line_widths, customdata = [], [], [], []
         for row in driver_laps.itertuples():
-            context = lap_context.get((str(driver_number), int(row.LapNumber)))
+            context = lap_context.get((str(driver_number), as_int(row.LapNumber)))
             clean, reasons = _lap_quality(row)
             close = context is not None and bool(context["within_threshold"])
             marker_colors.append("white" if close else color)
@@ -458,7 +465,7 @@ def _make_interactive_laptime_by_lap_number(session: Session) -> go.Figure:
             ),
         ))
     y_range = _interactive_race_laptime_range(session)
-    yaxis = dict(title="Lap Time [s]")
+    yaxis = go.layout.YAxis(title="Lap Time [s]")
     if y_range is None:
         yaxis["autorange"] = "reversed"
     else:
@@ -505,7 +512,7 @@ def plot_laptime_by_timing(
         for _, stint_laps in driver_laps.groupby('Stint', sort=False, dropna=False):
             lap_times = stint_laps.LapTime.dt.total_seconds().tolist()
             lap_starts = stint_laps['_LapStartDate'].values
-            if not lap_times or not lap_starts.size:
+            if not lap_times or len(lap_starts) == 0:
                 continue
             ax.plot(
                 lap_starts,
@@ -528,7 +535,7 @@ def plot_laptime_by_timing(
         report.register_plotly(_make_interactive_laptime_by_timing(session, laps), output_path)
 
 
-def _make_interactive_laptime_by_timing(session: Session, laps: Laps | None = None) -> go.Figure:
+def _make_interactive_laptime_by_timing(session: Session, laps: pandas.DataFrame | None = None) -> go.Figure:
     """Build an interactive time-axis counterpart to the static plot."""
     if laps is None:
         laps = session.laps
@@ -554,8 +561,8 @@ def _make_interactive_laptime_by_timing(session: Session, laps: Laps | None = No
                 y.append(None)
                 customdata.append([None, None, None, None])
             x.append(lap_start)
-            y.append(row.LapTime.total_seconds())
-            customdata.append([int(row.LapNumber), str(row.Compound), row.TyreLife, row.Stint])
+            y.append(as_seconds(row.LapTime))
+            customdata.append([as_int(row.LapNumber), str(row.Compound), row.TyreLife, row.Stint])
             previous_stint = stint
         fig.add_trace(go.Scatter(
             x=x,

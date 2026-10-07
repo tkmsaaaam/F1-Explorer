@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Mapping, Protocol, Sequence
 
+from matplotlib.figure import Figure
 import matplotlib.pyplot as plt
 import plotly.io as pio
 from opentelemetry import trace
@@ -29,13 +30,6 @@ class SessionLike(Protocol):
     name: str
 
 
-class MatplotlibFigure(Protocol):
-    """Protocol for figures accepted by :func:`save_matplotlib`."""
-
-    def savefig(self, fname: str | Path, **kwargs: Any) -> Any:
-        """Save the figure."""
-
-
 class PlotlyFigure(Protocol):
     """Protocol for figures accepted by :func:`save_plotly`."""
 
@@ -46,8 +40,13 @@ class PlotlyFigure(Protocol):
 class LoggerLike(Protocol):
     """Minimal logger interface used by the save helpers."""
 
-    def info(self, message: str, **kwargs: Any) -> Any:
+    def info(self, message: str, /) -> Any:
         """Log an informational message."""
+
+
+class WarningLoggerLike(LoggerLike, Protocol):
+    def warning(self, message: str, /) -> Any:
+        """Log a warning with optional context."""
 
 
 def _value(source: object, key: str) -> object:
@@ -84,7 +83,7 @@ def resolve_output_dir(session: SessionLike, output_dir: str | Path | None) -> P
 
 
 def save_matplotlib(
-    fig: MatplotlibFigure,
+    fig: Figure,
     path: str | Path,
     log: LoggerLike,
     *,

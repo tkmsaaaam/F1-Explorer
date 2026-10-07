@@ -12,11 +12,21 @@ from matplotlib.collections import LineCollection, PathCollection
 from matplotlib.patches import Rectangle
 from matplotlib.ticker import FixedLocator
 from matplotlib.text import Annotation
+from matplotlib.typing import ColorType
 import numpy as np
 import plotly.graph_objects as go
 
 
-def _color(value: object) -> str:
+def _color(value: ColorType | np.ndarray) -> str:
+    if isinstance(value, np.ndarray):
+        if value.shape == (1, 4):
+            value = value[0]
+        if value.shape == (3,):
+            value = (float(value[0]), float(value[1]), float(value[2]))
+        elif value.shape == (4,):
+            value = (float(value[0]), float(value[1]), float(value[2]), float(value[3]))
+        else:
+            raise ValueError("A chart color must have three or four channels")
     red, green, blue, alpha = colors.to_rgba(value)
     return f"rgba({round(red * 255)},{round(green * 255)},{round(blue * 255)},{alpha})"
 
@@ -73,7 +83,7 @@ def embed_matplotlib(fig) -> go.Figure:
                               width=float(widths[index % len(widths)])),
                 ))
         elif isinstance(collection, PathCollection):
-            points = collection.get_offsets()
+            points = np.asarray(collection.get_offsets())
             faces = collection.get_facecolors()
             edges = collection.get_edgecolors()
             sizes = collection.get_sizes()
@@ -109,8 +119,8 @@ def embed_matplotlib(fig) -> go.Figure:
                       weight=700 if text.get_fontweight() == "bold" else 400),
             xanchor={"left": "left", "right": "right"}.get(text.get_ha(), "center"),
             yanchor={"top": "top", "bottom": "bottom"}.get(text.get_va(), "middle"),
-            xshift=text.get_position()[0] if isinstance(text, Annotation) and text.anncoords == "offset points" else 0,
-            yshift=text.get_position()[1] if isinstance(text, Annotation) and text.anncoords == "offset points" else 0,
+            xshift=text.get_position()[0] if isinstance(text, Annotation) and isinstance(text.anncoords, str) and text.anncoords == "offset points" else 0,
+            yshift=text.get_position()[1] if isinstance(text, Annotation) and isinstance(text.anncoords, str) and text.anncoords == "offset points" else 0,
         )
 
     # Include explicitly supplied legend handles, e.g. tyre compounds and N/U.

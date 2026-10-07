@@ -17,11 +17,12 @@ import math
 from pathlib import Path
 import re
 import tempfile
-from typing import Any, Callable, Iterable, Mapping, Sequence
+from typing import Any, Callable, Iterable, Mapping, Sequence, TypedDict, NotRequired
 
 import numpy as np
 import pandas as pd
 
+from f1_explorer.scalars import as_float, as_int
 from f1_explorer.telemetry import lap_telemetry_without_driver_ahead
 
 
@@ -116,7 +117,7 @@ def _year(session: Any) -> int:
             value = event["year"]
         except (KeyError, TypeError, IndexError):
             value = getattr(session, "year", None)
-    return int(value)
+    return as_int(value)
 
 
 def _join_url(base: str, path: str) -> str:
@@ -274,7 +275,7 @@ class StaticArchiveClient:
                     temporary = Path(file.name)
                     file.write(data)
                     file.flush()
-                temporary.replace(cache_path)
+                Path(file.name).replace(cache_path)
             finally:
                 if temporary is not None and temporary.exists():
                     temporary.unlink()
@@ -450,7 +451,7 @@ def _integer_value(value: Any) -> int | None:
     if isinstance(value, Mapping):
         value = _first(value, "Value", "value")
     try:
-        return int(value)
+        return as_int(value)
     except (TypeError, ValueError):
         return None
 
@@ -676,7 +677,7 @@ def _lookup_distance(
         )
     elif isinstance(lookup, Mapping):
         value = entry
-        if callable(value):
+        if value is not None and callable(value):
             value = value(
                 sector_percent if sector_percent is not None else (
                     lap_percent if lap_percent is not None else timestamp
@@ -737,7 +738,7 @@ def _lookup_distance(
     else:
         value = None
     try:
-        value = float(value)
+        value = as_float(value)
     except (TypeError, ValueError):
         return None
     return value if math.isfinite(value) else None
@@ -1007,12 +1008,20 @@ def _lap_telemetry_without_driver_ahead(lap: Any) -> Any:
     return lap_telemetry_without_driver_ahead(lap, add_distance=True)
 
 
-def build_distance_lookup(session: Any) -> tuple[dict[tuple[str, int], dict[str, list[float]]], float | None]:
+
+class DistanceLookup(TypedDict):
+    SessionTime: list[float]
+    LapTimePercent: list[float]
+    Distance: list[float]
+    SectorTimePercent: NotRequired[dict[str, list[float]]]
+    SectorDistanceRange: NotRequired[dict[str, list[float]]]
+
+def build_distance_lookup(session: Any) -> tuple[dict[tuple[str, int], DistanceLookup], float | None]:
     """Build an interpolating lookup from FastF1 laps without guessing gaps."""
     laps = getattr(session, "laps", None)
     if laps is None:
         return {}, None
-    lookup: dict[tuple[str, int], dict[str, list[float]]] = {}
+    lookup: dict[tuple[str, int], DistanceLookup] = {}
     max_distance = 0.0
     try:
         count = len(laps)
@@ -1048,11 +1057,17 @@ def build_distance_lookup(session: Any) -> tuple[dict[tuple[str, int], dict[str,
             relative_times = [_time_seconds(value) for value in telemetry["Time"]]
             if any(value is None for value in relative_times):
                 continue
-            times = [start + value for value in relative_times]
+            times = []
+            for value in relative_times:
+                if value is not None:
+                    times.append(start + value)
         else:
             continue
         distances = [float(value) if pd.notna(value) else math.nan for value in telemetry["Distance"]]
-        pairs = [(time, distance) for time, distance in zip(times, distances) if time is not None and math.isfinite(distance)]
+        pairs: list[tuple[float, float]] = []
+        for time, distance in zip(times, distances):
+            if time is not None and math.isfinite(distance):
+                pairs.append((time, distance))
         if len(pairs) < 2:
             continue
         pairs.sort()
@@ -1082,14 +1097,16 @@ def build_distance_lookup(session: Any) -> tuple[dict[tuple[str, int], dict[str,
             and abs(sector_total - span) <= duration_tolerance
             and (lap_duration is None or abs(lap_duration - sector_total) <= duration_tolerance)
         )
-        if sector_times_consistent:
+        s1, s2, s3 = sector_times
+        if sector_times_consistent and s1 is not None and s2 is not None and s3 is not None:
+            valid_sector_times = [s1, s2, s3]
             elapsed = [pair[0] - pairs[0][0] for pair in pairs]
-            starts = [0.0, sector_times[0], sector_times[0] + sector_times[1]]
-            ends = [start + duration for start, duration in zip(starts, sector_times)]
+            starts = [0.0, s1, s1 + s2]
+            ends = [start + duration for start, duration in zip(starts, valid_sector_times)]
             if not any(start < 0 or end > span for start, end in zip(starts, ends)):
                 lookup[(driver, lap_number)]["SectorTimePercent"] = {
                     str(index): [
-                        (value - starts[index]) / sector_times[index] * 100.0
+                        (value - starts[index]) / valid_sector_times[index] * 100.0
                         for value in elapsed
                     ]
                     for index in range(3)
@@ -1161,7 +1178,10 @@ def _separator_maps(config: Mapping[str, Any]) -> list[Mapping[str, Any]]:
 def _scoped_separator_value(config: Mapping[str, Any], year: int, location: str) -> Any:
     locations = (location, location.casefold())
     for separator_map in _separator_maps(config):
-        year_map = separator_map.get(str(year), separator_map.get(year))
+        if str(year) in separator_map:
+            year_map = separator_map[str(year)]
+        else:
+            year_map = separator_map.get(year)
         if not isinstance(year_map, Mapping):
             continue
         for key in locations:
@@ -1181,7 +1201,7 @@ def _coerce_separator_boundary(value: Any) -> SeparatorBoundary | None:
         sector = value.get("sector", value.get("sector_index", value.get("Sector")))
         segment = value.get("segment", value.get("segment_index", value.get("Segment")))
         try:
-            candidate = SeparatorBoundary(float(distance), int(sector), int(segment))
+            candidate = SeparatorBoundary(as_float(distance), as_int(sector), as_int(segment))
         except (TypeError, ValueError):
             return None
     else:
@@ -1274,7 +1294,7 @@ def save_scoped_separator(
             import os
 
             os.fsync(file.fileno())
-        temporary.replace(path)
+        Path(file.name).replace(path)
     finally:
         if temporary is not None and temporary.exists():
             temporary.unlink()

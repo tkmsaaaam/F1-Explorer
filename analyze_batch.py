@@ -11,6 +11,7 @@ import argparse
 from dataclasses import dataclass
 import json
 import os
+from f1_explorer.scalars import as_int
 from pathlib import Path
 import subprocess
 import sys
@@ -66,7 +67,7 @@ def parse_plan(payload: Any) -> list[AnalysisJob]:
                 raise ValueError(f"plan[{year_index}].gp[{gp_index}] must be an object")
             raw_round = gp_item.get("number", gp_item.get("round"))
             try:
-                round_number = int(raw_round)
+                round_number = as_int(raw_round)
             except (TypeError, ValueError) as error:
                 raise ValueError(
                     f"plan[{year_index}].gp[{gp_index}].number must be an integer"
@@ -128,7 +129,7 @@ def write_config(path: str | Path, config: Mapping[str, Any]) -> None:
             file.write("\n")
             file.flush()
             os.fsync(file.fileno())
-        os.replace(temporary, target)
+        os.replace(Path(file.name), target)
     finally:
         if temporary is not None and temporary.exists():
             temporary.unlink()
