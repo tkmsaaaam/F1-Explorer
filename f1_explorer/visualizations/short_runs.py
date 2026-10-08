@@ -114,6 +114,22 @@ def compute_competitive_drivers(session: Session, log: structlog.stdlib.BoundLog
     return n
 
 
+@tracer.start_as_current_span("segment_table.prepare_car_data")
+def prepare_segment_car_data(session: Session) -> dict[str, Telemetry]:
+    """Read each driver's fastest-lap car samples once for both segment tables.
+
+    Preserve sample order, duplicate distances, and missing values. These are
+    raw car samples with distance added, rather than merged position telemetry.
+    """
+    samples: dict[str, Telemetry] = {}
+    for driver_number in session.drivers:
+        lap = session.laps.pick_drivers(driver_number).pick_fastest()
+        if lap is None or lap.empty:
+            continue
+        samples[str(driver_number)] = lap.get_car_data().add_distance()
+    return samples
+
+
 @tracer.start_as_current_span("compute_and_save_segment_tables_plotly")
 def compute_and_save_segment_tables_plotly(
         session: Session,
@@ -122,6 +138,7 @@ def compute_and_save_segment_tables_plotly(
         log: structlog.stdlib.BoundLogger,
         *,
         color_by_corner_speed: bool = False,
+        car_data_by_driver: Mapping[str, Telemetry] | None = None,
 ):
     """mini segmentごとのタイムをプロットする
     Args:
@@ -139,11 +156,12 @@ def compute_and_save_segment_tables_plotly(
     with tracer.start_as_current_span("segment_table.driver_times") as span:
         span.set_attribute("segment.boundary_count", len(segment_boundaries))
         span.set_attribute("segment.driver_count", len(session.drivers))
+        if car_data_by_driver is None:
+            car_data_by_driver = prepare_segment_car_data(session)
         for driver_number in session.drivers:
-            laps = session.laps.pick_drivers(driver_number).pick_fastest()
-            if laps is None or laps.empty:
+            car_data = car_data_by_driver.get(str(driver_number))
+            if car_data is None:
                 continue
-            car_data = laps.get_car_data().add_distance()
             driver_times[driver_number] = [
                 None if (last_point := car_data[car_data.Distance < dist]).empty else
                 last_point.iloc[-1].Time.total_seconds() for dist in segment_boundaries]
@@ -381,6 +399,19 @@ def plot_flat_out(session: Session, log: structlog.stdlib.BoundLogger, *, output
                           "Flat-out Time / Lap Time [%]")
 
 
+def _best_sector_seconds(laps: Laps) -> tuple[float, float, float]:
+    """Return independent sector minima from the caller's selected lap order.
+
+    Python min deliberately preserves the existing behavior for NaT/NaN;
+    changing missing-value policy belongs to a separate correctness change.
+    """
+    return (
+        min([laps.iloc[i].Sector1Time.total_seconds() for i in range(len(laps))]),
+        min([laps.iloc[i].Sector2Time.total_seconds() for i in range(len(laps))]),
+        min([laps.iloc[i].Sector3Time.total_seconds() for i in range(len(laps))]),
+    )
+
+
 @tracer.start_as_current_span("plot_ideal_best")
 def plot_ideal_best(session: Session, log: structlog.stdlib.BoundLogger, *, output_dir: str | Path | None = None):
     """y = 理論値
@@ -398,9 +429,7 @@ def plot_ideal_best(session: Session, log: structlog.stdlib.BoundLogger, *, outp
         if fastest is None:
             continue
         x = fastest.LapTime.total_seconds()
-        sec1 = min([laps.iloc[i].Sector1Time.total_seconds() for i in range(0, len(laps))])
-        sec2 = min([laps.iloc[i].Sector2Time.total_seconds() for i in range(0, len(laps))])
-        sec3 = min([laps.iloc[i].Sector3Time.total_seconds() for i in range(0, len(laps))])
+        sec1, sec2, sec3 = _best_sector_seconds(laps)
         y = sec1 + sec2 + sec3
         acronym = laps.Driver.iloc[0]
         try:
@@ -429,9 +458,7 @@ def plot_ideal_best_diff(session: Session, log: structlog.stdlib.BoundLogger, *,
             color = fastf1.plotting.get_team_color(laps.Team.iloc[0], session)
         except AttributeError:
             color = 'gray'
-        sec1 = min([laps.iloc[i].Sector1Time.total_seconds() for i in range(0, len(laps))])
-        sec2 = min([laps.iloc[i].Sector2Time.total_seconds() for i in range(0, len(laps))])
-        sec3 = min([laps.iloc[i].Sector3Time.total_seconds() for i in range(0, len(laps))])
+        sec1, sec2, sec3 = _best_sector_seconds(laps)
         y = sec1 + sec2 + sec3
         fastest = laps.pick_fastest()
         if fastest is None:

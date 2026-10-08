@@ -121,7 +121,10 @@ def main(*, force: bool = False, refresh_separators: bool = False):
             session, log, corners, 'corners',
             fastest_lap=fastest, telemetry=fastest_telemetry,
         )
-        short_runs.compute_and_save_segment_tables_plotly(session, base_path + "/corners", corners, log)
+        segment_car_data = short_runs.prepare_segment_car_data(session)
+        short_runs.compute_and_save_segment_tables_plotly(
+            session, base_path + "/corners", corners, log, car_data_by_driver=segment_car_data,
+        )
         corner_map = config.get_corners()
         segment_layout = short_runs.make_mini_segment_layout(
             session, log, corner_map,
@@ -135,7 +138,9 @@ def main(*, force: bool = False, refresh_separators: bool = False):
             fastest_lap=fastest,
             telemetry=fastest_telemetry,
         )
-        short_runs.compute_and_save_segment_tables_plotly(session, base_path + "/mini_segments", segment_layout, log)
+        short_runs.compute_and_save_segment_tables_plotly(
+            session, base_path + "/mini_segments", segment_layout, log, car_data_by_driver=segment_car_data,
+        )
     elif fastest is None:
         log.info("fastest info is None; skipping circuit-dependent analysis")
     short_runs.plot_flat_out(session, log)
