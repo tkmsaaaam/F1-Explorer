@@ -4,6 +4,7 @@ import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 from opentelemetry import trace
+from f1_explorer.scalars import require_present
 
 tracer = trace.get_tracer(__name__)
 
@@ -181,7 +182,7 @@ def _tow_at_measurement(lap_index, key, telemetry_cache, session, lap_rows=None,
     if key == "SpeedST" or lap_index not in telemetry_cache:
         return None
     _, telemetry = telemetry_cache[lap_index]
-    lap = (lap_rows or _indexed_laps(session.laps)).get(lap_index)
+    lap: pd.Series | None = (lap_rows or _indexed_laps(session.laps)).get(lap_index)
     if lap is None:
         return None
     if key == "SpeedFL":
@@ -230,7 +231,7 @@ def _measurement_values(laps, key, telemetry_cache, session=None, tow_context=No
                 rows.append((lap.get("Driver"), lap.get("Team", ""), float(maximum), lap_index, wants_tow))
     else:
         for lap_index, lap in _iter_laps(laps):
-            speed = pd.to_numeric(pd.Series([lap.get(key)]), errors="coerce").iloc[0]
+            speed = pd.to_numeric(pd.Series([lap.get(key)]), errors="coerce")[0]
             if pd.notna(speed) and speed > 0:
                 tow = None
                 if session is not None:
@@ -256,9 +257,12 @@ def make_qualifying_speed(session):
     prefix = "SQ" if session.name.startswith("Sprint") else "Q"
     scopes = [("全有効ラップ", valid)]
     for index in range(3):
-        part = parts[index] if len(parts) > index else None
-        part = _valid_laps(part) if part is not None and not part.empty else valid.iloc[0:0]
-        scopes.append((f"{prefix}{index + 1}ベストラップ", _best_laps(part)))
+        part: pd.DataFrame | None = parts[index] if len(parts) > index else None
+        if part is not None and not part.empty:
+            selected_part = _valid_laps(require_present(part))
+        else:
+            selected_part = valid.iloc[0:0]
+        scopes.append((f"{prefix}{index + 1}ベストラップ", _best_laps(selected_part)))
 
     combinations = []
     for scope_label, laps in scopes:

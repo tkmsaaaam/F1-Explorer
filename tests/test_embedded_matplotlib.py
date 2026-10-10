@@ -55,6 +55,22 @@ class EmbeddedMatplotlibTest(unittest.TestCase):
         finally:
             plt.close(fig)
 
+    def test_annotation_coordinate_callable_and_tuple_keep_zero_shift(self):
+        from matplotlib.transforms import Bbox
+
+        fig, ax = plt.subplots()
+        try:
+            ax.annotate("callable", (1, 2), xytext=(3, 4),
+                        textcoords=lambda renderer: Bbox.from_bounds(0, 0, 1, 1))
+            ax.annotate("tuple", (1, 2), xytext=(3, 4),
+                        textcoords=("data", "axes fraction"))
+            result = embed_matplotlib(fig)
+            for annotation in result.layout.annotations:
+                self.assertEqual(annotation.xshift, 0)
+                self.assertEqual(annotation.yshift, 0)
+        finally:
+            plt.close(fig)
+
     def test_tyre_history_embeds_bars_stint_boundaries_and_labels_without_png(self):
         laps = Laps(pd.DataFrame({
             "DriverNumber": ["1"] * 3, "LapNumber": [1, 2, 3], "Position": [1] * 3,
@@ -69,7 +85,10 @@ class EmbeddedMatplotlibTest(unittest.TestCase):
                 save.assert_not_called()
                 self.assertEqual(list(root.glob("*.png")), [])
                 import json
-                data = json.loads(report._ordered_items()[0].figure_json)
+                figure_json = report._ordered_items()[0].figure_json
+                self.assertIsNotNone(figure_json)
+                assert figure_json is not None
+                data = json.loads(figure_json)
                 self.assertEqual(len(data["layout"]["shapes"]), 3)
                 self.assertEqual([text["text"] for text in data["layout"]["annotations"]], ["1 N", "2", "5 U"])
                 self.assertEqual(data["layout"]["yaxis"]["ticktext"], ["1"])

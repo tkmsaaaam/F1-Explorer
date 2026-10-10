@@ -210,3 +210,15 @@ def test_non_race_interactive_laptime_range_keeps_full_autorange():
     assert figure.layout.yaxis.autorange == "reversed"
     assert figure.data[0].line.color == "gray"
     assert figure.data[0].line.dash == "solid"
+
+
+@pytest.mark.parametrize("session_start", [None, pandas.NaT])
+def test_missing_session_start_keeps_missing_lap_start(session_start):
+    from f1_explorer.visualizations.run_volume import _lap_start_dates
+    from types import SimpleNamespace
+
+    laps = pandas.DataFrame({"LapStartDate": [pandas.Timestamp("2026-10-01"), pandas.NaT],
+                             "LapStartTime": pandas.to_timedelta([0, 10], unit="s")})
+    starts = _lap_start_dates(SimpleNamespace(t0_date=session_start), laps)
+    assert starts.iloc[0] == pandas.Timestamp("2026-10-01")
+    assert pandas.isna(starts.iloc[1])

@@ -25,7 +25,7 @@ from f1_explorer.separator_estimator import (
 
 
 def _line(driver: str, lap: int, sector: int, segment: int, status: int, value: str | None = "1"):
-    segment_data = {"Status": status}
+    segment_data: dict[str, int | str] = {"Status": status}
     if value is not None:
         segment_data["Value"] = value
     return {
@@ -235,7 +235,7 @@ def test_fastf1_distance_lookup_skips_driver_ahead_and_preserves_telemetry(
     car_times = pd.to_timedelta([0, 2, 4, 6, 8, 10, 12], unit="s")
     position_times = pd.to_timedelta([0, 3, 6, 9, 12], unit="s")
     session._car_data = {
-        "1": Telemetry({
+        "1": Telemetry(pd.DataFrame({
             "Date": session_date + car_times,
             "SessionTime": car_times,
             "Time": car_times,
@@ -245,10 +245,10 @@ def test_fastf1_distance_lookup_skips_driver_ahead_and_preserves_telemetry(
             "nGear": [3] * 7,
             "RPM": [10000] * 7,
             "Source": ["car"] * 7,
-        }, session=session, driver="1")
+        }))
     }
     session._pos_data = {
-        "1": Telemetry({
+        "1": Telemetry(pd.DataFrame({
             "Date": session_date + position_times,
             "SessionTime": position_times,
             "Time": position_times,
@@ -257,8 +257,11 @@ def test_fastf1_distance_lookup_skips_driver_ahead_and_preserves_telemetry(
             "Z": [0] * 5,
             "Status": ["OnTrack"] * 5,
             "Source": ["pos"] * 5,
-        }, session=session, driver="1")
+        }))
     }
+    for telemetry in (session._car_data["1"], session._pos_data["1"]):
+        telemetry.session = session
+        telemetry.driver = "1"
     lap = Lap({
         "DriverNumber": "1", "LapNumber": 1,
         "LapStartTime": pd.to_timedelta(1, unit="s"),
@@ -512,3 +515,26 @@ def test_structured_resolution_round_trips_with_legacy_distance_projection(tmp_p
     assert selected.boundaries == [
         SeparatorBoundary(123.5, 0, 7), SeparatorBoundary(456.8, 1, 2)
     ]
+
+
+@pytest.mark.parametrize("value", [None, 12.0, object()])
+def test_distance_lookup_rejects_non_iterable_samples(value):
+    from f1_explorer.separator_estimator import _lookup_distance
+
+    lookup = {("1", 1): {"SessionTime": value, "Distance": [0.0, 100.0]}}
+    assert _lookup_distance(lookup, "1", 1, 5.0, {}) is None
+
+
+def test_optional_session_metadata_and_track_status():
+    from f1_explorer.separator_estimator import _location, _year, affected_intervals_from_session
+
+    session = SimpleNamespace(event=None, year=2026, laps=None, track_status=None)
+    assert _location(session) == ""
+    assert _year(session) == 2026
+    assert build_distance_lookup(session) == ({}, None)
+    assert affected_intervals_from_session(session) == []
+    session.event = {"year": 2025, "Location": " Baku "}
+    assert (_year(session), _location(session)) == (2025, "Baku")
+    session.track_status = pd.DataFrame({"Time": pd.to_timedelta([20, 0, 10], unit="s"),
+                                         "Status": ["1", "1", "4"]})
+    assert affected_intervals_from_session(session) == [(10.0, 20.0)]

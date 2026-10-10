@@ -260,6 +260,7 @@ def test_summary_scatter_values_and_interactive_report(tmp_path):
         for plot, x, y in cases:
             plot(session, MagicMock(), output_dir=tmp_path / "images")
             item = list(report._items.values())[-1]
+            assert item.figure_json is not None
             figure = json.loads(item.figure_json)
             assert figure["data"][0]["x"] == [x]
             assert figure["data"][0]["y"] == [y]

@@ -63,7 +63,9 @@ def segment_durations(
 
 
 @overload
-def segment_durations(boundary_times: Sequence[MaybeNumeric]) -> list[MaybeNumeric]:
+def segment_durations(
+    boundary_times: Sequence[MaybeNumeric],
+) -> list[MaybeNumeric] | dict[Hashable, list[MaybeNumeric]]:
     ...
 
 
@@ -80,6 +82,8 @@ def segment_durations(
     calculate all drivers while preserving its key order.
     """
 
+    # Mapping takes precedence even for objects also implementing Sequence.
+    # The Sequence overload includes that possible mapping return type.
     if isinstance(boundary_times, Mapping):
         return {
             driver: _durations_for_boundaries(boundaries)

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from dataclasses import dataclass
 import tempfile
 from types import SimpleNamespace
 import unittest
@@ -23,11 +24,31 @@ from f1_explorer.visualizations.style import driver_linestyle
 from f1_explorer.visualizations.report import SessionReport
 
 
-def _session() -> SimpleNamespace:
-    return SimpleNamespace(
-        event=SimpleNamespace(year=2025, RoundNumber=7, Location="Silverstone"),
-        name="Free Practice 1",
-    )
+class _Logger:
+    """Explicit output logger contract with recorded calls."""
+
+    def __init__(self) -> None:
+        self.messages: list[str] = []
+
+    def info(self, message: str, /) -> None:
+        self.messages.append(message)
+
+
+@dataclass
+class _OutputEvent:
+    year: int
+    RoundNumber: int
+    Location: str
+
+
+@dataclass
+class _OutputSession:
+    event: _OutputEvent
+    name: str
+
+
+def _session() -> _OutputSession:
+    return _OutputSession(_OutputEvent(2025, 7, "Silverstone"), "Free Practice 1")
 
 
 class VisualizationCommon(unittest.TestCase):
@@ -48,7 +69,7 @@ class VisualizationCommon(unittest.TestCase):
 
             with SessionReport(session, output) as report:
                 with patch("f1_explorer.visualizations.output.pio.write_images", side_effect=write_images):
-                    result = save_plotly_batch(figures, paths, Mock(), width=1920, height=1080)
+                    result = save_plotly_batch(figures, paths, _Logger(), width=1920, height=1080)
                 self.assertEqual(result, [expected, paths[1]])
                 self.assertEqual(report.image_paths(), (expected.resolve(),))
                 self.assertEqual(len(report._ordered_items()), 2)
@@ -67,7 +88,7 @@ class VisualizationCommon(unittest.TestCase):
                     if image == "laptime_table.png":
                         fig = go.Figure(go.Table(header=dict(values=["Lap"])))
                         with patch.object(fig, "write_image", side_effect=lambda path, **kw: path.write_bytes(b"png")):
-                            result = save_plotly(fig, output / image, Mock(), width=1920, height=1200)
+                            result = save_plotly(fig, output / image, _Logger(), width=1920, height=1200)
                     else:
                         fig, ax = plt.subplots()
                         ax.plot([1, 2], [90, 91])
@@ -116,7 +137,7 @@ class VisualizationCommon(unittest.TestCase):
 
     def test_save_matplotlib_creates_parent_and_closes_once(self) -> None:
         fig = Mock()
-        log = Mock()
+        log = _Logger()
         with tempfile.TemporaryDirectory() as directory:
             output_path = Path(directory) / "plots/figure.png"
             with patch("f1_explorer.visualizations.output.plt.close") as close:
@@ -125,13 +146,13 @@ class VisualizationCommon(unittest.TestCase):
         self.assertEqual(result, output_path)
         fig.savefig.assert_called_once_with(result, bbox_inches="tight")
         close.assert_called_once_with(fig)
-        log.info.assert_called_once()
+        self.assertEqual(len(log.messages), 1)
 
 
     def test_save_matplotlib_closes_when_save_raises(self) -> None:
         fig = Mock()
         fig.savefig.side_effect = RuntimeError("save failed")
-        log = Mock()
+        log = _Logger()
         with tempfile.TemporaryDirectory() as directory:
             output_path = Path(directory) / "plots/figure.png"
             with patch("f1_explorer.visualizations.output.plt.close") as close:
@@ -139,25 +160,25 @@ class VisualizationCommon(unittest.TestCase):
                     save_matplotlib(fig, output_path, log)
 
         close.assert_called_once_with(fig)
-        log.info.assert_not_called()
+        self.assertEqual(log.messages, [])
 
 
     def test_save_plotly_creates_parent_and_passes_dimensions(self) -> None:
         fig = Mock()
-        log = Mock()
+        log = _Logger()
         with tempfile.TemporaryDirectory() as directory:
             output_path = Path(directory) / "plots/figure.png"
             result = save_plotly(fig, output_path, log, width=1200, height=800)
 
         self.assertEqual(result, output_path)
         fig.write_image.assert_called_once_with(result, width=1200, height=800)
-        log.info.assert_called_once()
+        self.assertEqual(len(log.messages), 1)
 
 
     def test_save_plotly_batch_registers_three_images_in_order(self) -> None:
         figures = [go.Figure(data=[go.Table(header=dict(values=[name]))])
                    for name in ("durations", "ranks", "gaps")]
-        log = Mock()
+        log = _Logger()
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             paths = [root / f"corners_{name}.png"
@@ -185,7 +206,7 @@ class VisualizationCommon(unittest.TestCase):
                 self.assertTrue(all(f'"values":["{name}"]' in html
                                     for name in ("durations", "ranks", "gaps")))
             write.assert_not_called()
-            log.info.assert_not_called()
+            self.assertEqual(log.messages, [])
 
     def test_report_preserves_old_png_without_using_it_for_interactive_figure(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -195,7 +216,7 @@ class VisualizationCommon(unittest.TestCase):
             fig = go.Figure(go.Scatter(x=[1], y=[2]))
             with SessionReport(SimpleNamespace(name="Practice 1"), root) as report:
                 with patch.object(fig, "write_image") as write:
-                    save_plotly(fig, path, Mock(), width=1920, height=1080)
+                    save_plotly(fig, path, _Logger(), width=1920, height=1080)
                 write.assert_not_called()
                 self.assertEqual(path.read_bytes(), b"old image")
                 self.assertEqual(report.image_paths(), ())
@@ -215,8 +236,8 @@ class VisualizationCommon(unittest.TestCase):
                     graph_path = root / "laptime_by_lap_number.png"
                     with patch.object(table, "write_image", side_effect=lambda path, **kw: path.write_bytes(b"png")) as write_table, \
                          patch.object(graph, "write_image") as write_graph:
-                        save_plotly(table, table_path, Mock(), width=1920, height=1200)
-                        save_plotly(graph, graph_path, Mock(), width=1920, height=1080)
+                        save_plotly(table, table_path, _Logger(), width=1920, height=1200)
+                        save_plotly(graph, graph_path, _Logger(), width=1920, height=1080)
                     write_table.assert_called_once()
                     write_graph.assert_not_called()
                     self.assertTrue(table_path.is_file())
@@ -233,7 +254,7 @@ class VisualizationCommon(unittest.TestCase):
             with SessionReport(SimpleNamespace(name="Practice 1"), root):
                 fig = Mock()
                 with patch("f1_explorer.visualizations.output.plt.close") as close:
-                    save_matplotlib(fig, root / "long_runs/SOFT.png", Mock(), report_interactive=True)
+                    save_matplotlib(fig, root / "long_runs/SOFT.png", _Logger(), report_interactive=True)
                 fig.savefig.assert_not_called()
                 close.assert_called_once_with(fig)
 
@@ -256,13 +277,13 @@ class VisualizationCommon(unittest.TestCase):
 
 
     def test_save_plotly_batch_propagates_write_failure(self) -> None:
-        log = Mock()
+        log = _Logger()
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "corners_durations.png"
             with patch("f1_explorer.visualizations.output.pio.write_images", side_effect=RuntimeError("failed")):
                 with self.assertRaisesRegex(RuntimeError, "failed"):
                     save_plotly_batch([go.Figure()], [path], log, width=1920, height=1080)
-            log.info.assert_not_called()
+            self.assertEqual(log.messages, [])
 
 
     def test_driver_linestyle_uses_camera_and_safe_defaults(self) -> None:

@@ -14,16 +14,29 @@ from datetime import timedelta
 import hashlib
 import json
 import math
+import logging
+import structlog
 from pathlib import Path
 import re
 import tempfile
-from typing import Any, Callable, Iterable, Mapping, Sequence, TypedDict, NotRequired
+from typing import Any, Callable, Iterable, Mapping, Sequence, TypedDict, NotRequired, Protocol, runtime_checkable
 
 import numpy as np
 import pandas as pd
 
-from f1_explorer.scalars import as_float, as_int
+from f1_explorer.scalars import as_float, as_int, call_dynamic
 from f1_explorer.telemetry import lap_telemetry_without_driver_ahead
+
+
+class _LapIndexer(Protocol):
+    def __getitem__(self, index: int) -> Any: ...
+
+
+@runtime_checkable
+class _LapRows(Protocol):
+    @property
+    def iloc(self) -> _LapIndexer: ...
+    def __len__(self) -> int: ...
 
 
 DEFAULT_ARCHIVE_URL = "https://livetiming.formula1.com"
@@ -96,12 +109,12 @@ def _session_name(session: Any) -> str:
 
 
 def _location(session: Any) -> str:
-    event = getattr(session, "event", None)
+    event: object = getattr(session, "event", None)
     if event is None:
         return ""
     for key in ("Location", "location"):
         try:
-            value = event[key]
+            value = event[key] if isinstance(event, (Mapping, pd.Series)) else getattr(event, key, None)
         except (KeyError, TypeError, IndexError):
             value = getattr(event, key, None)
         if value is not None and str(value).strip():
@@ -110,11 +123,11 @@ def _location(session: Any) -> str:
 
 
 def _year(session: Any) -> int:
-    event = getattr(session, "event", None)
+    event: object = getattr(session, "event", None)
     value = getattr(event, "year", None)
     if value is None:
         try:
-            value = event["year"]
+            value = event["year"] if isinstance(event, (Mapping, pd.Series)) else getattr(session, "year", None)
         except (KeyError, TypeError, IndexError):
             value = getattr(session, "year", None)
     return as_int(value)
@@ -676,9 +689,9 @@ def _lookup_distance(
             ),
         )
     elif isinstance(lookup, Mapping):
-        value = entry
-        if value is not None and callable(value):
-            value = value(
+        value: object = entry
+        if callable(value):
+            value = call_dynamic(value,
                 sector_percent if sector_percent is not None else (
                     lap_percent if lap_percent is not None else timestamp
                 )
@@ -696,7 +709,7 @@ def _lookup_distance(
             else:
                 times = value.get("SessionTime", value.get("time"))
             distances = value.get("Distance", value.get("distance"))
-            if times is not None and distances is not None:
+            if isinstance(times, Iterable) and isinstance(distances, Iterable):
                 target = (
                     sector_percent if sector_percent is not None
                     else lap_percent if lap_percent is not None
@@ -711,6 +724,7 @@ def _lookup_distance(
                     return None
                 if any(item is None or not math.isfinite(item) for item in points + values):
                     return None
+                points = [item for item in points if item is not None]
                 if len(points) != len(values) or len(points) < 2:
                     return None
                 if any(current <= previous for previous, current in zip(points, points[1:])):
@@ -1018,8 +1032,8 @@ class DistanceLookup(TypedDict):
 
 def build_distance_lookup(session: Any) -> tuple[dict[tuple[str, int], DistanceLookup], float | None]:
     """Build an interpolating lookup from FastF1 laps without guessing gaps."""
-    laps = getattr(session, "laps", None)
-    if laps is None:
+    laps: object = getattr(session, "laps", None)
+    if not isinstance(laps, _LapRows):
         return {}, None
     lookup: dict[tuple[str, int], DistanceLookup] = {}
     max_distance = 0.0
@@ -1125,10 +1139,10 @@ def build_distance_lookup(session: Any) -> tuple[dict[tuple[str, int], DistanceL
 def affected_intervals_from_session(session: Any) -> list[tuple[float, float]]:
     """Return non-green track-status intervals as session-time ranges."""
     try:
-        status_data = getattr(session, "track_status", None)
+        status_data: object = getattr(session, "track_status", None)
     except Exception:
         status_data = None
-    if status_data is None:
+    if not isinstance(status_data, pd.DataFrame):
         return []
     try:
         rows = status_data.sort_values("Time")
@@ -1162,7 +1176,7 @@ def affected_intervals_from_session(session: Any) -> list[tuple[float, float]]:
     return intervals
 
 
-def _separator_maps(config: Mapping[str, Any]) -> list[Mapping[str, Any]]:
+def _separator_maps(config: Mapping[str, Any]) -> list[Mapping[str | int, Any]]:
     maps = []
     for key in (
         "separators", "Separators", "auto_separators", "AutoSeparators",
@@ -1306,7 +1320,7 @@ def resolve_separators(
     *,
     refresh: bool = False,
     client: StaticArchiveClient | None = None,
-    log: Any = None,
+    log: logging.Logger | structlog.stdlib.BoundLogger | None = None,
 ) -> SeparatorResolution:
     """Select saved boundaries, estimate new ones, or safely fall back."""
     path = Path(config_path)

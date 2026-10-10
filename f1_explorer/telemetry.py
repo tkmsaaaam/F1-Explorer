@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from typing import Any, Callable
+from typing import Any
 
-from fastf1.core import Telemetry
+from f1_explorer.scalars import call_dynamic
 
 from opentelemetry import trace
 
@@ -33,19 +33,19 @@ def lap_telemetry_without_driver_ahead(lap: Any, *, add_distance: bool = False) 
         if value is not None:
             span.set_attribute(f"f1.lap.{name.lower()}", str(value))
 
-    get_car_data: Callable[..., Telemetry] | None = getattr(lap, "get_car_data", None)
-    get_pos_data: Callable[..., Telemetry] | None = getattr(lap, "get_pos_data", None)
-    if get_car_data is None or get_pos_data is None or not callable(get_car_data) or not callable(get_pos_data):
-        get_telemetry: Callable[[], Telemetry] | None = getattr(lap, "get_telemetry", None)
+    get_car_data: object = getattr(lap, "get_car_data", None)
+    get_pos_data: object = getattr(lap, "get_pos_data", None)
+    if not callable(get_car_data) or not callable(get_pos_data):
+        get_telemetry: object = getattr(lap, "get_telemetry", None)
         span.set_attribute("f1.telemetry.fallback", True)
-        telemetry = get_telemetry() if get_telemetry is not None and callable(get_telemetry) else lap.telemetry
+        telemetry = call_dynamic(get_telemetry) if callable(get_telemetry) else lap.telemetry
         if add_distance:
             telemetry = telemetry.add_distance()
         _record_row_count(telemetry)
         return telemetry
 
-    pos_data = get_pos_data(pad=1, pad_side="both")
-    car_data = get_car_data(pad=1, pad_side="both")
+    pos_data = call_dynamic(get_pos_data, pad=1, pad_side="both")
+    car_data = call_dynamic(get_car_data, pad=1, pad_side="both")
     timestamps = car_data.iloc[1:-1].loc[:, ("Date", "Time", "SessionTime")]
     car_data = car_data.add_distance().add_relative_distance()
     car_data = car_data.merge_channels(timestamps)

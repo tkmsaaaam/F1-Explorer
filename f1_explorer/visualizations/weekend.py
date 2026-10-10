@@ -1,3 +1,4 @@
+from f1_explorer.scalars import require_present
 import datetime
 import hashlib
 import json
@@ -324,27 +325,28 @@ def _batch_cached_aggregate(year: int, race_number: int, log, current_session=No
     if aggregate is None:
         return None
     if eligible and cache_root is not None and fingerprint is not None and aggregate.get("complete") is True:
-        latest_fingerprint = _cache_fingerprint(year, race_number, current_session)
+        latest_fingerprint: CacheFingerprint | None = _cache_fingerprint(year, race_number, current_session)
         if latest_fingerprint is None:
             return aggregate
+        latest = require_present(latest_fingerprint)
         stable_fingerprint = _cache_fingerprint(year, race_number, current_session)
         initial_files = {
             tuple(entry) for entry in (fingerprint.get("input_files") or [])
             if isinstance(entry, list) and len(entry) == 3
         }
-        latest_files = (latest_fingerprint or {}).get("input_files")
+        latest_files = latest.get("input_files")
         latest_file_set = {
             tuple(entry) for entry in latest_files or []
             if isinstance(entry, list) and len(entry) == 3
         }
-        same_non_input_key = bool(latest_fingerprint and all(
-            latest_fingerprint.get(key) == fingerprint.get(key)
+        same_non_input_key = bool(latest and all(
+            latest.get(key) == fingerprint.get(key)
             for key in ("fingerprint", "environment", "settings")
         ))
-        if (latest_fingerprint is not None and latest_fingerprint == stable_fingerprint
+        if (latest == stable_fingerprint
                 and same_non_input_key and initial_files <= latest_file_set
-                and aggregate.get("inputs") == latest_fingerprint.get("inputs")):
-            _write_cache(Path(cache_root) / f"{year}-{race_number}.json", latest_fingerprint, aggregate)
+                and aggregate.get("inputs") == latest.get("inputs")):
+            _write_cache(Path(cache_root) / f"{year}-{race_number}.json", latest, aggregate)
     return aggregate
 
 

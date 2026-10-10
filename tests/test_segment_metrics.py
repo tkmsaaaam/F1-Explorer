@@ -1,4 +1,5 @@
 import unittest
+from collections.abc import Mapping, Sequence
 
 from f1_explorer.visualizations.segment_metrics import (
     deltas_to_reference,
@@ -24,6 +25,21 @@ class SegmentMetricsTests(unittest.TestCase):
 
     def test_segment_durations_accept_one_sequence(self):
         self.assertEqual([1.25, 2.75], segment_durations([0.0, 1.25, 4.0]))
+
+    def test_mapping_takes_precedence_for_dual_interface(self):
+        class MappingSequence(Mapping, Sequence):
+            def __len__(self):
+                return 1
+
+            def __iter__(self):
+                return iter(("A",))
+
+            def __getitem__(self, key):
+                if key == "A":
+                    return [0.0, 1.0, None, 3.0]
+                raise KeyError(key)
+
+        self.assertEqual({"A": [1.0, None, None]}, segment_durations(MappingSequence()))
 
     def test_ranks_exclude_missing_and_equal_values_share_rank(self):
         durations = {

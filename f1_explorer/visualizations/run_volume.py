@@ -14,7 +14,7 @@ from plotly.subplots import make_subplots
 # noinspection PyPackageRequirements
 from opentelemetry import trace
 
-from f1_explorer.scalars import as_int, as_seconds
+from f1_explorer.scalars import as_int, as_seconds, require_present
 from f1_explorer import constants
 from f1_explorer.visualizations.output import resolve_output_dir, save_matplotlib, save_plotly
 from f1_explorer.visualizations.report import current_report
@@ -57,7 +57,9 @@ def _lap_start_context(laps: Laps, threshold: float = TURBULENCE_GAP_SECONDS) ->
         crossing_time, ahead_number, _ = events[prior_index]
         if ahead_number == key[0]:
             continue
-        gap = (pandas.Timedelta(row.LapStartTime) - pandas.Timedelta(crossing_time)).total_seconds()
+        # FastF1 lap timestamps are timedelta scalars; retain nanoseconds.
+        lap_start_time: pandas.Timedelta = getattr(row, "LapStartTime")
+        gap = (lap_start_time - crossing_time).total_seconds()
         if gap < 0:
             continue
         result[key] = {
@@ -160,11 +162,10 @@ def plot_laptime(
             log.warning("Could not split qualifying sessions; using one table", reason=str(exception))
         else:
             prefix = "SQ" if session.name.startswith("Sprint") else "Q"
-            sections: list[tuple[str, Laps]] = [
-                (f"{prefix}{index}", laps)
-                for index, laps in enumerate(qualifying_laps, start=1)
-                if laps is not None and not laps.empty
-            ]
+            sections: list[tuple[str, Laps]] = []
+            for index, laps in enumerate(qualifying_laps, start=1):
+                if laps is not None and not laps.empty:
+                    sections.append((f"{prefix}{index}", laps))
             if sections:
                 _save_laptime_sections(session, log, sections, output_dir)
                 return
@@ -270,7 +271,10 @@ def _lap_start_dates(session: Session, laps: pandas.DataFrame) -> pandas.Series:
     """Return absolute lap-start timestamps, filling from session time when needed."""
 
     starts = pandas.to_datetime(laps["LapStartDate"], errors="coerce")
-    session_start = pandas.to_datetime(getattr(session, "t0_date", pandas.NaT))
+    session_start: pandas.Timestamp | None = getattr(session, "t0_date", None)
+    if session_start is None or pandas.isna(session_start):
+        return starts
+    session_start = pandas.Timestamp(require_present(session_start))
     if pandas.notna(session_start):
         fallback = pandas.Timestamp(session_start) + laps["LapStartTime"]
         starts = starts.fillna(fallback)

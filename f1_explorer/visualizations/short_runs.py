@@ -7,14 +7,15 @@ from f1_explorer.circuit import circuit_info_or_none
 
 import fastf1
 import fastf1.plotting
-import matplotlib as mpl
+from matplotlib import colormaps
+from matplotlib.collections import LineCollection
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas
 import plotly.express as px
 import plotly.graph_objects as go
 import structlog
-from fastf1.core import Session, Lap, Telemetry
+from fastf1.core import Session, Lap, Laps, Telemetry
 # noinspection PyPackageRequirements
 from opentelemetry import trace
 
@@ -491,9 +492,12 @@ def plot_gear_shift_on_track(session: Session, log: structlog.stdlib.BoundLogger
         points = np.array([x, y]).T.reshape(-1, 1, 2)
         segments = np.concatenate([points[:-1], points[1:]], axis=1)
         gear = tel.nGear.to_numpy().astype(float)
-        cmap = mpl.cm.Paired
-        lc_comp = mpl.collections.LineCollection(segments,
-                                                 norm=mpl.colors.Normalize(vmin=1, vmax=cmap.N + 1), cmap=cmap, linewidth=4, array=gear)
+        cmap = colormaps["Paired"]
+        lc_comp = LineCollection(
+            segments,
+            cmap=cmap, linewidth=4, array=gear,
+        )
+        lc_comp.set_clim(1, cmap.N + 1)
         fig.gca().add_collection(lc_comp)
         ax.axis('equal')
         ax.tick_params(labelleft=False, left=False, labelbottom=False, bottom=False)
@@ -656,14 +660,14 @@ def plot_speed_on_track(session: Session, log: structlog.stdlib.BoundLogger, *, 
         points = np.array([x, y]).T.reshape(-1, 1, 2)
         segments = np.concatenate([points[:-1], points[1:]], axis=1)
         speed = tel.Speed.to_numpy().astype(float)
-        cmap = mpl.cm.plasma
-        lc_comp = mpl.collections.LineCollection(
+        cmap = colormaps["plasma"]
+        lc_comp = LineCollection(
             segments,
-            norm=mpl.colors.Normalize(vmin=float(speed.min()), vmax=float(speed.max())),
             cmap=cmap,
             linewidth=4,
             array=speed,
         )
+        lc_comp.set_clim(float(speed.min()), float(speed.max()))
         ax.add_collection(lc_comp)
         ax.axis('equal')
         ax.tick_params(labelleft=False, left=False, labelbottom=False, bottom=False)
@@ -883,7 +887,7 @@ def _save_interactive_track_map(
             ],
         })
     figure.update_layout(
-        title=f"{event_name} {session.name} — {plot_name} — {figure.data[0].name}",
+        title=f"{event_name} {session.name} — {plot_name} — {figure.data[0]['name']}",
         template="plotly_white",
         meta={"f1ExplorerKind": "trackMap"},
         updatemenus=[{
@@ -1010,11 +1014,11 @@ def _save_interactive_time_distance_delta(
     driver_numbers = _ordered_quicklap_drivers(session)
     if not driver_numbers:
         return
-    laps_by_driver = {
-        str(driver_number): session.laps.pick_drivers(driver_number).pick_fastest()
-        for driver_number in driver_numbers
-    }
-    laps_by_driver = {driver: lap for driver, lap in laps_by_driver.items() if lap is not None}
+    laps_by_driver: dict[str, Lap] = {}
+    for driver_number in driver_numbers:
+        lap: Lap | None = session.laps.pick_drivers(driver_number).pick_fastest()
+        if lap is not None:
+            laps_by_driver[str(driver_number)] = lap
     if not laps_by_driver:
         return
     fastest_driver = min(laps_by_driver, key=lambda driver: laps_by_driver[driver].LapTime.total_seconds())
@@ -1283,8 +1287,8 @@ def plot_mini_segment_on_circuit(
         start = segment_boundaries[i - 1]
         end = segment_boundaries[i]
         mask = (car_data.Distance >= start) & (car_data.Distance <= end)
-        seg_x = car_data[mask].X.values
-        seg_y = car_data[mask].Y.values
+        seg_x = car_data["X"][mask].to_numpy()
+        seg_y = car_data["Y"][mask].to_numpy()
         color = 'black' if i % 2 == 0 else 'red'
         ax.plot(seg_x, seg_y, color=color, linewidth=3)
 

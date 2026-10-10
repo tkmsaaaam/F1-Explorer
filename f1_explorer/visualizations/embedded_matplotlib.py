@@ -12,6 +12,7 @@ from matplotlib.collections import LineCollection, PathCollection
 from matplotlib.patches import Rectangle
 from matplotlib.ticker import FixedLocator
 from matplotlib.text import Annotation
+from matplotlib.figure import Figure
 from matplotlib.typing import ColorType
 import numpy as np
 import plotly.graph_objects as go
@@ -31,7 +32,7 @@ def _color(value: ColorType | np.ndarray) -> str:
     return f"rgba({round(red * 255)},{round(green * 255)},{round(blue * 255)},{alpha})"
 
 
-def embed_matplotlib(fig) -> go.Figure:
+def embed_matplotlib(fig: Figure) -> go.Figure:
     """Preserve data, limits, labels, and map annotations without writing PNG."""
     if len(fig.axes) != 1:
         raise ValueError("Embedded session charts require a single axis")
@@ -53,6 +54,9 @@ def embed_matplotlib(fig) -> go.Figure:
 
     for line in ax.lines:
         label = line.get_label()
+        if not isinstance(label, str):
+            raise TypeError("Embedded line labels must be strings")
+        linestyle = line.get_linestyle()
         visible_label = legend is not None and not label.startswith("_") and label not in labels
         labels.add(label)
         x = line.get_xdata(orig=False)
@@ -67,7 +71,7 @@ def embed_matplotlib(fig) -> go.Figure:
             x=x_values(x), y=np.asarray(y).tolist(), mode="lines", name=label,
             showlegend=visible_label,
             line=dict(color=_color(line.get_color()), width=line.get_linewidth(),
-                      dash=dash.get(line.get_linestyle(), "solid")),
+                      dash=dash.get(linestyle, "solid") if isinstance(linestyle, str) else "solid"),
         ))
 
     for collection in ax.collections:
@@ -113,14 +117,16 @@ def embed_matplotlib(fig) -> go.Figure:
 
     for text in ax.texts:
         x, y = text.xy if isinstance(text, Annotation) else text.get_position()
+        anncoords = text.anncoords if isinstance(text, Annotation) else None
+        offset_points = isinstance(anncoords, str) and anncoords == "offset points"
         result.add_annotation(
             x=x_values([x])[0], y=y, text=text.get_text(), showarrow=False,
             font=dict(size=text.get_fontsize(), color=_color(text.get_color()),
                       weight=700 if text.get_fontweight() == "bold" else 400),
             xanchor={"left": "left", "right": "right"}.get(text.get_ha(), "center"),
             yanchor={"top": "top", "bottom": "bottom"}.get(text.get_va(), "middle"),
-            xshift=text.get_position()[0] if isinstance(text, Annotation) and isinstance(text.anncoords, str) and text.anncoords == "offset points" else 0,
-            yshift=text.get_position()[1] if isinstance(text, Annotation) and isinstance(text.anncoords, str) and text.anncoords == "offset points" else 0,
+            xshift=text.get_position()[0] if offset_points else 0,
+            yshift=text.get_position()[1] if offset_points else 0,
         )
 
     # Include explicitly supplied legend handles, e.g. tyre compounds and N/U.

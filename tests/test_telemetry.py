@@ -24,17 +24,20 @@ def test_driver_ahead_free_lap_telemetry_matches_fastf1(frequency, monkeypatch):
     session._t0_date = start
     car_time = pd.to_timedelta([0, 2, 4, 6, 8, 10, 12], unit="s")
     pos_time = pd.to_timedelta([0, 3, 6, 9, 12], unit="s")
-    session._car_data = {"1": Telemetry({
+    session._car_data = {"1": Telemetry(pd.DataFrame({
         "Date": start + car_time, "SessionTime": car_time, "Time": car_time,
         "Speed": [100, 110, 120, 130, 140, 150, 160],
         "Throttle": [95, 96, 97, 98, 99, 100, 100],
         "nGear": [2, 3, 4, 4, 5, 6, 7], "Source": ["car"] * 7,
-    }, session=session, driver="1")}
-    session._pos_data = {"1": Telemetry({
+    }))}
+    session._pos_data = {"1": Telemetry(pd.DataFrame({
         "Date": start + pos_time, "SessionTime": pos_time, "Time": pos_time,
         "X": [0, 3, 6, 9, 12], "Y": [1, 2, 3, 4, 5],
         "Z": [0] * 5, "Source": ["pos"] * 5,
-    }, session=session, driver="1")}
+    }))}
+    for telemetry in (session._car_data["1"], session._pos_data["1"]):
+        telemetry.session = session
+        telemetry.driver = "1"
     lap = Lap({
         "DriverNumber": "1", "LapNumber": 1,
         "LapStartTime": pd.to_timedelta(1, unit="s"),

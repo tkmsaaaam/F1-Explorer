@@ -20,7 +20,7 @@ def _session(name="Practice 1", status="Finished", root=None):
     return session
 
 
-def _aggregate(complete=True, inputs="inputs"):
+def _aggregate(complete=True, inputs="inputs") -> weekend.TyreAggregate:
     return {
         "drivers": {"AAA": {"Sessions": ["FP1"], "Compounds": ["SOFT"]}},
         "order": ["AAA"], "figure_names": ["AAA"], "sprint": False,
