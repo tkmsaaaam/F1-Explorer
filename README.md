@@ -23,7 +23,7 @@ The repository is organized into the following components:
 * **[analyze_season.py](analyze_season.py)**: Script for visualizing season-long trends, such as championship points
   transitions.
 * **[f1_explorer/](f1_explorer/)**: Shared configuration, analysis state, constants and separator logic.
-* **[visualizations/](visualizations/)**: A directory containing core visualization methods. The analysis scripts above
+* **[f1_explorer/visualizations/](f1_explorer/visualizations/)**: A directory containing core visualization methods. The analysis scripts above
   call functions from
   this directory to generate plots.
 * **[templates/template.html](templates/template.html)**: Shared HTML layout and browser behavior for session reports.
@@ -110,12 +110,25 @@ python analyze_batch.py sample.analysis-plan.json
 Season analysis is written as a self-contained offline report at
 `reports/<year>/season.html`. Interactive charts and the points/events table
 images are embedded in that single HTML file.
+The points table retains the sprint points total and lists points for each venue
+below it in sprint calendar order. The championship total includes both race and sprint points.
+
+The season report also includes recorded completed-lap counts for FP1–FP3,
+SQ, S, Q and R, plus estimated qualifying-attack attempts for each practice
+and qualifying segment. Attack estimates compare a driver's laps and first
+sector against that driver's best accurate lap and first sector on the same
+compound. In practice, four or more consecutive representative laps are
+marked as purpose-uncertain to avoid counting a long run as repeated attacks.
+Deleted laps and partial laps can count when their timing supports an attempt.
+These estimates do not identify every aborted lap; their thresholds are
+documented in [specs/SEASON.md](specs/SEASON.md). The report distinguishes
+missing data, non-participation, and provisional totals.
 
 Session analyses write independent offline reports to
 `reports/<year>/<round>_<location>/<session>/report.html`. Open
 `reports/index.html` to select a year, Grand Prix, and session. The index is
 updated when a session report is written. To rebuild it from existing reports,
-run `python -m visualizations.report_index` from the repository root.
+run `python -m f1_explorer.visualizations.report_index` from the repository root.
 
 Session analyses save only `laptime_table.png` for every session and
 `laptime_graph.png` for Sprint/Race.
@@ -153,6 +166,11 @@ by an analyzer, such as newly generated circuit separators, are retained.
 Supported session names are `FP1`, `FP2`, `FP3`, `Q`, `SQ`, `S` and `R`.
 Useful options are `--dry-run`, `--force`, `--refresh-separators`,
 `--fail-fast` and `--keep-last-config`.
+
+Within one batch, completed weekends can reuse the tyre aggregate across session
+reports. The cache lives only for that batch, is checked against the local
+FastF1 event files and analysis inputs, and is removed when the batch exits.
+The currently analyzed session is reused for the aggregate when available.
 
 ### Exporting OpenTelemetry data
 
@@ -258,7 +276,7 @@ or 2 seconds) and mini-sector progress is monotonic.
   telemetry, lap timing, and session results.
 * **Analysis & Visualization**:
     * Post-session scripts (`analyze_*.py`) utilize modular methods defined within
-      the [visualizations/](visualizations/) directory to
+      the [f1_explorer/visualizations/](f1_explorer/visualizations/) directory to
       ensure consistent plotting logic across different session types.
     * These tools transform raw API data into intuitive visual formats for performance comparison and trend analysis.
 * **Live Data Processing**:
