@@ -12,7 +12,7 @@ A Python project that analyzes lap and telemetry data from FastF1 to generate ch
 
 - `analyze_*.py`, `compare.py`: Analysis entrypoints and orchestration.
 - `f1_explorer/`: Configuration, analysis state, constants, shared utilities, and segment boundary estimation.
-- `visualizations/`: Metric calculations, charts, and report generation. Reuse existing helpers for shared styles and output handling.
+- `f1_explorer/visualizations/`: Metric calculations, charts, and report generation. Reuse existing helpers for shared styles and output handling.
 - `templates/template.html`: Shared HTML and browser behavior for session reports.
 - `live.py`, `track.py`, `tracker/`: Live data collection, analysis, and visualization.
 - `tests/`: Tests run with pytest. Preserve the existing unittest style where used.
