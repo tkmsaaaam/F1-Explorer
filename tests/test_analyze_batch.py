@@ -103,6 +103,21 @@ def test_failed_job_returns_one_and_fail_fast_stops_and_cleans_cache(tmp_path: P
     assert json.loads(config_path.read_text()) == original
 
 
+def test_batch_continues_after_failure_and_reports_nonzero(tmp_path: Path, capsys) -> None:
+    config_path = tmp_path / "config.json"
+    original = {"Year": 2025, "Round": 1, "Session": "R", "custom": "keep"}
+    config_path.write_text(json.dumps(original), encoding="utf-8")
+    jobs = [AnalysisJob(2026, 1, code) for code in ("FP1", "Q", "R")]
+    # A failed analyzer followed by a normal skip and a successful analysis.
+    with patch("analyze_batch.subprocess.run", side_effect=[
+        SimpleNamespace(returncode=1), SimpleNamespace(returncode=0), SimpleNamespace(returncode=0),
+    ]) as run_mock:
+        assert run_jobs(jobs, config_path=config_path, repo_root=tmp_path) == 1
+    assert run_mock.call_count == 3
+    assert "Completed with 1 failed job(s)." in capsys.readouterr().err
+    assert json.loads(config_path.read_text()) == original
+
+
 def test_run_jobs_cleans_cache_when_subprocess_raises(tmp_path: Path) -> None:
     config_path = tmp_path / "config.json"
     original = {"Year": 2025, "Round": 1, "Session": "R"}

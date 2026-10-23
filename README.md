@@ -167,6 +167,20 @@ Supported session names are `FP1`, `FP2`, `FP3`, `Q`, `SQ`, `S` and `R`.
 Useful options are `--dry-run`, `--force`, `--refresh-separators`,
 `--fail-fast` and `--keep-last-config`.
 
+The Practice, Qualifying (including SQ), and Race (including Sprint) commands
+exit with code 0 after successful analysis or a normal skip (a future session
+or an unchanged report). Future sessions are skipped before loading lap data.
+Invalid configuration, the wrong session category, and session lookup failures
+exit with code 1. Unhandled loading, analysis, or report/manifest write errors
+also exit nonzero, without writing a new success manifest. Existing manifests
+are retained. Optional chart omissions and separator-save warnings remain
+recoverable and do not by themselves fail the analysis.
+
+The batch exits with code 1 if any analyzer fails. It continues with the next
+job by default; `--fail-fast` stops at the first failure. Normal skips are not
+counted as failures. In either case, the original session selection is restored
+unless `--keep-last-config` is specified.
+
 Within one batch, completed weekends can reuse the tyre aggregate across session
 reports. The cache lives only for that batch, is checked against the local
 FastF1 event files and analysis inputs, and is removed when the batch exits.

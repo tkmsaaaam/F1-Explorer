@@ -31,37 +31,38 @@ def start_at(session: fastf1.core.Session) -> None | datetime.datetime:
     return None
 
 @tracer.start_as_current_span("main")
-def main(*, force: bool = False, refresh_separators: bool = False):
+def main(*, force: bool = False, refresh_separators: bool = False) -> int:
     log = config_module.log()
     try:
         config = config_module.load_config()
     except Exception as exception:
         log.warning('setup is failed', args=exception.args)
-        return
+        return 1
 
     if config.get_session_category() != config_module.SessionCategory.Qualifying:
         log.warning(f"{config.get_session()} is not Q or SQ.  \"Session\" needs to be set to Q or SQ.")
-        return
+        return 1
     config_module.fast_f1()
     try:
         session = fastf1.get_session(config.get_year(), config.get_round(), config.get_session())
     except Exception as exception:
         log.warning('setup is failed', args=exception.args)
-        return
+        return 1
+
+    start = start_at(session)
+    if start is None:
+        log.warning(f"{session.name} is not Sprint Qualifying or Qualifying.")
+        return 1
+    if datetime.datetime.now().astimezone() < start:
+        log.warning(
+            f"{session.event.year} Race {session.event.RoundNumber} {session.event.EventName} Qualifying is not started."
+        )
+        return 0
 
     output_dir = session_output_dir(session)
     report_dir = session_report_dir(session)
     with tracer.start_as_current_span("session.load"):
         session.load(messages=False)
-    start = start_at(session)
-    if start is None:
-        log.warning(f"{session.name} is not Sprint Qualifying or Qualifying.")
-        return
-    if datetime.datetime.now().astimezone() < start:
-        log.warning(
-            f"{session.event.year} Race {session.event.RoundNumber} {session.event.EventName} Qualifying is not started."
-        )
-        return
     with tracer.start_as_current_span("resolve_separators"):
         separator_resolution = resolve_separators(
             session,
@@ -85,7 +86,7 @@ def main(*, force: bool = False, refresh_separators: bool = False):
         manifest_path(report_dir), fingerprint, identity, force=force or refresh_separators
     ):
         log.info("Analysis skipped; source and environment fingerprint unchanged")
-        return
+        return 0
     report = SessionReport(session, output_dir, report_dir=report_dir)
     report.activate()
 
@@ -181,6 +182,7 @@ def main(*, force: bool = False, refresh_separators: bool = False):
         extra_output_dirs=(output_dir,),
         exclude_extra_suffixes=(".png",),
     )
+    return 0
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -196,4 +198,4 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
 if __name__ == "__main__":
     args = parse_args()
-    main(force=args.force, refresh_separators=args.refresh_separators)
+    raise SystemExit(main(force=args.force, refresh_separators=args.refresh_separators))
