@@ -312,30 +312,44 @@ def plot_pit_time(session: Session, log: structlog.stdlib.BoundLogger, *, output
     header = [""]
     data_rows = [["No<br>pit<br>in<br>out<br>in<br>out<br>sum"]]
     pits = []
+
+    def lap_seconds_text(value: object) -> str:
+        return "—" if pandas.isna(value) else f"{as_seconds(value):.3f}"
+
     for n in session.drivers:
-        driver_laps = session.laps.pick_drivers(n).sort_values(by='LapNumber')
+        driver_laps = session.laps.pick_drivers(n)
         if driver_laps is None:
             continue
+        driver_laps = driver_laps.sort_values(by='LapNumber')
         lap_times = []
         for i in range(len(driver_laps)):
             outLap = driver_laps.iloc[i]
             if pandas.isna(outLap.PitOutTime):
                 continue
             j = i - 1
-            if j < 1:
+            if j < 0:
                 continue
             inLap = driver_laps.iloc[j]
+            if (pandas.isna(inLap.LapNumber) or pandas.isna(outLap.LapNumber)
+                    or outLap.LapNumber != inLap.LapNumber + 1
+                    or pandas.isna(inLap.PitInTime) or pandas.isna(outLap.LapStartTime)
+                    or not inLap.PitInTime <= outLap.LapStartTime <= outLap.PitOutTime):
+                log.warning("Skipping unmatched or invalid pit timing", driver=n,
+                            lap_number=outLap.LapNumber)
+                continue
             pitInTime = (outLap.LapStartTime - inLap.PitInTime).total_seconds()
             pitOutTime = (outLap.PitOutTime - outLap.LapStartTime).total_seconds()
             pit = pitInTime + pitOutTime
+            lap_sum = ("—" if pandas.isna(inLap.LapTime) or pandas.isna(outLap.LapTime)
+                       else str(as_seconds(inLap.LapTime + outLap.LapTime)))
             lap_times.append(
                 f"{outLap.LapNumber}"
                 f"<br>{"{:.3f}".format(pit)}"
                 f"<br>{"{:.3f}".format(pitInTime)}"
                 f"<br>{"{:.3f}".format(pitOutTime)}"
-                f"<br>{"{:.3f}".format(inLap.LapTime.total_seconds())}"
-                f"<br>{"{:.3f}".format(outLap.LapTime.total_seconds())}"
-                f"<br>{(inLap.LapTime + outLap.LapTime).total_seconds()}"
+                f"<br>{lap_seconds_text(inLap.LapTime)}"
+                f"<br>{lap_seconds_text(outLap.LapTime)}"
+                f"<br>{lap_sum}"
             )
             pits.append(pit)
         if not lap_times:
@@ -344,12 +358,9 @@ def plot_pit_time(session: Session, log: structlog.stdlib.BoundLogger, *, output
         data_rows.append(lap_times)
 
     header.append('avg')
-    data_rows.append([
-        f"{len(pits)}"
-        f"<br>{"{:.3f}".format(numpy.mean(pits))}"
-        f"<br>{"{:.3f}".format(min(pits))}"
-        f"<br>{"{:.3f}".format(max(pits))}"
-    ])
+    statistics = ([f"{value:.3f}" for value in (numpy.mean(pits), min(pits), max(pits))]
+                  if pits else ["—", "—", "—"])
+    data_rows.append(["<br>".join([str(len(pits)), *statistics])])
 
     fig = go.Figure(
         data=[go.Table(

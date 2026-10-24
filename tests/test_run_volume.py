@@ -10,6 +10,7 @@ from f1_explorer.visualizations.run_volume import (
     _make_interactive_laptime_by_lap_number,
     _make_interactive_laptime_by_timing,
     plot_laptime,
+    plot_pit_time,
 )
 
 
@@ -28,6 +29,91 @@ def _laps(driver_numbers: list[str], lap_numbers: list[int]) -> Laps:
         "LapStartTime": pandas.to_timedelta([f"{index * 90}s" for index in range(count)]),
         "LapStartDate": pandas.to_datetime([f"2026-08-23 13:{index:02d}:00" for index in range(count)]),
     }))
+
+
+def _pit_figure(laps, drivers=None):
+    session = SimpleNamespace(
+        laps=laps, drivers=["1"] if drivers is None else drivers,
+        get_driver=lambda number: SimpleNamespace(Abbreviation=f"D{number}"),
+    )
+    with patch("f1_explorer.visualizations.run_volume.save_plotly") as save:
+        plot_pit_time(session, MagicMock(), output_dir="test-output")
+    return save.call_args.args[0]
+
+
+def _pit_laps():
+    laps = _laps(["1", "1"], [1, 2])
+    laps.loc[0, "PitInTime"] = pandas.to_timedelta(85, unit="s")
+    laps.loc[1, "PitOutTime"] = pandas.to_timedelta(110, unit="s")
+    return laps
+
+
+@pytest.mark.parametrize("drivers,lap_numbers", [([], []), (["1"], []), (["1"], [1, 2])])
+def test_pit_table_with_no_stops_has_missing_statistics(drivers, lap_numbers):
+    laps = _laps(["1"] * len(lap_numbers), lap_numbers)
+    table = _pit_figure(laps, drivers).data[0]
+    assert list(table.header.values) == ["", "avg"]
+    assert list(table.cells.values[-1]) == ["0<br>—<br>—<br>—"]
+
+
+def test_first_recorded_lap_can_be_pit_in_and_input_is_not_modified():
+    laps = _pit_laps().iloc[::-1]  # Selection must be sorted by lap number.
+    before = laps.copy(deep=True)
+    table = _pit_figure(laps, ["16", "1"]).data[0]
+    assert list(table.header.values) == ["", "D1", "avg"]
+    assert list(table.cells.values[1]) == ["2<br>25.000<br>5.000<br>20.000<br>80.000<br>81.000<br>161.0"]
+    assert list(table.cells.values[-1]) == ["1<br>25.000<br>25.000<br>25.000"]
+    pandas.testing.assert_frame_equal(laps, before)
+
+
+@pytest.mark.parametrize("column,index,value", [
+    ("PitInTime", 0, pandas.NaT),
+    ("LapStartTime", 1, pandas.NaT),
+    ("PitOutTime", 1, pandas.NaT),
+    ("PitInTime", 0, pandas.to_timedelta(95, unit="s")),
+    ("PitOutTime", 1, pandas.to_timedelta(80, unit="s")),
+    ("LapNumber", 0, 0),  # A missing intervening lap is not a matching pit-in.
+    ("LapNumber", 0, float("nan")),
+])
+def test_unmatched_or_invalid_pit_timing_is_excluded(column, index, value):
+    laps = _pit_laps()
+    laps.loc[index, column] = value
+    table = _pit_figure(laps).data[0]
+    assert list(table.header.values) == ["", "avg"]
+    assert list(table.cells.values[-1]) == ["0<br>—<br>—<br>—"]
+
+
+@pytest.mark.parametrize("missing_index", [0, 1])
+def test_missing_laptime_preserves_measured_pit_duration(missing_index):
+    laps = _pit_laps()
+    laps.loc[missing_index, "LapTime"] = pandas.NaT
+    table = _pit_figure(laps).data[0]
+    fields = table.cells.values[1][0].split("<br>")
+    assert fields[:4] == ["2", "25.000", "5.000", "20.000"]
+    assert fields[4 + missing_index] == "—"
+    assert fields[-1] == "—"
+    assert list(table.cells.values[-1]) == ["1<br>25.000<br>25.000<br>25.000"]
+
+
+def test_pit_summary_uses_only_matched_measurements_across_drivers():
+    laps = pandas.concat([_pit_laps(), _pit_laps(), _pit_laps()], ignore_index=True)
+    laps.loc[2:3, "DriverNumber"] = "16"
+    laps.loc[3, "PitOutTime"] = pandas.to_timedelta(120, unit="s")
+    laps.loc[4:5, "DriverNumber"] = "22"
+    laps.loc[4, "PitInTime"] = pandas.NaT
+    table = _pit_figure(Laps(laps), ["1", "16", "22"]).data[0]
+    assert list(table.header.values) == ["", "D1", "D16", "avg"]
+    assert list(table.cells.values[-1]) == ["2<br>30.000<br>25.000<br>35.000"]
+
+
+def test_initial_pit_out_is_not_a_stop_and_later_stop_is_preserved():
+    laps = _laps(["1"] * 3, [1, 2, 3])
+    laps.loc[0, "PitOutTime"] = pandas.to_timedelta(5, unit="s")
+    laps.loc[1, "PitInTime"] = pandas.to_timedelta(170, unit="s")
+    laps.loc[2, "PitOutTime"] = pandas.to_timedelta(195, unit="s")
+    table = _pit_figure(laps).data[0]
+    assert list(table.cells.values[1]) == ["3<br>25.000<br>10.000<br>15.000<br>81.000<br>82.000<br>163.0"]
+    assert list(table.cells.values[-1]) == ["1<br>25.000<br>25.000<br>25.000"]
 
 
 def test_qualifying_laptime_table_has_one_section_per_qualifying_period():
