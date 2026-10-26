@@ -92,8 +92,14 @@ def main(*, force: bool = False, refresh_separators: bool = False) -> int:
         log.info("Analysis skipped; source and environment fingerprint unchanged")
         return 0
     report = SessionReport(session, output_dir, report_dir=report_dir)
-    report.activate()
+    with report:
+        _analyze_session(session, config, log, report, output_dir, report_dir, identity,
+                         separator_resolution, refresh_separators)
+    return 0
 
+
+def _analyze_session(session, config, log, report, output_dir, report_dir, identity,
+                     separator_resolution, refresh_separators):
     config.set_attribute_to_span()
     log.info(
         f"{session.event.year} Race {session.event['RoundNumber']} {session.event.EventName} {config.get_session()}")
@@ -168,7 +174,6 @@ def main(*, force: bool = False, refresh_separators: bool = False) -> int:
     weather.execute(session, log, base_path)
 
     weekend.plot_tyre(config.get_year(), config.get_round(), log, current_session=session)
-    report.deactivate()
     report.write(scan_existing=False)
     try:
         persist_resolution(separator_resolution, Path("config.json"), session, refresh=refresh_separators)
@@ -185,7 +190,7 @@ def main(*, force: bool = False, refresh_separators: bool = False) -> int:
         extra_output_dirs=(output_dir,),
         exclude_extra_suffixes=(".png",),
     )
-    return 0
+    return None
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:

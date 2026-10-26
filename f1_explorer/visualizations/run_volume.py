@@ -120,26 +120,29 @@ def plot_lap_number_by_timing(session: Session, log: structlog.stdlib.BoundLogge
         log: ロガー
     """
     fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
-    grouped = session.laps.groupby(['Stint', 'DriverNumber'])
-    for (stint_num, driver_number), stint_laps in grouped:
-        if stint_laps.empty:
-            continue
-        team = stint_laps.Team.iloc[0]
-        color = 'white' if team == '' else fastf1.plotting.get_team_color(team, session)
-        stint_laps = stint_laps.sort_values(by='LapNumber')
-        lap_numbers = stint_laps.LapNumber
-        lap_starts = stint_laps.LapStartDate
-        if stint_num == 1:
-            ax.plot(lap_starts, lap_numbers, color=color,
-                    linestyle=driver_linestyle(session.event.year, int(cast(str, driver_number))),
-                    label=stint_laps.Driver.iloc[0])
-        else:
-            ax.plot(lap_starts, lap_numbers, color=color,
-                    linestyle=driver_linestyle(session.event.year, int(cast(str, driver_number))))
-    ax.legend(fontsize='small')
-    ax.grid(True)
-    output_path = resolve_output_dir(session, output_dir) / "lap_number_by_timing.png"
-    save_matplotlib(fig, output_path, log)
+    try:
+        grouped = session.laps.groupby(['Stint', 'DriverNumber'])
+        for (stint_num, driver_number), stint_laps in grouped:
+            if stint_laps.empty:
+                continue
+            team = stint_laps.Team.iloc[0]
+            color = 'white' if team == '' else fastf1.plotting.get_team_color(team, session)
+            stint_laps = stint_laps.sort_values(by='LapNumber')
+            lap_numbers = stint_laps.LapNumber
+            lap_starts = stint_laps.LapStartDate
+            if stint_num == 1:
+                ax.plot(lap_starts, lap_numbers, color=color,
+                        linestyle=driver_linestyle(session.event.year, int(cast(str, driver_number))),
+                        label=stint_laps.Driver.iloc[0])
+            else:
+                ax.plot(lap_starts, lap_numbers, color=color,
+                        linestyle=driver_linestyle(session.event.year, int(cast(str, driver_number))))
+        ax.legend(fontsize='small')
+        ax.grid(True)
+        output_path = resolve_output_dir(session, output_dir) / "lap_number_by_timing.png"
+        save_matplotlib(fig, output_path, log)
+    finally:
+        plt.close(fig)
 
 
 @tracer.start_as_current_span("plot_laptime")
@@ -383,28 +386,32 @@ def plot_laptime_by_lap_number(session: Session, log: structlog.stdlib.BoundLogg
         log: ロガー
     """
     fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
-    grouped = session.laps.groupby(['DriverNumber'])
-    for _, stint_laps in grouped:
-        if stint_laps.empty:
-            continue
-        team = stint_laps.Team.iloc[0]
-        color = 'white' if team == '' else fastf1.plotting.get_team_color(team, session)
-        stint_laps = stint_laps.sort_values(by='LapNumber')
-        lap_times = stint_laps.LapTime.dt.total_seconds().tolist()
-        lap_numbers = stint_laps.LapNumber
-        ax.plot(lap_numbers, lap_times, color=color,
-                linestyle=driver_linestyle(session.event.year, int(stint_laps.DriverNumber.iloc[0])),
-                label=stint_laps.Driver.iloc[0])
-    # noinspection PyUnresolvedReferences
-    minimum = session.laps.LapTime.min().total_seconds()
-    ax.set_ylim(top=minimum, bottom=minimum * 1.25)
-    ax.legend(fontsize='small')
-    ax.grid(True)
-    output_path = resolve_output_dir(session, output_dir) / "laptime_by_lap_number.png"
-    save_matplotlib(fig, output_path, log, report_interactive=True)
-    report = current_report()
-    if report is not None:
-        report.register_plotly(_make_interactive_laptime_by_lap_number(session), output_path)
+    try:
+        grouped = session.laps.groupby(['DriverNumber'])
+        for _, stint_laps in grouped:
+            if stint_laps.empty:
+                continue
+            team = stint_laps.Team.iloc[0]
+            color = 'white' if team == '' else fastf1.plotting.get_team_color(team, session)
+            stint_laps = stint_laps.sort_values(by='LapNumber')
+            lap_times = stint_laps.LapTime.dt.total_seconds().tolist()
+            lap_numbers = stint_laps.LapNumber
+            ax.plot(lap_numbers, lap_times, color=color,
+                    linestyle=driver_linestyle(session.event.year, int(stint_laps.DriverNumber.iloc[0])),
+                    label=stint_laps.Driver.iloc[0])
+        # noinspection PyUnresolvedReferences
+        minimum = session.laps.LapTime.min().total_seconds()
+        ax.set_ylim(top=minimum, bottom=minimum * 1.25)
+        ax.legend(fontsize='small')
+        ax.grid(True)
+        output_path = resolve_output_dir(session, output_dir) / "laptime_by_lap_number.png"
+        save_matplotlib(fig, output_path, log, report_interactive=True)
+        report = current_report()
+        if report is not None:
+            report.register_plotly(_make_interactive_laptime_by_lap_number(session), output_path)
+    finally:
+        plt.close(fig)
+
 
 
 def _is_race_session(session: Session) -> bool:
@@ -515,39 +522,43 @@ def plot_laptime_by_timing(
     """
     laps = _laps_without_pit_laps(session.laps) if exclude_pit_laps else session.laps
     fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
-    grouped = laps.groupby(['DriverNumber'])
-    for _, driver_laps in grouped:
-        if driver_laps.empty:
-            continue
-        team = driver_laps.Team.iloc[0]
-        color = 'white' if team == '' else fastf1.plotting.get_team_color(team, session)
-        driver_laps = driver_laps.sort_values(by='LapNumber').copy()
-        driver_laps['_LapStartDate'] = _lap_start_dates(session, driver_laps)
-        show_label = True
-        for _, stint_laps in driver_laps.groupby('Stint', sort=False, dropna=False):
-            lap_times = stint_laps.LapTime.dt.total_seconds().tolist()
-            lap_starts = stint_laps['_LapStartDate'].values
-            if not lap_times or len(lap_starts) == 0:
+    try:
+        grouped = laps.groupby(['DriverNumber'])
+        for _, driver_laps in grouped:
+            if driver_laps.empty:
                 continue
-            ax.plot(
-                lap_starts,
-                lap_times,
-                color=color,
-                linestyle=driver_linestyle(session.event.year, int(stint_laps.DriverNumber.iloc[0])),
-                label=stint_laps.Driver.iloc[0] if show_label else None,
-            )
-            show_label = False
-    # noinspection PyUnresolvedReferences
-    minimum = laps.LapTime.min().seconds
-    ax.set_ylim(top=minimum, bottom=minimum * 1.25)
-    ax.xaxis.set_major_formatter(mdates.DateFormatter('%H:%M'))
-    output_path = resolve_output_dir(session, output_dir) / "laptime_by_timing.png"
-    ax.legend(fontsize='small')
-    ax.grid(True)
-    save_matplotlib(fig, output_path, log, report_interactive=True)
-    report = current_report()
-    if report is not None:
-        report.register_plotly(_make_interactive_laptime_by_timing(session, laps), output_path)
+            team = driver_laps.Team.iloc[0]
+            color = 'white' if team == '' else fastf1.plotting.get_team_color(team, session)
+            driver_laps = driver_laps.sort_values(by='LapNumber').copy()
+            driver_laps['_LapStartDate'] = _lap_start_dates(session, driver_laps)
+            show_label = True
+            for _, stint_laps in driver_laps.groupby('Stint', sort=False, dropna=False):
+                lap_times = stint_laps.LapTime.dt.total_seconds().tolist()
+                lap_starts = stint_laps['_LapStartDate'].values
+                if not lap_times or len(lap_starts) == 0:
+                    continue
+                ax.plot(
+                    lap_starts,
+                    lap_times,
+                    color=color,
+                    linestyle=driver_linestyle(session.event.year, int(stint_laps.DriverNumber.iloc[0])),
+                    label=stint_laps.Driver.iloc[0] if show_label else None,
+                )
+                show_label = False
+        # noinspection PyUnresolvedReferences
+        minimum = laps.LapTime.min().seconds
+        ax.set_ylim(top=minimum, bottom=minimum * 1.25)
+        ax.xaxis.set_major_formatter(mdates.DateFormatter('%H:%M'))
+        output_path = resolve_output_dir(session, output_dir) / "laptime_by_timing.png"
+        ax.legend(fontsize='small')
+        ax.grid(True)
+        save_matplotlib(fig, output_path, log, report_interactive=True)
+        report = current_report()
+        if report is not None:
+            report.register_plotly(_make_interactive_laptime_by_timing(session, laps), output_path)
+    finally:
+        plt.close(fig)
+
 
 
 def _make_interactive_laptime_by_timing(session: Session, laps: pandas.DataFrame | None = None) -> go.Figure:

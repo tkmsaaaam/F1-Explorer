@@ -103,41 +103,44 @@ def laptime(log: WarningLoggerLike, filepath: str, filename: str, session: Sessi
         lap_logs: ドライバーごとのラップ
     """
     fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
-    for lap_log in lap_logs:
-        lap_numbers = sorted(lap_log.get_laps().keys())
-        lap_times = [
-            l.get_time() if (l := lap_log.get_laps().get(i)) is not None else None
-            for i in lap_numbers
-        ]
-        color = fastf1.plotting.get_team_color(lap_log.get_driver().get_team_name(), session)
-        ax.plot(lap_numbers, lap_times, color=color, label=lap_log.get_driver().get_name(), linewidth=0.5,
-                linestyle=driver_linestyle(session.event.year, lap_log.get_driver().get_number()))
-    minimum: datetime.timedelta = session.laps.sort_values(by='LapTime').LapTime.min()
-    maximum: datetime.timedelta = session.laps[
-        session.laps.IsAccurate
-        & (session.laps.Deleted == False)
-        & (session.laps.TrackStatus == '1')
+    try:
+        for lap_log in lap_logs:
+            lap_numbers = sorted(lap_log.get_laps().keys())
+            lap_times = [
+                lap.get_time() if (lap := lap_log.get_laps().get(i)) is not None else None
+                for i in lap_numbers
+            ]
+            color = fastf1.plotting.get_team_color(lap_log.get_driver().get_team_name(), session)
+            ax.plot(lap_numbers, lap_times, color=color, label=lap_log.get_driver().get_name(), linewidth=0.5,
+                    linestyle=driver_linestyle(session.event.year, lap_log.get_driver().get_number()))
+        minimum: datetime.timedelta = session.laps.sort_values(by='LapTime').LapTime.min()
+        maximum: datetime.timedelta = session.laps[
+            session.laps.IsAccurate
+            & (session.laps.Deleted == False)
+            & (session.laps.TrackStatus == '1')
         ].sort_values(by='LapTime', ascending=False).LapTime.max()
-    ax.legend(fontsize='small')
-    ax.set_ylim(top=minimum.total_seconds() - 0.1, bottom=maximum.total_seconds() + 0.1)
-    ax.set_xlabel("Lap Number [lap]")
-    ax.set_ylabel("Lap Time [s]")
-    ax.grid(True)
-    output_path = f"{filepath}/{filename}.png"
-    if current_report() is not None:
-        save_matplotlib(fig, output_path, log)
-        return
-    os.makedirs(os.path.dirname(output_path), exist_ok=True)
-    fig.savefig(output_path, bbox_inches='tight')
-    log.info(f"Saved plot to {output_path}")
-    if r is not None:
-        ax.set_ylim(top=minimum.total_seconds(), bottom=minimum.total_seconds() + r)
+        ax.legend(fontsize='small')
+        ax.set_ylim(top=minimum.total_seconds() - 0.1, bottom=maximum.total_seconds() + 0.1)
+        ax.set_xlabel("Lap Number [lap]")
+        ax.set_ylabel("Lap Time [s]")
         ax.grid(True)
-        output_path = f"{filepath}/{filename}_{r}.png"
+        output_path = f"{filepath}/{filename}.png"
+        if current_report() is not None:
+            save_matplotlib(fig, output_path, log)
+            return
         os.makedirs(os.path.dirname(output_path), exist_ok=True)
         fig.savefig(output_path, bbox_inches='tight')
         log.info(f"Saved plot to {output_path}")
-    plt.close(fig)
+        if r is not None:
+            ax.set_ylim(top=minimum.total_seconds(), bottom=minimum.total_seconds() + r)
+            ax.grid(True)
+            output_path = f"{filepath}/{filename}_{r}.png"
+            os.makedirs(os.path.dirname(output_path), exist_ok=True)
+            fig.savefig(output_path, bbox_inches='tight')
+            log.info(f"Saved plot to {output_path}")
+    finally:
+        plt.close(fig)
+
 
 
 def make_top_time_map(all_laps: Laps) -> dict[int, datetime.datetime]:

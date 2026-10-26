@@ -9,9 +9,14 @@ import sys
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
+import matplotlib.pyplot as plt
+import pandas as pd
 import pytest
 
 from f1_explorer.config import Config
+from f1_explorer.visualizations.report import current_report
+from f1_explorer.visualizations import report as report_module
+from f1_explorer.visualizations import run_volume
 
 
 SESSIONS = [
@@ -140,12 +145,72 @@ def test_unhandled_failure_propagates_without_new_success_record(analysis, stage
         analysis.module.main()
     if stage != "manifest":
         analysis.manifest.assert_not_called()
+    assert current_report() is None
 
 
 def test_success_returns_zero_after_report_and_manifest(analysis):
     assert analysis.module.main() == 0
     analysis.report.write.assert_called_once_with(scan_existing=False)
     analysis.manifest.assert_called_once()
+
+
+@pytest.mark.parametrize("stage", ["analysis", "registration", "report"])
+def test_report_context_is_restored_after_analysis_failures(analysis, monkeypatch, stage):
+    category = analysis.module.__name__.removeprefix("analyze_")
+    initial = MagicMock(name="previous report")
+    token = report_module._CURRENT_REPORT.set(initial)
+    try:
+        if stage == "analysis":
+            analysis.module.run_volume.plot_laptime.side_effect = RuntimeError("injected analysis failure")
+        elif stage == "registration":
+            analysis.report.register_plotly.side_effect = RuntimeError("injected registration failure")
+            if category == "race":
+                monkeypatch.setattr(analysis.module.race, "execute", lambda *args: analysis.report.register_plotly(None, "x"))
+            else:
+                monkeypatch.setattr(analysis.module, "save_plotly", lambda *args, **kwargs: analysis.report.register_plotly(None, "x"))
+        else:
+            analysis.report.write.side_effect = RuntimeError("injected report failure")
+        before = set(plt.get_fignums())
+        with pytest.raises(RuntimeError):
+            analysis.module.main(force=True)
+        assert current_report() is initial
+        assert set(plt.get_fignums()) == before
+        analysis.manifest.assert_not_called()
+    finally:
+        report_module._CURRENT_REPORT.reset(token)
+
+
+def test_figure_construction_failure_closes_only_owned_figure(monkeypatch, tmp_path):
+    laps = pd.DataFrame({
+        "Stint": [1], "DriverNumber": ["1"], "Team": ["Ferrari"], "LapNumber": [1],
+        "LapStartDate": [datetime.datetime(2026, 1, 1)], "Driver": ["Driver"],
+    })
+    session = MagicMock()
+    session.laps = laps
+    session.event.year = 2026
+    unrelated = plt.figure()
+    before = set(plt.get_fignums())
+    monkeypatch.setattr(run_volume, "driver_linestyle", lambda *args: "solid")
+    monkeypatch.setattr(run_volume.fastf1.plotting, "get_team_color", lambda *args: "red")
+    monkeypatch.setattr(run_volume, "save_matplotlib", lambda *args, **kwargs: None)
+    with pytest.raises(RuntimeError, match="plot failed"):
+        with monkeypatch.context() as patcher:
+            patcher.setattr(run_volume.plt.Axes, "plot", lambda *args, **kwargs: (_ for _ in ()).throw(RuntimeError("plot failed")))
+            run_volume.plot_lap_number_by_timing(session, MagicMock(), output_dir=tmp_path)
+    assert set(plt.get_fignums()) == before
+    assert unrelated.number in plt.get_fignums()
+    plt.close(unrelated)
+
+
+def test_report_context_does_not_leak_figures_to_next_session(analysis):
+    analysis.module.run_volume.plot_laptime.side_effect = RuntimeError("injected failure")
+    with pytest.raises(RuntimeError):
+        analysis.module.main(force=True)
+    second = report_module.SessionReport(analysis.session, Path("second"))
+    with second:
+        assert current_report() is second
+        assert second._ordered_items() == []
+    assert current_report() is None
 
 
 @pytest.mark.parametrize("future", [False, True], ids=["setup-error", "future-skip"])

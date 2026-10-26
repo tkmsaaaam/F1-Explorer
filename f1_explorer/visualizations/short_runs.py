@@ -484,29 +484,33 @@ def plot_gear_shift_on_track(session: Session, log: structlog.stdlib.BoundLogger
         if lap is None:
             continue
         fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
-        tel = lap.get_telemetry()
-        track_data[str(driver_number)] = (lap, tel)
-        x = np.array(tel.X.values)
-        y = np.array(tel.Y.values)
+        try:
+            tel = lap.get_telemetry()
+            track_data[str(driver_number)] = (lap, tel)
+            x = np.array(tel.X.values)
+            y = np.array(tel.Y.values)
 
-        points = np.array([x, y]).T.reshape(-1, 1, 2)
-        segments = np.concatenate([points[:-1], points[1:]], axis=1)
-        gear = tel.nGear.to_numpy().astype(float)
-        cmap = colormaps["Paired"]
-        lc_comp = LineCollection(
-            segments,
-            cmap=cmap, linewidth=4, array=gear,
-        )
-        lc_comp.set_clim(1, cmap.N + 1)
-        fig.gca().add_collection(lc_comp)
-        ax.axis('equal')
-        ax.tick_params(labelleft=False, left=False, labelbottom=False, bottom=False)
+            points = np.array([x, y]).T.reshape(-1, 1, 2)
+            segments = np.concatenate([points[:-1], points[1:]], axis=1)
+            gear = tel.nGear.to_numpy().astype(float)
+            cmap = colormaps["Paired"]
+            lc_comp = LineCollection(
+                segments,
+                cmap=cmap, linewidth=4, array=gear,
+            )
+            lc_comp.set_clim(1, cmap.N + 1)
+            fig.gca().add_collection(lc_comp)
+            ax.axis('equal')
+            ax.tick_params(labelleft=False, left=False, labelbottom=False, bottom=False)
 
-        cbar = fig.colorbar(mappable=lc_comp, label="Gear", boundaries=np.arange(1, 10))
-        cbar.set_ticks(np.arange(1.5, 9.5))
-        cbar.set_ticklabels(np.arange(1, 9))
-        output_path = resolve_output_dir(session, output_dir) / "shift_on_track" / f"{driver_number}_{lap.Driver}.png"
-        save_matplotlib(fig, output_path, log)
+            cbar = fig.colorbar(mappable=lc_comp, label="Gear", boundaries=np.arange(1, 10))
+            cbar.set_ticks(np.arange(1.5, 9.5))
+            cbar.set_ticklabels(np.arange(1, 9))
+            output_path = resolve_output_dir(session, output_dir) / "shift_on_track" / f"{driver_number}_{lap.Driver}.png"
+            save_matplotlib(fig, output_path, log)
+        finally:
+            plt.close(fig)
+
 
     _save_interactive_track_map(
         session,
@@ -563,22 +567,26 @@ def plot_speed_distance(session: Session, log: structlog.stdlib.BoundLogger, *, 
             continue
         fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
         try:
-            team_color = fastf1.plotting.get_team_color(laps.Team, session)
-        except AttributeError:
-            team_color = 'gray'
-        style = driver_linestyle(session.event.year, int(driver_number))
-        car_data = laps.get_car_data().add_distance()
-        ax.plot(car_data.Distance, car_data.Speed, color=team_color, label=laps.Driver, linestyle=style)
-        v_min: float = car_data.Speed.min()
-        v_max: float = car_data.Speed.max()
-        ax.vlines(x=circuit_info.corners.Distance, ymin=v_min - 20, ymax=v_max + 20, linestyles='dotted', colors='grey')
-        for _, corner in circuit_info.corners.iterrows():
-            txt = f"{corner.Number}{corner.Letter}"
-            ax.text(corner.Distance, v_min - 30, txt, va='center_baseline', ha='center', size='small')
-        ax.set_ylim(v_min - 40, v_max + 20)
-        ax.grid(True)
-        output_path = resolve_output_dir(session, output_dir) / "speed_distance" / f"{driver_number}_{laps.Driver}.png"
-        save_matplotlib(fig, output_path, log)
+            try:
+                team_color = fastf1.plotting.get_team_color(laps.Team, session)
+            except AttributeError:
+                team_color = 'gray'
+            style = driver_linestyle(session.event.year, int(driver_number))
+            car_data = laps.get_car_data().add_distance()
+            ax.plot(car_data.Distance, car_data.Speed, color=team_color, label=laps.Driver, linestyle=style)
+            v_min: float = car_data.Speed.min()
+            v_max: float = car_data.Speed.max()
+            ax.vlines(x=circuit_info.corners.Distance, ymin=v_min - 20, ymax=v_max + 20, linestyles='dotted', colors='grey')
+            for _, corner in circuit_info.corners.iterrows():
+                txt = f"{corner.Number}{corner.Letter}"
+                ax.text(corner.Distance, v_min - 30, txt, va='center_baseline', ha='center', size='small')
+            ax.set_ylim(v_min - 40, v_max + 20)
+            ax.grid(True)
+            output_path = resolve_output_dir(session, output_dir) / "speed_distance" / f"{driver_number}_{laps.Driver}.png"
+            save_matplotlib(fig, output_path, log)
+        finally:
+            plt.close(fig)
+
 
     _save_interactive_driver_telemetry(
         session,
@@ -609,34 +617,37 @@ def plot_speed_distance_comparison(session: Session, log: structlog.stdlib.Bound
         driver_group = driver_numbers[start:] if group_index == num_groups - 1 else driver_numbers[
             start:start + drivers_per_fig]
         fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
-        minimum_list = []
-        maximum_list = []
-        for driver_number in driver_group:
-            laps = session.laps.pick_drivers(driver_number).pick_fastest()
-            if laps is None:
+        try:
+            minimum_list = []
+            maximum_list = []
+            for driver_number in driver_group:
+                laps = session.laps.pick_drivers(driver_number).pick_fastest()
+                if laps is None:
+                    continue
+                try:
+                    team_color = fastf1.plotting.get_team_color(laps.Team, session)
+                except AttributeError:
+                    team_color = 'gray'
+                style = driver_linestyle(session.event.year, int(driver_number))
+                car_data = laps.get_car_data().add_distance()
+                ax.plot(car_data.Distance, car_data.Speed, color=team_color, label=laps.Driver, linestyle=style,
+                        linewidth=1, alpha=0.5)
+                minimum_list.append(car_data.Speed.min())
+                maximum_list.append(car_data.Speed.max())
+            if not minimum_list or not maximum_list:
                 continue
-            try:
-                team_color = fastf1.plotting.get_team_color(laps.Team, session)
-            except AttributeError:
-                team_color = 'gray'
-            style = driver_linestyle(session.event.year, int(driver_number))
-            car_data = laps.get_car_data().add_distance()
-            ax.plot(car_data.Distance, car_data.Speed, color=team_color, label=laps.Driver, linestyle=style,
-                    linewidth=1, alpha=0.5)
-            minimum_list.append(car_data.Speed.min())
-            maximum_list.append(car_data.Speed.max())
-        if not minimum_list or not maximum_list:
-            continue
-        ax.vlines(x=circuit_info.corners.Distance, ymin=min(minimum_list) - 20, ymax=max(maximum_list) + 20,
-                  linestyles='dotted', colors='grey')
-        for _, corner in circuit_info.corners.iterrows():
-            txt = f"{corner.Number}{corner.Letter}"
-            ax.text(corner.Distance, min(minimum_list) - 30, txt, va='center_baseline', ha='center', size='small')
-        ax.set_ylim(min(minimum_list) - 40, max(maximum_list) + 20)
-        ax.legend(fontsize='small')
-        ax.grid(True)
-        output_path = resolve_output_dir(session, output_dir) / "speed_distance" / "comparison" / f"{start + 1}_.png"
-        save_matplotlib(fig, output_path, log)
+            ax.vlines(x=circuit_info.corners.Distance, ymin=min(minimum_list) - 20, ymax=max(maximum_list) + 20,
+                      linestyles='dotted', colors='grey')
+            for _, corner in circuit_info.corners.iterrows():
+                txt = f"{corner.Number}{corner.Letter}"
+                ax.text(corner.Distance, min(minimum_list) - 30, txt, va='center_baseline', ha='center', size='small')
+            ax.set_ylim(min(minimum_list) - 40, max(maximum_list) + 20)
+            ax.legend(fontsize='small')
+            ax.grid(True)
+            output_path = resolve_output_dir(session, output_dir) / "speed_distance" / "comparison" / f"{start + 1}_.png"
+            save_matplotlib(fig, output_path, log)
+        finally:
+            plt.close(fig)
 
 
 @tracer.start_as_current_span("plot_speed_on_track")
@@ -652,29 +663,33 @@ def plot_speed_on_track(session: Session, log: structlog.stdlib.BoundLogger, *, 
         if lap is None:
             continue
         fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
-        tel = lap.get_telemetry()
-        track_data[str(driver_number)] = (lap, tel)
-        x = np.array(tel.X.values)
-        y = np.array(tel.Y.values)
+        try:
+            tel = lap.get_telemetry()
+            track_data[str(driver_number)] = (lap, tel)
+            x = np.array(tel.X.values)
+            y = np.array(tel.Y.values)
 
-        points = np.array([x, y]).T.reshape(-1, 1, 2)
-        segments = np.concatenate([points[:-1], points[1:]], axis=1)
-        speed = tel.Speed.to_numpy().astype(float)
-        cmap = colormaps["plasma"]
-        lc_comp = LineCollection(
-            segments,
-            cmap=cmap,
-            linewidth=4,
-            array=speed,
-        )
-        lc_comp.set_clim(float(speed.min()), float(speed.max()))
-        ax.add_collection(lc_comp)
-        ax.axis('equal')
-        ax.tick_params(labelleft=False, left=False, labelbottom=False, bottom=False)
+            points = np.array([x, y]).T.reshape(-1, 1, 2)
+            segments = np.concatenate([points[:-1], points[1:]], axis=1)
+            speed = tel.Speed.to_numpy().astype(float)
+            cmap = colormaps["plasma"]
+            lc_comp = LineCollection(
+                segments,
+                cmap=cmap,
+                linewidth=4,
+                array=speed,
+            )
+            lc_comp.set_clim(float(speed.min()), float(speed.max()))
+            ax.add_collection(lc_comp)
+            ax.axis('equal')
+            ax.tick_params(labelleft=False, left=False, labelbottom=False, bottom=False)
 
-        fig.colorbar(mappable=lc_comp, label="Speed")
-        output_path = resolve_output_dir(session, output_dir) / "speed_on_track" / f"{driver_number}_{lap.Driver}.png"
-        save_matplotlib(fig, output_path, log)
+            fig.colorbar(mappable=lc_comp, label="Speed")
+            output_path = resolve_output_dir(session, output_dir) / "speed_on_track" / f"{driver_number}_{lap.Driver}.png"
+            save_matplotlib(fig, output_path, log)
+        finally:
+            plt.close(fig)
+
 
     _save_interactive_track_map(
         session,
@@ -730,50 +745,53 @@ def plot_time_distance_comparison(session: Session, log: structlog.stdlib.BoundL
         common_distance = np.arange(0.0, max_distance, resample_step)
         ref_time = np.interp(common_distance, fastest_dist, fastest_time)
         fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout="tight")
-        minimum_list = []
-        maximum_list = []
-        for driver_number, lap in lap_map.items():
-            car_data = lap.get_car_data().add_distance()
-            dist = car_data.Distance.to_numpy()
-            tm = np.array([t.total_seconds() for t in car_data.Time], dtype=float)
-            uniq_idx = np.unique(dist, return_index=True)[1]
-            dist = dist[np.sort(uniq_idx)]
-            tm = tm[np.sort(uniq_idx)]
-            interp_time = np.interp(common_distance, dist, tm)
-            delta = interp_time - ref_time
-            try:
-                team_color = fastf1.plotting.get_team_color(lap.Team, session)
-            except AttributeError:
-                team_color = 'gray'
-            label = lap.Driver
-            if driver_number == fastest_driver_number:
-                label += " (FASTEST)"
-            ax.plot(
-                common_distance,
-                delta,
-                color=team_color,
-                linestyle=driver_linestyle(session.event.year, int(driver_number)),
-                label=label
-            )
-            minimum_list.append(float(delta.min()))
-            maximum_list.append(float(delta.max()))
-        valid_corners = circuit_info.corners[circuit_info.corners.Distance <= max_distance]
-        v_min = min(minimum_list) if min(minimum_list) > -3 else -3
-        v_max = max(maximum_list) if max(maximum_list) < 3 else 3
-        ax.vlines(x=valid_corners.Distance, ymin=v_max, ymax=v_min, linestyles="dotted", colors="grey")
-        for _, corner in valid_corners.iterrows():
-            txt = f"{corner.Number}{corner.Letter}"
-            ax.text(corner.Distance, v_min, txt, va="bottom", ha="center", size="small")
-        ax.axhline(0, linestyle="--", linewidth=1)
-        ax.set_xlabel(f"Distance (m) - {fastest_lap.Driver} reference")
-        ax.set_ylabel("Delta Time (s)")
-        ax.set_title(f"{session.event.EventName} {session.name}\nDelta to fastest in group ({fastest_lap.Driver})")
-        ax.set_xlim(0, max_distance)
-        ax.set_ylim(v_min, v_max)
-        ax.grid(True)
-        ax.legend(fontsize="small")
-        output_path = resolve_output_dir(session, output_dir) / "time_distance_delta" / f"{start + 1}_.png"
-        save_matplotlib(fig, output_path, log)
+        try:
+            minimum_list = []
+            maximum_list = []
+            for driver_number, lap in lap_map.items():
+                car_data = lap.get_car_data().add_distance()
+                dist = car_data.Distance.to_numpy()
+                tm = np.array([t.total_seconds() for t in car_data.Time], dtype=float)
+                uniq_idx = np.unique(dist, return_index=True)[1]
+                dist = dist[np.sort(uniq_idx)]
+                tm = tm[np.sort(uniq_idx)]
+                interp_time = np.interp(common_distance, dist, tm)
+                delta = interp_time - ref_time
+                try:
+                    team_color = fastf1.plotting.get_team_color(lap.Team, session)
+                except AttributeError:
+                    team_color = 'gray'
+                label = lap.Driver
+                if driver_number == fastest_driver_number:
+                    label += " (FASTEST)"
+                ax.plot(
+                    common_distance,
+                    delta,
+                    color=team_color,
+                    linestyle=driver_linestyle(session.event.year, int(driver_number)),
+                    label=label
+                )
+                minimum_list.append(float(delta.min()))
+                maximum_list.append(float(delta.max()))
+            valid_corners = circuit_info.corners[circuit_info.corners.Distance <= max_distance]
+            v_min = min(minimum_list) if min(minimum_list) > -3 else -3
+            v_max = max(maximum_list) if max(maximum_list) < 3 else 3
+            ax.vlines(x=valid_corners.Distance, ymin=v_max, ymax=v_min, linestyles="dotted", colors="grey")
+            for _, corner in valid_corners.iterrows():
+                txt = f"{corner.Number}{corner.Letter}"
+                ax.text(corner.Distance, v_min, txt, va="bottom", ha="center", size="small")
+            ax.axhline(0, linestyle="--", linewidth=1)
+            ax.set_xlabel(f"Distance (m) - {fastest_lap.Driver} reference")
+            ax.set_ylabel("Delta Time (s)")
+            ax.set_title(f"{session.event.EventName} {session.name}\nDelta to fastest in group ({fastest_lap.Driver})")
+            ax.set_xlim(0, max_distance)
+            ax.set_ylim(v_min, v_max)
+            ax.grid(True)
+            ax.legend(fontsize="small")
+            output_path = resolve_output_dir(session, output_dir) / "time_distance_delta" / f"{start + 1}_.png"
+            save_matplotlib(fig, output_path, log)
+        finally:
+            plt.close(fig)
 
     _save_interactive_time_distance_delta(session, log, output_dir=output_dir)
 
@@ -1117,46 +1135,47 @@ def _plot_driver_telemetry(session: Session, log: structlog.stdlib.BoundLogger, 
     for i in range(0, len(driver_numbers), group_size):
         group = driver_numbers[i:] if i + group_size >= len(driver_numbers) else driver_numbers[i:i + group_size]
         fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
-        v_min, v_max = float('inf'), float('-inf')
+        try:
+            v_min, v_max = float('inf'), float('-inf')
 
-        for driver_number in group:
-            laps = session.laps.pick_drivers(driver_number).pick_fastest()
-            if laps is None or laps.empty:
+            for driver_number in group:
+                laps = session.laps.pick_drivers(driver_number).pick_fastest()
+                if laps is None or laps.empty:
+                    continue
+
+                car_data = laps.get_car_data().add_distance()
+                driver_name = laps.Driver
+                try:
+                    team_color = fastf1.plotting.get_team_color(laps.Team, session)
+                except AttributeError:
+                    team_color = 'gray'
+                line_style = driver_linestyle(session.event.year, int(driver_number))
+
+                y_data = value_func(car_data)
+                ax.plot(car_data.Distance, y_data, label=driver_name, linewidth=1, color=team_color, linestyle=line_style,
+                        alpha=0.5)
+                v_min, v_max = min(v_min, y_data.min()), max(v_max, y_data.max())
+
+            if v_min == float('inf') or v_max == float('-inf') or (v_min == 0.0 and v_max == 0.0):
                 continue
 
-            car_data = laps.get_car_data().add_distance()
-            driver_name = laps.Driver
-            try:
-                team_color = fastf1.plotting.get_team_color(laps.Team, session)
-            except AttributeError:
-                team_color = 'gray'
-            line_style = driver_linestyle(session.event.year, int(driver_number))
+            for _, corner in circuit_info.corners.iterrows():
+                ax.axvline(x=corner.Distance, linestyle='dotted', color='grey', linewidth=0.8)
+                ax.text(corner.Distance, v_min - (v_max - v_min) * 0.05, f"{corner.Number}{corner.Letter}",
+                        va='center_baseline', ha='center', size='small')
 
-            y_data = value_func(car_data)
-            ax.plot(car_data.Distance, y_data, label=driver_name, linewidth=1, color=team_color, linestyle=line_style,
-                    alpha=0.5)
-            v_min, v_max = min(v_min, y_data.min()), max(v_max, y_data.max())
+            ax.set_ylim(v_min - 0.1 * (v_max - v_min), v_max + 0.1 * (v_max - v_min))
+            ax.set_ylabel(label)
+            ax.set_xlabel("Distance [m]")
+            ax.grid(True)
+            ax.legend(loc='upper right', fontsize='small')
+            plt.tight_layout()
 
-        if v_min == float('inf') or v_max == float('-inf') or (v_min == 0.0 and v_max == 0.0):
+            output_path = resolve_output_dir(session, output_dir) / key / f"{i + 1}-{i + len(group)}.png"
+            ax.grid(True)
+            save_matplotlib(fig, output_path, log)
+        finally:
             plt.close(fig)
-            continue
-
-        for _, corner in circuit_info.corners.iterrows():
-            ax.axvline(x=corner.Distance, linestyle='dotted', color='grey', linewidth=0.8)
-            ax.text(corner.Distance, v_min - (v_max - v_min) * 0.05, f"{corner.Number}{corner.Letter}",
-                    va='center_baseline', ha='center', size='small')
-
-        ax.set_ylim(v_min - 0.1 * (v_max - v_min), v_max + 0.1 * (v_max - v_min))
-        ax.set_ylabel(label)
-        ax.set_xlabel("Distance [m]")
-        ax.grid(True)
-        ax.legend(loc='upper right', fontsize='small')
-        plt.tight_layout()
-
-        output_path = resolve_output_dir(session, output_dir) / key / f"{i + 1}-{i + len(group)}.png"
-        ax.grid(True)
-        save_matplotlib(fig, output_path, log)
-
 
 @tracer.start_as_current_span("make_mini_segment")
 def make_mini_segment_layout(
@@ -1483,48 +1502,50 @@ def plot_telemetry(session: Session, log: structlog.stdlib.BoundLogger,
     if circuit_info is None:
         return
     fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
+    try:
 
-    v_min, v_max = float('inf'), float('-inf')
+        v_min, v_max = float('inf'), float('-inf')
 
-    name = ''
-    for driver_number in driver_numbers:
-        laps = session.laps.pick_drivers(driver_number).pick_fastest()
-        if laps is None or laps.empty:
-            continue
+        name = ''
+        for driver_number in driver_numbers:
+            laps = session.laps.pick_drivers(driver_number).pick_fastest()
+            if laps is None or laps.empty:
+                continue
 
-        car_data = laps.get_car_data().add_distance()
-        driver_name = laps.Driver
-        team_color = fastf1.plotting.get_team_color(laps.Team, session)
-        line_style = driver_linestyle(session.event.year, int(driver_number))
+            car_data = laps.get_car_data().add_distance()
+            driver_name = laps.Driver
+            team_color = fastf1.plotting.get_team_color(laps.Team, session)
+            line_style = driver_linestyle(session.event.year, int(driver_number))
 
-        y_data = value_func(car_data)
-        ax.plot(car_data.Distance, y_data, label=driver_name,
-                color=team_color, linestyle=line_style)
+            y_data = value_func(car_data)
+            ax.plot(car_data.Distance, y_data, label=driver_name,
+                    color=team_color, linestyle=line_style)
 
-        v_min, v_max = min(v_min, y_data.min()), max(v_max, y_data.max())
-        name += f"{driver_name}_"
+            v_min, v_max = min(v_min, y_data.min()), max(v_max, y_data.max())
+            name += f"{driver_name}_"
 
-    if v_min == float('inf') or v_max == float('-inf') or (v_min == 0.0 and v_max == 0.0):
+        if v_min == float('inf') or v_max == float('-inf') or (v_min == 0.0 and v_max == 0.0):
+            plt.close(fig)
+            return
+
+        for _, corner in circuit_info.corners.iterrows():
+            ax.axvline(x=corner.Distance, linestyle='dotted', color='grey', linewidth=0.8)
+            ax.text(corner.Distance, v_min - (v_max - v_min) * 0.05,
+                    f"{corner.Number}{corner.Letter}",
+                    va='center_baseline', ha='center', size='small')
+
+        ax.set_ylim(v_min - 0.1 * (v_max - v_min), v_max + 0.1 * (v_max - v_min))
+        ax.set_ylabel(label)
+        ax.set_xlabel("Distance [m]")
+        ax.grid(True)
+        ax.legend(loc='upper right', fontsize='small')
+        plt.tight_layout()
+
+        output_path = resolve_output_dir(session, output_dir) / key / f"{name}.png"
+        ax.grid(True)
+        save_matplotlib(fig, output_path, log)
+    finally:
         plt.close(fig)
-        return
-
-    for _, corner in circuit_info.corners.iterrows():
-        ax.axvline(x=corner.Distance, linestyle='dotted', color='grey', linewidth=0.8)
-        ax.text(corner.Distance, v_min - (v_max - v_min) * 0.05,
-                f"{corner.Number}{corner.Letter}",
-                va='center_baseline', ha='center', size='small')
-
-    ax.set_ylim(v_min - 0.1 * (v_max - v_min), v_max + 0.1 * (v_max - v_min))
-    ax.set_ylabel(label)
-    ax.set_xlabel("Distance [m]")
-    ax.grid(True)
-    ax.legend(loc='upper right', fontsize='small')
-    plt.tight_layout()
-
-    output_path = resolve_output_dir(session, output_dir) / key / f"{name}.png"
-    ax.grid(True)
-    save_matplotlib(fig, output_path, log)
-
 
 @tracer.start_as_current_span("plot_tyre_age_and_laptime")
 def plot_tyre_age_and_laptime(session: Session, log: structlog.stdlib.BoundLogger, *, output_dir: str | Path | None = None):

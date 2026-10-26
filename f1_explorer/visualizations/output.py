@@ -93,22 +93,17 @@ def save_matplotlib(
     """Embed chart data, retain requested PNGs, and close the source figure."""
     output_path = Path(path)
     report = current_report()
-    if report is not None and (report_interactive or not report.accepts_output(output_path)):
-        plt.close(fig)
-        return output_path
-    if report is not None and not report.requires_png(output_path):
-        from f1_explorer.visualizations.embedded_matplotlib import embed_matplotlib
-
-        try:
+    try:
+        if report is not None and (report_interactive or not report.accepts_output(output_path)):
+            return output_path
+        if report is not None and not report.requires_png(output_path):
+            from f1_explorer.visualizations.embedded_matplotlib import embed_matplotlib
             report.register_plotly(embed_matplotlib(fig), output_path)
             return output_path
-        finally:
-            plt.close(fig)
-    if report is not None:
-        output_path = report.png_output_path(output_path)
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    savefig_kwargs.setdefault("bbox_inches", "tight")
-    try:
+        if report is not None:
+            output_path = report.png_output_path(output_path)
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        savefig_kwargs.setdefault("bbox_inches", "tight")
         fig.savefig(output_path, **savefig_kwargs)
         report = current_report()
         if report is not None:

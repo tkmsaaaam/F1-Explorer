@@ -65,8 +65,12 @@ def main(*, force: bool = False) -> int:
         return 0
     session.load()
     report = SessionReport(session, output_dir, report_dir=report_dir)
-    report.activate()
+    with report:
+        _analyze_session(session, config, log, report, output_dir, report_dir, identity, fingerprint)
+    return 0
 
+
+def _analyze_session(session, config, log, report, output_dir, report_dir, identity, fingerprint):
     config.set_attribute_to_span()
     log.info(f"{session.event.year} Race {session.event.RoundNumber} {session.event.EventName} Race")
 
@@ -80,7 +84,6 @@ def main(*, force: bool = False) -> int:
     race.execute(session, log, path, path, None, None, None)
 
     weather.execute(session, log, path)
-    report.deactivate()
     report.write(scan_existing=False)
     write_success_manifest(
         report_dir,
@@ -90,7 +93,7 @@ def main(*, force: bool = False) -> int:
         extra_output_dirs=(output_dir,),
         exclude_extra_suffixes=(".png",),
     )
-    return 0
+    return None
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:

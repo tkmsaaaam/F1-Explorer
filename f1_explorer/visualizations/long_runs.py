@@ -206,34 +206,37 @@ def plot_by_tyre_age_and_tyre(
     for compound in session.laps.Compound.unique():
         fastf1.plotting.setup_mpl(mpl_timedelta_support=True, color_scheme='light')
         fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
-        minimum_laps = criteria.min_consecutive_clean_laps if criteria else 2
-        stint_set = make_stint_set(minimum_laps, session.laps, compound, criteria)
-        legends = set()
-        for stint in stint_set:
-            team = stint.driver.team_name
-            color = fastf1.plotting.get_team_color(team, session) if team != '' else 'white'
-            x = sorted(stint.laps.keys())
-            y = [stint.laps[i] for i in x]
-            line_style = driver_linestyle(session.event.year, stint.driver.number)
-            if stint.driver.number in legends:
-                ax.plot(x, y, linewidth=0.5, color=color, linestyle=line_style)
-            else:
-                ax.plot(x, y, linewidth=0.5, color=color, linestyle=line_style, label=stint.driver.name)
-                legends.add(stint.driver.number)
-        if legends:
-            ax.legend(fontsize='small')
-        ax.invert_yaxis()
-        ax.set_xlabel("Tyre age [laps]")
-        ax.set_ylabel("Lap Time [s]")
-        ax.grid(True)
-        output_path = resolve_output_dir(session, output_dir) / "long_runs" / f"{compound}.png"
-        save_matplotlib(fig, output_path, log, report_interactive=True)
-        report = current_report()
-        if report is not None:
-            report.register_plotly(
-                _make_interactive_long_run_figure(session, compound, stint_set),
-                output_path,
-            )
+        try:
+            minimum_laps = criteria.min_consecutive_clean_laps if criteria else 2
+            stint_set = make_stint_set(minimum_laps, session.laps, compound, criteria)
+            legends = set()
+            for stint in stint_set:
+                team = stint.driver.team_name
+                color = fastf1.plotting.get_team_color(team, session) if team != '' else 'white'
+                x = sorted(stint.laps.keys())
+                y = [stint.laps[i] for i in x]
+                line_style = driver_linestyle(session.event.year, stint.driver.number)
+                if stint.driver.number in legends:
+                    ax.plot(x, y, linewidth=0.5, color=color, linestyle=line_style)
+                else:
+                    ax.plot(x, y, linewidth=0.5, color=color, linestyle=line_style, label=stint.driver.name)
+                    legends.add(stint.driver.number)
+            if legends:
+                ax.legend(fontsize='small')
+            ax.invert_yaxis()
+            ax.set_xlabel("Tyre age [laps]")
+            ax.set_ylabel("Lap Time [s]")
+            ax.grid(True)
+            output_path = resolve_output_dir(session, output_dir) / "long_runs" / f"{compound}.png"
+            save_matplotlib(fig, output_path, log, report_interactive=True)
+            report = current_report()
+            if report is not None:
+                report.register_plotly(
+                    _make_interactive_long_run_figure(session, compound, stint_set),
+                    output_path,
+                )
+        finally:
+            plt.close(fig)
 
 
 def _make_interactive_long_run_figure(

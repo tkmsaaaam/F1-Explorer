@@ -28,22 +28,25 @@ def plot_weather(session: Session, log: WarningLoggerLike, key: str, filepath: s
         filepath: 保存先のパス
     """
     fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
-    plt.tight_layout()
-    weather = session.weather_data.sort_values('Time')
+    try:
+        plt.tight_layout()
+        weather = session.weather_data.sort_values('Time')
 
-    x = list((session.date + weather.Time).values)
-    y = weather[key].to_list()
-    ax.plot(x, y)
-    ax.set_xlabel("Time [UTC, HH:MM]")
-    ax.xaxis.set_major_formatter(mdates.DateFormatter("%H:%M"))
-    ax.set_ylabel({
-        "AirTemp": "Air Temperature [°C]",
-        "TrackTemp": "Track Temperature [°C]",
-        "WindSpeed": "Wind Speed [m/s]",
-        "Rainfall": "Rainfall [0 = dry, 1 = raining]",
-    }.get(key, key))
-    if key == "Rainfall":
-        ax.set_yticks([0, 1], ["0 (dry)", "1 (raining)"])
-    plt.gcf().autofmt_xdate()
-    ax.grid(True)
-    save_matplotlib(fig, filepath, log)
+        x = list((session.date + weather.Time).values)
+        y = weather[key].to_list()
+        ax.plot(x, y)
+        ax.set_xlabel("Time [UTC, HH:MM]")
+        ax.xaxis.set_major_formatter(mdates.DateFormatter("%H:%M"))
+        ax.set_ylabel({
+            "AirTemp": "Air Temperature [°C]",
+            "TrackTemp": "Track Temperature [°C]",
+            "WindSpeed": "Wind Speed [m/s]",
+            "Rainfall": "Rainfall [0 = dry, 1 = raining]",
+        }.get(key, key))
+        if key == "Rainfall":
+            ax.set_yticks([0, 1], ["0 (dry)", "1 (raining)"])
+        plt.gcf().autofmt_xdate()
+        ax.grid(True)
+        save_matplotlib(fig, filepath, log)
+    finally:
+        plt.close(fig)
