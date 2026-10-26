@@ -13,6 +13,7 @@ from f1_explorer.analysis_state import (
     SCHEMA_VERSION,
     build_fingerprint,
     manifest_path,
+    invalidate_success_manifest,
     should_skip,
     write_success_manifest,
 )
@@ -41,8 +42,7 @@ class AnalysisStateTest(unittest.TestCase):
             fingerprint = self._fingerprint(root)
             manifest = write_success_manifest(
                 report_dir, fingerprint, IDENTITY,
-                extra_output_paths=(retained,), extra_output_dirs=(image_dir,),
-                exclude_extra_suffixes=(".png",),
+                extra_output_paths=(retained, log), required_output_paths=(retained,),
             )
             files = json.loads(manifest.read_text())["output_files"]
             self.assertIn(str(retained.resolve()), files)
@@ -115,7 +115,8 @@ class AnalysisStateTest(unittest.TestCase):
             output = output_dir / "plot.png"
             output.write_bytes(b"image")
             fingerprint = self._fingerprint(root)
-            path = write_success_manifest(output_dir, fingerprint, IDENTITY)
+            path = write_success_manifest(output_dir, fingerprint, IDENTITY,
+                                          extra_output_paths=(output,), required_output_paths=(output,))
 
             self.assertTrue(should_skip(path, fingerprint, IDENTITY))
             self.assertFalse(should_skip(path, fingerprint, IDENTITY, force=True))
@@ -153,7 +154,8 @@ class AnalysisStateTest(unittest.TestCase):
             fingerprint = self._fingerprint(root)
 
             path = write_success_manifest(
-                output_dir, fingerprint, IDENTITY, extra_output_paths=(external,)
+                output_dir, fingerprint, IDENTITY, extra_output_paths=(external, nested),
+                required_output_paths=(external,)
             )
             payload = json.loads(path.read_text(encoding="utf-8"))
 
@@ -186,7 +188,7 @@ class AnalysisStateTest(unittest.TestCase):
                 report_dir,
                 fingerprint,
                 IDENTITY,
-                extra_output_dirs=(image_dir,),
+                extra_output_paths=(report, image), required_output_paths=(report,),
             )
             payload = json.loads(path.read_text(encoding="utf-8"))
 
@@ -196,6 +198,43 @@ class AnalysisStateTest(unittest.TestCase):
             self.assertTrue(should_skip(path, fingerprint, IDENTITY))
             image.unlink()
             self.assertFalse(should_skip(path, fingerprint, IDENTITY))
+
+    def test_manifest_requires_explicit_existing_outputs_and_can_be_invalidated(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = self._repo(Path(temporary) / "repo")
+            output_dir = Path(temporary) / "output"
+            output_dir.mkdir()
+            stale = output_dir / "old.png"
+            stale.write_bytes(b"old")
+            old_log = output_dir / "old.log"
+            old_log.write_text("old log", encoding="utf-8")
+            fingerprint = self._fingerprint(root)
+            with self.assertRaises(ValueError):
+                write_success_manifest(output_dir, fingerprint, IDENTITY)
+            required = output_dir / "new.png"
+            with self.assertRaises(FileNotFoundError):
+                write_success_manifest(output_dir, fingerprint, IDENTITY,
+                                       extra_output_paths=(required,), required_output_paths=(required,))
+            self.assertTrue(stale.is_file())
+            required.write_bytes(b"stale output")
+            with self.assertRaises(ValueError):
+                write_success_manifest(output_dir, fingerprint, IDENTITY,
+                                       extra_output_paths=(stale,), required_output_paths=(required,))
+            current = output_dir / "current.html"
+            current.write_text("current", encoding="utf-8")
+            manifest = write_success_manifest(
+                output_dir, fingerprint, IDENTITY, extra_output_paths=(current,),
+                required_output_paths=(current,),
+            )
+            files = json.loads(manifest.read_text(encoding="utf-8"))["output_files"]
+            self.assertEqual(files, ["current.html"])
+            self.assertTrue(stale.is_file())
+            self.assertTrue(old_log.is_file())
+            previous = manifest_path(output_dir)
+            previous.write_text("old success", encoding="utf-8")
+            invalidate_success_manifest(output_dir)
+            self.assertFalse(previous.exists())
+            self.assertTrue(stale.is_file())
 
 
 if __name__ == "__main__":

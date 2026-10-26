@@ -110,6 +110,8 @@ def save_matplotlib(
             from f1_explorer.visualizations.embedded_matplotlib import embed_matplotlib
 
             report.register_plotly(embed_matplotlib(fig), output_path)
+            if report.requires_png(output_path):
+                report.record_written_output(output_path)
         log.info(f"Saved plot to {output_path}")
         return output_path
     finally:
@@ -144,6 +146,8 @@ def save_plotly(
         with tracer.start_as_current_span("plotly.register_report") as span:
             span.set_attribute("plot.name", output_path.name)
             report.register_plotly(fig, output_path)
+            if report.requires_png(output_path):
+                report.record_written_output(output_path)
     return output_path
 
 

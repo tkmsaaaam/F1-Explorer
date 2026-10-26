@@ -17,6 +17,7 @@ from f1_explorer.config import Config
 from f1_explorer.visualizations.report import current_report
 from f1_explorer.visualizations import report as report_module
 from f1_explorer.visualizations import run_volume
+from f1_explorer.analysis_state import manifest_path
 
 
 SESSIONS = [
@@ -55,6 +56,9 @@ def analysis(request, monkeypatch, tmp_path):
     monkeypatch.setattr(module, "should_skip", MagicMock(return_value=False))
     manifest = MagicMock()
     monkeypatch.setattr(module, "write_success_manifest", manifest)
+    report_dir = tmp_path / "report"
+    manifest_path(report_dir).parent.mkdir(parents=True, exist_ok=True)
+    manifest_path(report_dir).write_text('{"previous":"success"}', encoding="utf-8")
     report = MagicMock()
     monkeypatch.setattr(module, "SessionReport", MagicMock(return_value=report))
     for function in ("plot_lap_number_by_timing", "plot_laptime", "plot_laptime_by_timing",
@@ -83,7 +87,7 @@ def analysis(request, monkeypatch, tmp_path):
         for function in functions:
             monkeypatch.setattr(module, function, MagicMock())
     return SimpleNamespace(module=module, config=config, session=session, report=report,
-                           manifest=manifest, log=log)
+                           manifest=manifest, log=log, report_dir=report_dir)
 
 
 def test_setup_failure_returns_nonzero_without_success_record(analysis):
@@ -175,9 +179,43 @@ def test_report_context_is_restored_after_analysis_failures(analysis, monkeypatc
             analysis.module.main(force=True)
         assert current_report() is initial
         assert set(plt.get_fignums()) == before
+        assert not manifest_path(analysis.report_dir).exists()
         analysis.manifest.assert_not_called()
     finally:
         report_module._CURRENT_REPORT.reset(token)
+
+
+@pytest.mark.parametrize("stage", ["analysis", "report", "manifest"])
+def test_forced_regeneration_invalidates_old_manifest(analysis, stage):
+    manifest = manifest_path(analysis.report_dir)
+    assert manifest.is_file()
+    if stage == "analysis":
+        analysis.module.run_volume.plot_laptime.side_effect = RuntimeError("forced analysis failure")
+    elif stage == "report":
+        analysis.report.write.side_effect = RuntimeError("forced HTML failure")
+    else:
+        analysis.manifest.side_effect = RuntimeError("manifest write failure")
+    with pytest.raises(RuntimeError):
+        analysis.module.main(force=True)
+    assert not manifest.exists()
+    assert analysis.manifest.call_count == (1 if stage == "manifest" else 0)
+
+
+@pytest.mark.parametrize("stage", ["analysis", "report", "manifest"])
+def test_normal_run_retries_after_failed_forced_regeneration(analysis, stage):
+    if stage == "analysis":
+        analysis.module.run_volume.plot_laptime.side_effect = [RuntimeError("figure failed"), None]
+    elif stage == "report":
+        analysis.report.write.side_effect = [RuntimeError("HTML failed"), None]
+    else:
+        analysis.manifest.side_effect = [RuntimeError("manifest failed"), None]
+    with pytest.raises(RuntimeError):
+        analysis.module.main(force=True)
+    assert not manifest_path(analysis.report_dir).exists()
+
+    assert analysis.module.main(force=False) == 0
+    assert analysis.report.write.call_count == (1 if stage == "analysis" else 2)
+    assert analysis.manifest.call_count == (2 if stage == "manifest" else 1)
 
 
 def test_figure_construction_failure_closes_only_owned_figure(monkeypatch, tmp_path):

@@ -21,8 +21,8 @@ import tempfile
 from typing import Iterable, Mapping, TypeAlias
 
 
-# Version 2 adds the configuration fingerprint used by circuit separators.
-SCHEMA_VERSION = 2
+# Version 3 records only outputs explicitly produced by the current run.
+SCHEMA_VERSION = 3
 MANIFEST_FILENAME = ".analysis-manifest.json"
 MISSING_VERSION = "<missing>"
 _IDENTITY_KEYS = frozenset({"year", "round", "session", "entrypoint"})
@@ -189,6 +189,15 @@ def manifest_path(output_dir: str | Path) -> Path:
     return Path(output_dir) / MANIFEST_FILENAME
 
 
+def invalidate_success_manifest(output_dir: str | Path) -> None:
+    """Remove the prior success marker before starting a regeneration."""
+
+    try:
+        manifest_path(output_dir).unlink()
+    except FileNotFoundError:
+        pass
+
+
 def _identity_dict(identity: AnalysisIdentity) -> dict[str, JsonScalar]:
     normalized = dict(identity)
     if set(normalized) != _IDENTITY_KEYS:
@@ -266,30 +275,30 @@ def write_success_manifest(
     extra_output_paths: Iterable[str | Path] = (),
     extra_output_dirs: Iterable[str | Path] = (),
     exclude_extra_suffixes: tuple[str, ...] = (),
+    required_output_paths: Iterable[str | Path] = (),
 ) -> Path:
-    """Atomically record a successful analysis and all existing output files."""
+    """Atomically record explicitly listed outputs from a successful analysis."""
 
     directory = Path(output_dir)
     directory.mkdir(parents=True, exist_ok=True)
     target = manifest_path(directory)
 
-    output_paths = {
-        path.resolve()
-        for path in directory.rglob("*")
-        if path.is_file() and path.resolve() != target.resolve()
-    }
-    for extra_directory in map(Path, extra_output_dirs):
-        if not extra_directory.is_dir():
-            continue
-        output_paths.update(
-            path.resolve()
-            for path in extra_directory.rglob("*")
-            if path.is_file() and path.name != MANIFEST_FILENAME
-            and path.suffix.lower() not in exclude_extra_suffixes
-        )
-    output_paths.update(
-        Path(path).resolve() for path in extra_output_paths if Path(path).is_file()
-    )
+    if tuple(extra_output_dirs) or exclude_extra_suffixes:
+        raise ValueError("recursive output discovery is unsupported; pass explicit output paths")
+    required_paths = {Path(path).resolve() for path in required_output_paths}
+    output_paths = {Path(path).resolve() for path in extra_output_paths}
+    if not required_paths or not output_paths:
+        raise ValueError("at least one required output path must be declared")
+    missing = sorted(str(path) for path in required_paths if not path.is_file())
+    if missing:
+        raise FileNotFoundError(f"required analysis outputs are missing: {missing}")
+    unlisted_required = sorted(str(path) for path in required_paths if path not in output_paths)
+    if unlisted_required:
+        raise ValueError(f"required outputs were not produced in this run: {unlisted_required}")
+    missing_listed = sorted(str(path) for path in output_paths if not path.is_file())
+    if missing_listed:
+        raise FileNotFoundError(f"analysis outputs are missing: {missing_listed}")
+    output_paths.discard(target.resolve())
     output_files = sorted(_output_record(path, directory) for path in output_paths)
 
     payload = {

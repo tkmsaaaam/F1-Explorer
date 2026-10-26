@@ -127,6 +127,7 @@ class SessionReport:
         self.output_dir = Path(output_dir)
         self.report_dir = Path(report_dir) if report_dir is not None else self.output_dir
         self._items: dict[str, ReportItem] = {}
+        self._written_paths: set[Path] = set()
         self._anchor_counts: dict[str, int] = {}
         self._token: Token[SessionReport | None] | None = None
 
@@ -227,11 +228,26 @@ class SessionReport:
 
         self._add(path)
 
+    def written_output_paths(self) -> tuple[Path, ...]:
+        """Return files explicitly registered during this report generation."""
+        return tuple(sorted(self._written_paths))
+
+    def record_written_output(self, path: str | Path) -> None:
+        """Track a path only after its current-run write has succeeded."""
+        self._written_paths.add(Path(path).resolve())
+
     def image_paths(self) -> tuple[Path, ...]:
         """Return PNG artifacts required by this report or explicitly retained."""
         return tuple(item.path for item in self._items.values()
                      if item.path.is_file() and
                      (not item.interactive or self.requires_png(item.path)))
+
+    def required_png_paths(self) -> tuple[Path, ...]:
+        """Return standalone PNGs required by this session's report policy."""
+        names = ["laptime_table.png"]
+        if self._is_race_session():
+            names.append("laptime_graph.png")
+        return tuple(self.png_output_path(self.output_dir / name).resolve() for name in names)
 
     def scan_images(self, extra_paths: Iterable[str | Path] = ()) -> None:
         """Add PNGs not already registered by a save helper."""
@@ -318,6 +334,7 @@ class SessionReport:
         )
         html = organize_session_report_html(html, str(getattr(self.session, "name", "")))
         target.write_text(html, encoding="utf-8")
+        self._written_paths.add(target.resolve())
         if output_path is None and event is not None:
             try:
                 expected = (

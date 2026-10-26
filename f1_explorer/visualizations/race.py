@@ -1,5 +1,6 @@
 import datetime
 import os
+from pathlib import Path
 from math import isfinite
 from typing import cast
 
@@ -55,11 +56,10 @@ def execute(session: Session, log: WarningLoggerLike, images_path: str, logs_pat
     tyres(log, f"{images_path}/tyres.png", session.laps)
     write_messages(session, logs_path)
     write_track_status(session, logs_path)
-    try:
-        os.remove(f"{logs_path}/timestamp.txt")
-    except FileNotFoundError:
-        pass
-    util.write_to_file_top(f"{logs_path}/timestamp.txt", datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+    Path(logs_path).mkdir(parents=True, exist_ok=True)
+    Path(f"{logs_path}/timestamp.txt").write_text(
+        datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"), encoding="utf-8"
+    )
 
 
 def make_driver_laps_set(laps: Laps) -> list[DriverLaps]:
@@ -613,10 +613,8 @@ def _format_tyre_age(value: object) -> str:
 
 @tracer.start_as_current_span("write_messages")
 def write_messages(session: Session, logs_path: str):
-    try:
-        os.remove(f"{logs_path}/race_control.txt")
-    except FileNotFoundError:
-        pass
+    Path(logs_path).mkdir(parents=True, exist_ok=True)
+    Path(f"{logs_path}/race_control.txt").write_text("", encoding="utf-8")
     messages = session.race_control_messages.sort_values('Time')
     for i in range(0, len(messages)):
         t = session.race_control_messages.Time.iloc[i]
@@ -632,10 +630,8 @@ def write_messages(session: Session, logs_path: str):
 
 @tracer.start_as_current_span("write_track_status")
 def write_track_status(session: Session, logs_path: str):
-    try:
-        os.remove(f"{logs_path}/track_status.txt")
-    except FileNotFoundError:
-        pass
+    Path(logs_path).mkdir(parents=True, exist_ok=True)
+    Path(f"{logs_path}/track_status.txt").write_text("", encoding="utf-8")
     messages = session.track_status.sort_values('Time')
     for i in range(0, len(messages)):
         t = session.race_control_messages.Time.iloc[i]

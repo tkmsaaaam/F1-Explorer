@@ -15,7 +15,9 @@ from f1_explorer.visualizations.output import session_output_dir, session_report
 from f1_explorer.visualizations.report import SessionReport
 from f1_explorer.visualizations.qualifying_best import make_qualifying_best
 from f1_explorer.visualizations.qualifying_speed import make_qualifying_speed
-from f1_explorer.analysis_state import build_fingerprint, manifest_path, should_skip, write_success_manifest
+from f1_explorer.analysis_state import (
+    build_fingerprint, invalidate_success_manifest, manifest_path, should_skip, write_success_manifest,
+)
 from f1_explorer.separator_estimator import persist_resolution, resolve_separators
 from f1_explorer.telemetry import lap_telemetry_without_driver_ahead
 
@@ -87,6 +89,7 @@ def main(*, force: bool = False, refresh_separators: bool = False) -> int:
     ):
         log.info("Analysis skipped; source and environment fingerprint unchanged")
         return 0
+    invalidate_success_manifest(report_dir)
     report = SessionReport(session, output_dir, report_dir=report_dir)
     with report:
         _analyze_session(session, config, log, report, output_dir, report_dir, identity,
@@ -183,9 +186,8 @@ def _analyze_session(session, config, log, report, output_dir, report_dir, ident
         report_dir,
         fingerprint,
         identity,
-        extra_output_paths=report.image_paths(),
-        extra_output_dirs=(output_dir,),
-        exclude_extra_suffixes=(".png",),
+        extra_output_paths=report.written_output_paths(),
+        required_output_paths=(report.report_dir / "report.html", *report.required_png_paths()),
     )
     return None
 
