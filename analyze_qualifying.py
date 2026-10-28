@@ -19,9 +19,16 @@ from f1_explorer.analysis_state import (
     build_fingerprint, invalidate_success_manifest, manifest_path, should_skip, write_success_manifest,
 )
 from f1_explorer.separator_estimator import persist_resolution, resolve_separators
-from f1_explorer.telemetry import lap_telemetry_without_driver_ahead
+from f1_explorer.telemetry import last_valid_distance, lap_telemetry_without_driver_ahead
 
 tracer = trace.get_tracer(__name__)
+
+
+def _fastest_distance_or_none(telemetry, log):
+    distance = last_valid_distance(telemetry)
+    if distance is None:
+        log.warning("Skipping circuit-dependent analysis without valid fastest-lap distances")
+    return distance
 
 
 @tracer.start_as_current_span("start_at")
@@ -119,37 +126,35 @@ def _analyze_session(session, config, log, report, output_dir, report_dir, ident
     fastest = session.laps.pick_fastest()
     if circuit is not None and fastest is not None:
         fastest_telemetry = lap_telemetry_without_driver_ahead(fastest, add_distance=True)
-        corners = [0] + list(circuit.corners['Distance']) + [fastest_telemetry['Distance'].iloc[-1]]
-        short_runs.plot_mini_segment_on_circuit(
-            session, log, corners, 'corners',
-            fastest_lap=fastest, telemetry=fastest_telemetry,
-        )
-        segment_car_data = short_runs.prepare_segment_car_data(session)
-        short_runs.compute_and_save_segment_tables_plotly(
-            session,
-            base_path + "/corners",
-            corners,
-            log,
-            color_by_corner_speed=True,
-            car_data_by_driver=segment_car_data,
-        )
+        last_distance = _fastest_distance_or_none(fastest_telemetry, log)
+        if last_distance is not None:
+                corners = [0] + list(circuit.corners['Distance']) + [last_distance]
+                short_runs.plot_mini_segment_on_circuit(
+                    session, log, corners, 'corners',
+                    fastest_lap=fastest, telemetry=fastest_telemetry,
+                )
+                segment_car_data = short_runs.prepare_segment_car_data(session)
+                short_runs.compute_and_save_segment_tables_plotly(
+                    session, base_path + "/corners", corners, log,
+                    color_by_corner_speed=True, car_data_by_driver=segment_car_data,
+                )
 
-        corner_map = config.get_corners()
-        segment_layout = short_runs.make_mini_segment_layout(
-            session, log, corner_map,
-            config.get_separator_boundaries() or config.get_separator(),
-            fastest_lap=fastest,
-            telemetry=fastest_telemetry,
-        )
-        short_runs.plot_mini_segment_on_circuit(
-            session, log, segment_layout, 'mini_segments',
-            show_sector_boundaries=True,
-            fastest_lap=fastest,
-            telemetry=fastest_telemetry,
-        )
-        short_runs.compute_and_save_segment_tables_plotly(
-            session, base_path + "/mini_segments", segment_layout, log, car_data_by_driver=segment_car_data,
-        )
+                corner_map = config.get_corners()
+                segment_layout = short_runs.make_mini_segment_layout(
+                    session, log, corner_map,
+                    config.get_separator_boundaries() or config.get_separator(),
+                    fastest_lap=fastest,
+                    telemetry=fastest_telemetry,
+                )
+                short_runs.plot_mini_segment_on_circuit(
+                    session, log, segment_layout, 'mini_segments',
+                    show_sector_boundaries=True,
+                    fastest_lap=fastest,
+                    telemetry=fastest_telemetry,
+                )
+                short_runs.compute_and_save_segment_tables_plotly(
+                    session, base_path + "/mini_segments", segment_layout, log, car_data_by_driver=segment_car_data,
+                )
     elif fastest is None:
         log.info("fastest info is None; skipping circuit-dependent analysis")
     short_runs.plot_flat_out(session, log)

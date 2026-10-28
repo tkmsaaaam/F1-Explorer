@@ -7,7 +7,7 @@ from unittest.mock import Mock
 import pandas as pd
 import pytest
 
-from f1_explorer.telemetry import lap_telemetry_without_driver_ahead
+from f1_explorer.telemetry import last_valid_distance, lap_telemetry_without_driver_ahead
 
 
 @pytest.mark.parametrize("frequency", ["original", 2])
@@ -111,3 +111,16 @@ def test_fallback_handles_empty_telemetry_or_propagates_failure(failure):
     else:
         with pytest.raises(ValueError, match="unavailable"):
             lap_telemetry_without_driver_ahead(LapLike())
+
+
+@pytest.mark.parametrize("telemetry, expected", [
+    (None, None),
+    (pd.DataFrame(), None),
+    (pd.DataFrame({"Time": [0, 1]}), None),
+    (pd.DataFrame({"Distance": [float("nan"), float("inf")]}), None),
+    (pd.DataFrame({"Distance": [0, 0]}), None),
+    (pd.DataFrame({"Distance": [100, float("nan")]}), 100.0),
+    (pd.DataFrame({"Distance": [0, 100, 200]}), 200.0),
+])
+def test_last_valid_distance_handles_missing_and_invalid_samples(telemetry, expected):
+    assert last_valid_distance(telemetry) == expected

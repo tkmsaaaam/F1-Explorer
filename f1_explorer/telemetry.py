@@ -4,6 +4,9 @@ from __future__ import annotations
 
 from typing import Any
 
+import numpy as np
+import pandas as pd
+
 from f1_explorer.scalars import call_dynamic
 
 from opentelemetry import trace
@@ -54,3 +57,12 @@ def lap_telemetry_without_driver_ahead(lap: Any, *, add_distance: bool = False) 
         telemetry = telemetry.add_distance()
     _record_row_count(telemetry)
     return telemetry
+
+
+def last_valid_distance(telemetry: Any) -> float | None:
+    """Return the last finite distance sample, or None when unavailable."""
+    if telemetry is None or getattr(telemetry, "empty", True) or "Distance" not in telemetry:
+        return None
+    distances = pd.to_numeric(telemetry["Distance"], errors="coerce").to_numpy(dtype=float)
+    valid = distances[np.isfinite(distances) & (distances > 0)]
+    return float(valid[-1]) if valid.size else None

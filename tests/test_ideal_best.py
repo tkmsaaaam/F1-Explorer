@@ -1,4 +1,4 @@
-"""Characterize the selected laps and NaT behavior of both ideal-best figures."""
+"""Verify accurate-lap selection and robust sector-time minima."""
 import json
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
@@ -43,14 +43,32 @@ def test_sector_minima_can_come_from_different_laps_and_preserve_driver_order():
     assert [(trace['x'], trace['y']) for trace in figures[1]['data']] == [([0.0], [95.0]), ([-2.0], [88.0])]
 
 
-@pytest.mark.parametrize('row, expected_ideal, expected_delta', [(0, None, None), (1, 88.0, -2.0)])
-def test_nat_sector_keeps_python_min_order_behavior(row, expected_ideal, expected_delta):
+@pytest.mark.parametrize('row', [0, 1, 2])
+def test_nat_sector_order_does_not_change_sector_minimum(row):
     laps = _laps()
     laps.loc[row, 'Sector1Time'] = pd.NaT
     figures = _figures(laps)
-    assert figures[0]['data'][1]['y'] == [expected_ideal]
-    assert figures[1]['data'][1]['y'] == [expected_ideal]
-    assert figures[1]['data'][1]['x'] == [expected_delta]
+    expected = 90.0 if row == 0 else 88.0
+    assert figures[0]['data'][1]['y'] == [expected]
+    assert figures[1]['data'][1]['y'] == [expected]
+    assert figures[1]['data'][1]['x'] == [expected - 90.0]
+
+
+@pytest.mark.parametrize('bad_value', [pd.NaT, pd.to_timedelta(0, unit='s'), pd.to_timedelta(-1, unit='s')])
+def test_driver_is_omitted_when_any_sector_has_no_positive_candidate(bad_value):
+    laps = _laps()
+    laps.loc[laps.DriverNumber == '1', 'Sector2Time'] = bad_value
+    figures = _figures(laps)
+    assert [trace['name'] for trace in figures[0]['data']] == ['BBB']
+    assert [trace['name'] for trace in figures[1]['data']] == ['BBB']
+
+
+@pytest.mark.parametrize('bad_value', [pd.NaT, pd.to_timedelta(0, unit='s'), pd.to_timedelta(-1, unit='s')])
+def test_invalid_sector_values_do_not_replace_valid_minimum(bad_value):
+    laps = _laps()
+    laps.loc[0, 'Sector1Time'] = bad_value
+    figures = _figures(laps)
+    assert figures[0]['data'][1]['y'] == [90.0]
 
 
 @pytest.mark.parametrize('condition', ['empty', 'no_fastest', 'inaccurate'])

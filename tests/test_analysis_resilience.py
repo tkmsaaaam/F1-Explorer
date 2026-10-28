@@ -1,5 +1,6 @@
 from unittest.mock import MagicMock
 
+import pandas as pd
 import pytest
 
 import analyze_practice
@@ -37,3 +38,25 @@ def test_optional_circuit_metadata_preserves_telemetry_figure():
     figure = make_telemetry_comparison(session)
     assert figure.layout.xaxis.title.text == "Distance [m]"
     session.get_circuit_info.assert_called_once()
+
+
+@pytest.mark.parametrize("entrypoint", [analyze_practice, analyze_qualifying])
+@pytest.mark.parametrize("telemetry", [
+    None,
+    pd.DataFrame(),
+    pd.DataFrame({"Time": [0, 1]}),
+    pd.DataFrame({"Distance": [float("nan"), float("inf")]}),
+    pd.DataFrame({"Distance": [0, 0]}),
+])
+def test_entrypoint_skips_fastest_lap_circuit_plots_without_valid_distance(entrypoint, telemetry):
+    log = MagicMock()
+
+    assert entrypoint._fastest_distance_or_none(telemetry, log) is None
+    log.warning.assert_called_once()
+
+
+@pytest.mark.parametrize("entrypoint", [analyze_practice, analyze_qualifying])
+def test_entrypoint_uses_last_finite_positive_distance(entrypoint):
+    telemetry = pd.DataFrame({"Distance": [0, 500, float("nan"), 1234]})
+
+    assert entrypoint._fastest_distance_or_none(telemetry, MagicMock()) == 1234

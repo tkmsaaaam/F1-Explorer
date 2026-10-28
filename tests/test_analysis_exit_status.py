@@ -152,6 +152,38 @@ def test_unhandled_failure_propagates_without_new_success_record(analysis, stage
     assert current_report() is None
 
 
+@pytest.mark.parametrize("analysis", [
+    ("practice", "FP1", "Practice 1"),
+    ("qualifying", "Q", "Qualifying"),
+], indirect=True, ids=["FP", "Q"])
+@pytest.mark.parametrize("telemetry", [
+    None,
+    pd.DataFrame(),
+    pd.DataFrame({"Time": [0, 1]}),
+    pd.DataFrame({"Distance": [float("nan"), float("inf")]}),
+    pd.DataFrame({"Distance": [0, 0]}),
+])
+def test_missing_fastest_distance_skips_circuit_charts_and_writes_report(analysis, telemetry, monkeypatch):
+    module = analysis.module
+    mini_segment = MagicMock()
+    segment_tables = MagicMock()
+    monkeypatch.setattr(module.short_runs, "plot_mini_segment_on_circuit", mini_segment)
+    monkeypatch.setattr(module.short_runs, "compute_and_save_segment_tables_plotly", segment_tables)
+    fastest = MagicMock()
+    analysis.session.laps.pick_fastest.return_value = fastest
+    module._circuit_info_or_none.return_value = SimpleNamespace(
+        corners=pd.DataFrame({"Distance": [100.0]}),
+    )
+    module.lap_telemetry_without_driver_ahead.return_value = telemetry
+
+    assert module.main() == 0
+
+    mini_segment.assert_not_called()
+    segment_tables.assert_not_called()
+    analysis.report.write.assert_called_once()
+    analysis.log.warning.assert_any_call("Skipping circuit-dependent analysis without valid fastest-lap distances")
+
+
 def test_success_returns_zero_after_report_and_manifest(analysis):
     assert analysis.module.main() == 0
     analysis.report.write.assert_called_once_with(scan_existing=False)

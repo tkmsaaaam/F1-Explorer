@@ -374,22 +374,45 @@ def plot_flat_out(session: Session, log: structlog.stdlib.BoundLogger, *, output
     for driver_number in driver_numbers:
         lap = session.laps.pick_drivers(driver_number).pick_fastest()
         if lap is None:
+            log.warning("Skipping flat-out point without a fastest lap", driver_number=driver_number)
             continue
         tel: Telemetry = lap_telemetry_without_driver_ahead(lap)
-        is_flat_out_prev = (tel.Throttle > float(tel.Throttle.max()) - 3).shift(1, fill_value=False)
-        sum_distance = (tel.Distance.diff() * is_flat_out_prev).sum()
-        sum_time = (tel.Time.dt.total_seconds().diff() * is_flat_out_prev).sum()
-        z = tel.iloc[-1]
-        try:
-            lap_distance = float(z.Distance)
-        except (TypeError, ValueError):
+        required = {"Throttle", "Distance", "Time"}
+        if tel is None or tel.empty or not required.issubset(tel.columns):
+            log.warning("Skipping flat-out point without required telemetry", driver_number=driver_number)
             continue
-        if not math.isfinite(lap_distance) or lap_distance <= 0:
+        throttle = pandas.to_numeric(tel["Throttle"], errors="coerce")
+        distance = pandas.to_numeric(tel["Distance"], errors="coerce")
+        time = tel["Time"]
+        if pandas.api.types.is_timedelta64_dtype(time):
+            time = time.dt.total_seconds()
+        elif pandas.api.types.is_datetime64_any_dtype(time):
+            time = (time - time.iloc[0]).dt.total_seconds()
+        else:
+            time = pandas.to_numeric(time, errors="coerce")
+        data = pandas.DataFrame({"Throttle": throttle, "Distance": distance, "Time": time})
+        data = data.replace([np.inf, -np.inf], np.nan)
+        if data.isna().any().any():
+            log.warning("Skipping flat-out point with incomplete telemetry", driver_number=driver_number)
             continue
-        x = sum_distance / lap_distance
+        if len(data) < 2:
+            log.warning("Skipping flat-out point without valid telemetry samples", driver_number=driver_number)
+            continue
+        total_distance = float(data["Distance"].iloc[-1])
+        total_time = float(data["Time"].iloc[-1] - data["Time"].iloc[0])
+        if not math.isfinite(total_distance) or total_distance <= 0 or not math.isfinite(total_time) or total_time <= 0:
+            log.warning("Skipping flat-out point with invalid lap distance or time", driver_number=driver_number)
+            continue
+        is_flat_out_prev = (data.Throttle > float(data.Throttle.max()) - 3).shift(1, fill_value=False)
+        sum_distance = float((data.Distance.diff() * is_flat_out_prev).sum())
+        sum_time = float((data.Time.diff() * is_flat_out_prev).sum())
+        x = sum_distance / total_distance
         if x < 0.1:
             continue
-        y = sum_time / (z.Time.total_seconds() - tel.Time.iloc[0].total_seconds())
+        y = sum_time / total_time
+        if not math.isfinite(x) or not math.isfinite(y):
+            log.warning("Skipping flat-out point with invalid calculated ratio", driver_number=driver_number)
+            continue
         try:
             color = fastf1.plotting.get_team_color(lap.Team, session)
         except AttributeError:
@@ -401,16 +424,20 @@ def plot_flat_out(session: Session, log: structlog.stdlib.BoundLogger, *, output
 
 
 def _best_sector_seconds(laps: Laps) -> tuple[float, float, float]:
-    """Return independent sector minima from the caller's selected lap order.
-
-    Python min deliberately preserves the existing behavior for NaT/NaN;
-    changing missing-value policy belongs to a separate correctness change.
-    """
-    return (
-        min([laps.iloc[i].Sector1Time.total_seconds() for i in range(len(laps))]),
-        min([laps.iloc[i].Sector2Time.total_seconds() for i in range(len(laps))]),
-        min([laps.iloc[i].Sector3Time.total_seconds() for i in range(len(laps))]),
-    )
+    """Return independent positive finite sector minima or raise if unavailable."""
+    minima = []
+    for column in ("Sector1Time", "Sector2Time", "Sector3Time"):
+        try:
+            sector_times = [getattr(laps.iloc[index], column) for index in range(len(laps))]
+        except (AttributeError, KeyError, TypeError, IndexError) as error:
+            raise ValueError(f"Missing sector time column: {column}") from error
+        seconds = pandas.to_timedelta(pandas.Series(sector_times), errors="coerce").dt.total_seconds()
+        values = pandas.to_numeric(seconds, errors="coerce").to_numpy(dtype=float)
+        values = values[np.isfinite(values) & (values > 0)]
+        if values.size == 0:
+            raise ValueError(f"No valid sector times in {column}")
+        minima.append(float(values.min()))
+    return tuple(minima)
 
 
 @tracer.start_as_current_span("plot_ideal_best")
@@ -430,7 +457,11 @@ def plot_ideal_best(session: Session, log: structlog.stdlib.BoundLogger, *, outp
         if fastest is None:
             continue
         x = fastest.LapTime.total_seconds()
-        sec1, sec2, sec3 = _best_sector_seconds(laps)
+        try:
+            sec1, sec2, sec3 = _best_sector_seconds(laps)
+        except (AttributeError, TypeError, ValueError) as error:
+            log.warning("Skipping ideal-best point with unavailable sector times", driver_number=driver_number, reason=str(error))
+            continue
         y = sec1 + sec2 + sec3
         acronym = laps.Driver.iloc[0]
         try:
@@ -459,7 +490,11 @@ def plot_ideal_best_diff(session: Session, log: structlog.stdlib.BoundLogger, *,
             color = fastf1.plotting.get_team_color(laps.Team.iloc[0], session)
         except AttributeError:
             color = 'gray'
-        sec1, sec2, sec3 = _best_sector_seconds(laps)
+        try:
+            sec1, sec2, sec3 = _best_sector_seconds(laps)
+        except (AttributeError, TypeError, ValueError) as error:
+            log.warning("Skipping ideal-best-difference point with unavailable sector times", driver_number=driver_number, reason=str(error))
+            continue
         y = sec1 + sec2 + sec3
         fastest = laps.pick_fastest()
         if fastest is None:

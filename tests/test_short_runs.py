@@ -12,6 +12,7 @@ import matplotlib.pyplot as plt
 from matplotlib.collections import LineCollection
 import pandas as pd
 import numpy as np
+import pytest
 
 from f1_explorer.separator_estimator import SeparatorBoundary
 from f1_explorer.visualizations.short_runs import (
@@ -293,6 +294,28 @@ def test_flat_out_skips_zero_distance_laps_without_runtime_warning():
         plot_flat_out(session, MagicMock())
 
     save.assert_called_once()
+
+
+@pytest.mark.parametrize("telemetry", [
+    None,
+    pd.DataFrame(),
+    pd.DataFrame({"Throttle": [100, 100], "Time": pd.to_timedelta([0, 1], unit="s")}),
+    pd.DataFrame({"Throttle": [100, 100], "Distance": [0, 100], "Time": [0, 0]}),
+    pd.DataFrame({"Throttle": [100, np.nan], "Distance": [0, 100],
+                  "Time": pd.to_timedelta([0, 1], unit="s")}),
+])
+def test_flat_out_skips_unavailable_or_invalid_telemetry(telemetry):
+    lap = SimpleNamespace(telemetry=telemetry)
+    laps = MagicMock()
+    laps.DriverNumber.unique.return_value = np.array(["1"])
+    laps.pick_drivers.return_value.pick_fastest.return_value = lap
+    session = SimpleNamespace(laps=laps)
+
+    with patch("f1_explorer.visualizations.short_runs._save_summary_scatter") as save:
+        plot_flat_out(session, MagicMock())
+
+    fig = save.call_args.args[0]
+    assert fig.data == ()
 
 
 def test_speed_on_track_uses_colored_line_collection_and_vertical_colorbar() -> None:
