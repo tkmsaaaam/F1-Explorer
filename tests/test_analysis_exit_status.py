@@ -53,6 +53,8 @@ def analysis(request, monkeypatch, tmp_path):
     monkeypatch.setattr(module, "session_output_dir", lambda session: tmp_path / "images")
     monkeypatch.setattr(module, "session_report_dir", lambda session: tmp_path / "report")
     monkeypatch.setattr(module, "build_fingerprint", MagicMock())
+    monkeypatch.setattr(module, "session_input_fingerprint", MagicMock(return_value={"algorithm": "test", "hash": "x"}))
+    monkeypatch.setattr(module, "session_is_finished", MagicMock(return_value=True))
     monkeypatch.setattr(module, "should_skip", MagicMock(return_value=False))
     manifest = MagicMock()
     monkeypatch.setattr(module, "write_success_manifest", manifest)
@@ -134,6 +136,40 @@ def test_unchanged_session_is_normal_skip(analysis):
     assert analysis.module.main() == 0
     analysis.module.SessionReport.assert_not_called()
     analysis.manifest.assert_not_called()
+    analysis.session.load.assert_called_once()
+
+
+def test_loaded_input_change_regenerates_then_identical_input_skips(analysis):
+    first = {"algorithm": "test", "hash": "first"}
+    changed = {"algorithm": "test", "hash": "changed"}
+    analysis.module.session_input_fingerprint.side_effect = [first, changed, changed]
+    previous = None
+
+    def compare_loaded_input(*args, **kwargs):
+        nonlocal previous
+        current = kwargs["session_input"]
+        should_reuse = previous == current
+        previous = current
+        return should_reuse
+
+    analysis.module.should_skip.side_effect = compare_loaded_input
+    assert analysis.module.main() == 0
+    assert analysis.module.main() == 0
+    assert analysis.module.main() == 0
+    assert analysis.report.write.call_count == 2
+    assert analysis.session.load.call_count == 3
+    assert analysis.manifest.call_count == 2
+
+
+@pytest.mark.parametrize("unusable", ["unfinished", "hash-failure"])
+def test_unfinished_or_unhashable_input_writes_report_without_success_manifest(analysis, unusable):
+    if unusable == "unfinished":
+        analysis.module.session_is_finished.return_value = False
+    else:
+        analysis.module.session_input_fingerprint.return_value = None
+    assert analysis.module.main() == 0
+    assert analysis.report.write.call_count == 1
+    analysis.manifest.assert_not_called()
 
 
 @pytest.mark.parametrize("stage", ["load", "analysis", "report", "manifest"])
@@ -147,6 +183,8 @@ def test_unhandled_failure_propagates_without_new_success_record(analysis, stage
     failing_call.side_effect = RuntimeError(f"{stage} failed")
     with pytest.raises(RuntimeError, match=f"{stage} failed"):
         analysis.module.main()
+    if stage == "load":
+        assert not manifest_path(analysis.report_dir).exists()
     if stage != "manifest":
         analysis.manifest.assert_not_called()
     assert current_report() is None

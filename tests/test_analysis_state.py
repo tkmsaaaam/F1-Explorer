@@ -8,6 +8,8 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
+import pandas as pd
+
 from f1_explorer.analysis_state import (
     MISSING_VERSION,
     SCHEMA_VERSION,
@@ -25,9 +27,26 @@ IDENTITY = {
     "session": "Race",
     "entrypoint": "analyze_race.py",
 }
+SESSION_INPUT = {"algorithm": "fastf1-session-input-v1", "hash": "a" * 64,
+                 "components": ["event"], "fastf1_version": "test"}
 
 
 class AnalysisStateTest(unittest.TestCase):
+    def _session_inputs(self):
+        from types import SimpleNamespace
+
+        data = pd.DataFrame({"Time": [pd.Timestamp("2026-01-01")], "Value": [1]})
+        return SimpleNamespace(
+            event={"Year": 2026, "Round": 1},
+            results=pd.DataFrame({"Position": [1], "Driver": ["AAA"]}),
+            laps=pd.DataFrame({"LapNumber": [1], "Value": [1]}),
+            weather_data=data.copy(),
+            session_status=pd.DataFrame({"Status": ["Finished"]}),
+            track_status=pd.DataFrame({"Time": [pd.Timestamp("2026-01-01")], "Status": ["1"]}),
+            car_data={"1": data.copy()}, pos_data={"1": data.copy()},
+            race_control_messages=pd.DataFrame({"Time": [pd.Timestamp("2026-01-01")], "Message": ["green"]}),
+        )
+
     def test_manifest_excludes_unused_pngs_but_tracks_retained_images_and_logs(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = self._repo(Path(temporary) / "repo")
@@ -42,16 +61,16 @@ class AnalysisStateTest(unittest.TestCase):
             fingerprint = self._fingerprint(root)
             manifest = write_success_manifest(
                 report_dir, fingerprint, IDENTITY,
-                extra_output_paths=(retained, log), required_output_paths=(retained,),
+                extra_output_paths=(retained, log), required_output_paths=(retained,), session_input=SESSION_INPUT,
             )
             files = json.loads(manifest.read_text())["output_files"]
             self.assertIn(str(retained.resolve()), files)
             self.assertIn(str(log.resolve()), files)
             self.assertNotIn(str(stale.resolve()), files)
             stale.unlink()
-            self.assertTrue(should_skip(manifest, fingerprint, IDENTITY))
+            self.assertTrue(should_skip(manifest, fingerprint, IDENTITY, session_input=SESSION_INPUT))
             retained.unlink()
-            self.assertFalse(should_skip(manifest, fingerprint, IDENTITY))
+            self.assertFalse(should_skip(manifest, fingerprint, IDENTITY, session_input=SESSION_INPUT))
 
     def _repo(self, root: Path) -> Path:
         root.mkdir(parents=True, exist_ok=True)
@@ -116,14 +135,18 @@ class AnalysisStateTest(unittest.TestCase):
             output.write_bytes(b"image")
             fingerprint = self._fingerprint(root)
             path = write_success_manifest(output_dir, fingerprint, IDENTITY,
-                                          extra_output_paths=(output,), required_output_paths=(output,))
+                                          extra_output_paths=(output,), required_output_paths=(output,), session_input=SESSION_INPUT)
 
-            self.assertTrue(should_skip(path, fingerprint, IDENTITY))
+            self.assertTrue(should_skip(path, fingerprint, IDENTITY, session_input=SESSION_INPUT))
             self.assertFalse(should_skip(path, fingerprint, IDENTITY, force=True))
+            self.assertFalse(should_skip(path, fingerprint, IDENTITY, session_input=SESSION_INPUT, complete=False))
+            self.assertFalse(should_skip(path, fingerprint, IDENTITY, session_input=None))
+            changed_input = {**SESSION_INPUT, "hash": "b" * 64}
+            self.assertFalse(should_skip(path, fingerprint, IDENTITY, session_input=changed_input))
             changed_identity = {**IDENTITY, "session": "Qualifying"}
-            self.assertFalse(should_skip(path, fingerprint, changed_identity))
+            self.assertFalse(should_skip(path, fingerprint, changed_identity, session_input=SESSION_INPUT))
             output.unlink()
-            self.assertFalse(should_skip(path, fingerprint, IDENTITY))
+            self.assertFalse(should_skip(path, fingerprint, IDENTITY, session_input=SESSION_INPUT))
 
     def test_corrupt_and_old_manifest_are_cache_misses(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -135,12 +158,12 @@ class AnalysisStateTest(unittest.TestCase):
             fingerprint = self._fingerprint(root)
             path = manifest_path(output_dir)
             path.write_text("not json", encoding="utf-8")
-            self.assertFalse(should_skip(path, fingerprint, IDENTITY))
+            self.assertFalse(should_skip(path, fingerprint, IDENTITY, session_input=SESSION_INPUT))
 
             path.write_text(
                 json.dumps({"schema_version": SCHEMA_VERSION - 1}), encoding="utf-8"
             )
-            self.assertFalse(should_skip(path, fingerprint, IDENTITY))
+            self.assertFalse(should_skip(path, fingerprint, IDENTITY, session_input=SESSION_INPUT))
 
     def test_success_manifest_contains_metadata_and_is_written_atomically(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -155,7 +178,7 @@ class AnalysisStateTest(unittest.TestCase):
 
             path = write_success_manifest(
                 output_dir, fingerprint, IDENTITY, extra_output_paths=(external, nested),
-                required_output_paths=(external,)
+                required_output_paths=(external,), session_input=SESSION_INPUT
             )
             payload = json.loads(path.read_text(encoding="utf-8"))
 
@@ -168,7 +191,7 @@ class AnalysisStateTest(unittest.TestCase):
             self.assertIn(str(external.resolve()), payload["output_files"])
             self.assertTrue(payload["completed_at"].endswith("Z"))
             self.assertEqual(list(output_dir.glob("*.tmp")), [])
-            self.assertTrue(should_skip(path, fingerprint, IDENTITY))
+            self.assertTrue(should_skip(path, fingerprint, IDENTITY, session_input=SESSION_INPUT))
 
     def test_manifest_tracks_outputs_from_a_separate_image_directory(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -188,16 +211,16 @@ class AnalysisStateTest(unittest.TestCase):
                 report_dir,
                 fingerprint,
                 IDENTITY,
-                extra_output_paths=(report, image), required_output_paths=(report,),
+                extra_output_paths=(report, image), required_output_paths=(report,), session_input=SESSION_INPUT,
             )
             payload = json.loads(path.read_text(encoding="utf-8"))
 
             self.assertIn("report.html", payload["output_files"])
             self.assertIn(str(image.resolve()), payload["output_files"])
             self.assertNotIn(str((image_dir / ".analysis-manifest.json").resolve()), payload["output_files"])
-            self.assertTrue(should_skip(path, fingerprint, IDENTITY))
+            self.assertTrue(should_skip(path, fingerprint, IDENTITY, session_input=SESSION_INPUT))
             image.unlink()
-            self.assertFalse(should_skip(path, fingerprint, IDENTITY))
+            self.assertFalse(should_skip(path, fingerprint, IDENTITY, session_input=SESSION_INPUT))
 
     def test_manifest_requires_explicit_existing_outputs_and_can_be_invalidated(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -214,17 +237,19 @@ class AnalysisStateTest(unittest.TestCase):
             required = output_dir / "new.png"
             with self.assertRaises(FileNotFoundError):
                 write_success_manifest(output_dir, fingerprint, IDENTITY,
-                                       extra_output_paths=(required,), required_output_paths=(required,))
+                                       extra_output_paths=(required,), required_output_paths=(required,),
+                                       session_input=SESSION_INPUT)
             self.assertTrue(stale.is_file())
             required.write_bytes(b"stale output")
             with self.assertRaises(ValueError):
                 write_success_manifest(output_dir, fingerprint, IDENTITY,
-                                       extra_output_paths=(stale,), required_output_paths=(required,))
+                                       extra_output_paths=(stale,), required_output_paths=(required,),
+                                       session_input=SESSION_INPUT)
             current = output_dir / "current.html"
             current.write_text("current", encoding="utf-8")
             manifest = write_success_manifest(
                 output_dir, fingerprint, IDENTITY, extra_output_paths=(current,),
-                required_output_paths=(current,),
+                required_output_paths=(current,), session_input=SESSION_INPUT,
             )
             files = json.loads(manifest.read_text(encoding="utf-8"))["output_files"]
             self.assertEqual(files, ["current.html"])
@@ -235,6 +260,118 @@ class AnalysisStateTest(unittest.TestCase):
             invalidate_success_manifest(output_dir)
             self.assertFalse(previous.exists())
             self.assertTrue(stale.is_file())
+
+    def test_session_input_normalization_and_finished_gate(self) -> None:
+        from f1_explorer.analysis_state import session_input_fingerprint, session_is_finished
+
+        frame = pd.DataFrame({"Time": [pd.Timestamp("2026-01-01"), pd.NaT],
+                              "Value": [1.0, float("nan")]}, index=[4, 5])
+        session = type("Session", (), {})()
+        session.event = {"Year": 2026, "Round": 1}
+        session.results = pd.DataFrame({"Position": [1], "Driver": ["AAA"]})
+        session.laps = frame.assign(LapNumber=[1, 2])
+        session.weather_data = pd.DataFrame({"Time": [pd.Timestamp("2026-01-01 00:00:01")]})
+        session.session_status = pd.DataFrame({"Status": ["Started", "FINISHED"]})
+        session.track_status = pd.DataFrame({"Time": [pd.Timestamp("2026-01-01 00:00:01")], "Status": ["1"]})
+        session.car_data = {"1": frame}
+        session.pos_data = {"1": frame}
+        session.race_control_messages = pd.DataFrame({"Time": [pd.Timestamp("2026-01-01 00:00:01")], "Message": ["test"]})
+        first = session_input_fingerprint(session, include_messages=True)
+        self.assertTrue(session_is_finished(session))
+        self.assertIsNotNone(first)
+        session.laps.loc[4, "Value"] = 2.0
+        self.assertNotEqual(first["hash"], session_input_fingerprint(session, include_messages=True)["hash"])
+        session.session_status = pd.DataFrame({"Status": ["Finalised"]})
+        self.assertFalse(session_is_finished(session))
+        session.session_status = pd.DataFrame()
+        self.assertFalse(session_is_finished(session))
+        del session.results
+        self.assertIsNone(session_input_fingerprint(session, include_messages=True))
+        session = self._session_inputs()
+        session.results = None
+        self.assertIsNone(session_input_fingerprint(session, include_messages=True))
+
+        class Unavailable:
+            @property
+            def results(self):
+                raise RuntimeError("FastF1 data not loaded")
+
+        broken = Unavailable()
+        for name, value in vars(self._session_inputs()).items():
+            if name != "results":
+                setattr(broken, name, value)
+        self.assertIsNone(session_input_fingerprint(broken, include_messages=True))
+
+    def test_each_raw_session_component_changes_the_fingerprint(self) -> None:
+        from f1_explorer.analysis_state import session_input_fingerprint
+
+        changes = {
+            "event": lambda s: s.event.update(Round=2),
+            "results": lambda s: s.results.__setitem__("Position", [2]),
+            "laps": lambda s: s.laps.__setitem__("Value", [2]),
+            "weather_data": lambda s: s.weather_data.__setitem__("Value", [2]),
+            "session_status": lambda s: s.session_status.__setitem__("Status", ["Started"]),
+            "track_status": lambda s: s.track_status.__setitem__("Status", ["2"]),
+            "car_data": lambda s: s.car_data["1"].__setitem__("Value", [2]),
+            "pos_data": lambda s: s.pos_data["1"].__setitem__("Value", [2]),
+            "race_control_messages": lambda s: s.race_control_messages.__setitem__("Message", ["red"]),
+        }
+        for component, change in changes.items():
+            with self.subTest(component=component):
+                session = self._session_inputs()
+                before = session_input_fingerprint(session, include_messages=True)
+                change(session)
+                after = session_input_fingerprint(session, include_messages=True)
+                self.assertIsNotNone(before)
+                self.assertNotEqual(before["hash"], after["hash"])
+        without_messages = session_input_fingerprint(self._session_inputs(), include_messages=False)
+        with_messages = session_input_fingerprint(self._session_inputs(), include_messages=True)
+        self.assertNotEqual(without_messages["hash"], with_messages["hash"])
+        self.assertNotIn("race_control_messages", without_messages["components"])
+
+    def test_dataframe_shape_order_missing_and_numeric_types_are_explicit(self) -> None:
+        from f1_explorer.analysis_state import session_input_fingerprint
+
+        baseline = self._session_inputs()
+        base_hash = session_input_fingerprint(baseline, include_messages=False)["hash"]
+        variants = []
+        changed = self._session_inputs()
+        changed.laps = changed.laps.set_index(pd.Index([8]))
+        variants.append(("index", changed))
+        changed = self._session_inputs()
+        changed.laps = changed.laps[["Value", "LapNumber"]]
+        variants.append(("column order", changed))
+        changed = self._session_inputs()
+        changed.laps["Extra"] = [1]
+        variants.append(("added column", changed))
+        changed = self._session_inputs()
+        changed.laps = changed.laps.drop(columns="LapNumber")
+        variants.append(("missing required column", changed))
+        changed = self._session_inputs()
+        changed.pos_data["1"] = changed.pos_data["1"].drop(columns="Time")
+        variants.append(("missing telemetry column", changed))
+        changed = self._session_inputs()
+        changed.laps = pd.DataFrame({"LapNumber": [1, 2], "Value": [1, 2]})
+        changed.laps = changed.laps.iloc[::-1]
+        variants.append(("row order", changed))
+        for label, session in variants:
+            with self.subTest(label=label):
+                current = session_input_fingerprint(session, include_messages=False)
+                if label.startswith("missing"):
+                    self.assertIsNone(current)
+                else:
+                    self.assertNotEqual(base_hash, current["hash"])
+
+        left = self._session_inputs()
+        left.laps = pd.DataFrame({"LapNumber": [1], "Value": [float("nan")]})
+        right = self._session_inputs()
+        right.laps = pd.DataFrame({"LapNumber": [1], "Value": [None]})
+        self.assertEqual(session_input_fingerprint(left, include_messages=False)["hash"],
+                         session_input_fingerprint(right, include_messages=False)["hash"])
+        left.laps["Value"] = [1]
+        right.laps["Value"] = [1.0]
+        self.assertNotEqual(session_input_fingerprint(left, include_messages=False)["hash"],
+                            session_input_fingerprint(right, include_messages=False)["hash"])
 
 
 if __name__ == "__main__":

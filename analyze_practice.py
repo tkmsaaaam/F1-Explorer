@@ -17,6 +17,7 @@ from f1_explorer.telemetry import last_valid_distance, lap_telemetry_without_dri
 from f1_explorer.visualizations.output import save_plotly
 from f1_explorer.analysis_state import (
     build_fingerprint, invalidate_success_manifest, manifest_path, should_skip, write_success_manifest,
+    session_input_fingerprint, session_is_finished,
 )
 from f1_explorer.separator_estimator import persist_resolution, resolve_separators
 
@@ -75,7 +76,13 @@ def main(*, force: bool = False, refresh_separators: bool = False) -> int:
     # Load before deciding whether an unchanged report can be skipped: an unsaved
     # circuit separator is an input to this report and may need estimating.
     with tracer.start_as_current_span("session.load"):
-        session.load(messages=False)
+        try:
+            session.load(messages=False)
+        except Exception:
+            invalidate_success_manifest(report_dir)
+            raise
+    session_input = session_input_fingerprint(session, include_messages=False)
+    complete = session_is_finished(session)
     with tracer.start_as_current_span("resolve_separators"):
         separator_resolution = resolve_separators(
             session,
@@ -96,20 +103,21 @@ def main(*, force: bool = False, refresh_separators: bool = False) -> int:
         Path(__file__), Path(__file__).resolve().parent, Path("config.json")
     )
     if not separator_resolution.pending_save and should_skip(
-        manifest_path(report_dir), fingerprint, identity, force=force or refresh_separators
+        manifest_path(report_dir), fingerprint, identity, force=force or refresh_separators,
+        session_input=session_input, complete=complete,
     ):
-        log.info("Analysis skipped; source and environment fingerprint unchanged")
+        log.info("Analysis skipped; loaded session inputs and analysis environment match the successful report")
         return 0
     invalidate_success_manifest(report_dir)
     report = SessionReport(session, output_dir, report_dir=report_dir)
     with report:
         _analyze_session(session, config, log, report, output_dir, report_dir, identity,
-                         separator_resolution, refresh_separators)
+                         separator_resolution, refresh_separators, session_input, complete)
     return 0
 
 
 def _analyze_session(session, config, log, report, output_dir, report_dir, identity,
-                     separator_resolution, refresh_separators):
+                     separator_resolution, refresh_separators, session_input, complete):
     config.set_attribute_to_span()
     log.info(
         f"{session.event.year} Race {session.event['RoundNumber']} {session.event.EventName} {config.get_session()}")
@@ -194,19 +202,21 @@ def _analyze_session(session, config, log, report, output_dir, report_dir, ident
     fingerprint = build_fingerprint(
         Path(__file__), Path(__file__).resolve().parent, Path("config.json")
     )
-    write_success_manifest(
-        report_dir,
-        fingerprint,
-        identity,
-        extra_output_paths=report.written_output_paths(),
-        required_output_paths=(report.report_dir / "report.html", *report.required_png_paths()),
-    )
+    if complete and session_input is not None:
+        write_success_manifest(
+            report_dir,
+            fingerprint,
+            identity,
+            extra_output_paths=report.written_output_paths(),
+            required_output_paths=(report.report_dir / "report.html", *report.required_png_paths()),
+            session_input=session_input,
+        )
     return None
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Analyze a Formula 1 practice session")
-    parser.add_argument("--force", action="store_true", help="rerun even when the analysis is unchanged")
+    parser.add_argument("--force", action="store_true", help="re-analyze loaded data; does not refresh FastF1 upstream cache")
     parser.add_argument(
         "--refresh-separators",
         action="store_true",

@@ -8,7 +8,7 @@ the cache decision so that unrelated commits do not force an analysis rerun.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 import hashlib
 from importlib import metadata
 import json
@@ -18,14 +18,31 @@ import platform
 import re
 import subprocess
 import tempfile
+from collections.abc import Mapping as RuntimeMapping
 from typing import Iterable, Mapping, TypeAlias
 
+import fastf1
+import math
+import numpy as np
+import pandas as pd
 
-# Version 3 records only outputs explicitly produced by the current run.
-SCHEMA_VERSION = 3
+
+# Version 4 adds a loaded-session input fingerprint to successful manifests.
+SCHEMA_VERSION = 4
 MANIFEST_FILENAME = ".analysis-manifest.json"
 MISSING_VERSION = "<missing>"
 _IDENTITY_KEYS = frozenset({"year", "round", "session", "entrypoint"})
+SESSION_INPUT_ALGORITHM = "fastf1-session-input-v1"
+SESSION_INPUT_COMPONENTS = (
+    "event", "results", "laps", "weather_data", "session_status",
+    "track_status", "car_data", "pos_data", "race_control_messages",
+)
+_REQUIRED_INPUT_COLUMNS = {
+    "results": {"Position"}, "laps": {"LapNumber"}, "weather_data": {"Time"},
+    "session_status": {"Status"}, "track_status": {"Time", "Status"},
+    "race_control_messages": {"Time", "Message"},
+    "car_data": {"Time"}, "pos_data": {"Time"},
+}
 
 JsonScalar: TypeAlias = str | int | float | bool | None
 AnalysisIdentity: TypeAlias = Mapping[str, JsonScalar]
@@ -79,6 +96,122 @@ def _canonical_hash(value: object) -> str:
         separators=(",", ":"),
     ).encode("utf-8")
     return _sha256(encoded)
+
+
+def _normalise_input_value(value: object) -> object:
+    """Turn FastF1 and pandas values into deterministic JSON with explicit nulls."""
+    if value is None or value is pd.NA or value is pd.NaT:
+        return None
+    if isinstance(value, pd.DataFrame):
+        return {
+            "kind": "dataframe", "columns": [_normalise_input_value(v) for v in value.columns],
+            "index": [_normalise_input_value(v) for v in value.index],
+            "rows": [[_normalise_input_value(v) for v in row] for row in value.itertuples(index=False, name=None)],
+        }
+    if isinstance(value, pd.Series):
+        return {"kind": "series", "name": _normalise_input_value(value.name),
+                "index": [_normalise_input_value(v) for v in value.index],
+                "values": [_normalise_input_value(v) for v in value.array]}
+    if isinstance(value, pd.Index):
+        return {"kind": "index", "values": [_normalise_input_value(v) for v in value]}
+    if isinstance(value, RuntimeMapping):
+        return {str(k): _normalise_input_value(value[k]) for k in sorted(value, key=lambda item: str(item))}
+    if isinstance(value, np.ndarray):
+        return [_normalise_input_value(v) for v in value.tolist()]
+    if isinstance(value, (list, tuple)):
+        return [_normalise_input_value(v) for v in value]
+    if isinstance(value, np.generic):
+        return _normalise_input_value(value.item())
+    if isinstance(value, (pd.Timestamp, datetime)):
+        return {"datetime": value.isoformat()}
+    if isinstance(value, pd.Timedelta):
+        return {"timedelta_ns": int(value.value)}
+    if isinstance(value, timedelta):
+        total_seconds = value.days * 86_400 + value.seconds
+        return {"timedelta_ns": total_seconds * 1_000_000_000 + value.microseconds * 1_000}
+    if isinstance(value, float):
+        if math.isnan(value):
+            return None
+        if math.isinf(value):
+            return {"float": "+inf" if value > 0 else "-inf"}
+        return value
+    if isinstance(value, (str, int, bool)):
+        return value
+    if hasattr(value, "isoformat"):
+        return {"datetime": value.isoformat()}
+    raise TypeError(f"unsupported session input value: {type(value).__name__}")
+
+
+def session_input_fingerprint(session: object, *, include_messages: bool) -> dict[str, object] | None:
+    """Hash raw loaded session inputs; failures conservatively disable reuse."""
+    components = [name for name in SESSION_INPUT_COMPONENTS
+                  if include_messages or name != "race_control_messages"]
+    inputs: dict[str, object] = {}
+    values: dict[str, object] = {}
+    try:
+        event = getattr(session, "event")
+        if event is None:
+            return None
+        values["event"] = event
+        if ((isinstance(event, RuntimeMapping) and not event)
+                or (isinstance(event, pd.Series) and event.empty)):
+            return None
+        inputs["event"] = _normalise_input_value(event)
+        for name in components[1:]:
+            # Every selected property must be present; an unavailable value is
+            # not equivalent to an empty input. FastF1 may raise DataNotLoadedError.
+            value = getattr(session, name)
+            values[name] = value
+            if value is None:
+                return None
+            if name in ("car_data", "pos_data") and isinstance(value, RuntimeMapping):
+                if any(not isinstance(frame, pd.DataFrame) for frame in value.values()):
+                    return None
+                required_columns = _REQUIRED_INPUT_COLUMNS[name]
+                if any(not required_columns.issubset(set(map(str, frame.columns)))
+                       for frame in value.values()):
+                    return None
+                value = {str(k): value[k] for k in sorted(value, key=lambda item: str(item))}
+            elif name in ("car_data", "pos_data"):
+                return None
+            elif not isinstance(value, pd.DataFrame):
+                return None
+            required_columns = _REQUIRED_INPUT_COLUMNS.get(name, set())
+            if (isinstance(value, pd.DataFrame)
+                    and not required_columns.issubset(set(map(str, value.columns)))):
+                return None
+            inputs[name] = _normalise_input_value(value)
+        digest = _canonical_hash(inputs)
+        columns = {}
+        for name in components:
+            value = values[name]
+            columns[name] = {
+                str(key): [str(column) for column in item.columns]
+                for key, item in value.items()
+            } if name in ("car_data", "pos_data") else (
+                [str(key) for key in value.index] if name == "event" and isinstance(value, pd.Series) else (
+                [str(key) for key in value] if name == "event" and isinstance(value, RuntimeMapping) else (
+                [str(column) for column in value.columns] if isinstance(value, pd.DataFrame) else None
+                ))
+            )
+    except Exception:
+        # FastF1 DataNotLoadedError and unusual third-party scalar types mean
+        # the loaded input cannot be compared safely, so disable reuse.
+        return None
+    return {"algorithm": SESSION_INPUT_ALGORITHM, "hash": digest,
+            "components": components, "columns": columns,
+            "fastf1_version": getattr(fastf1, "__version__", MISSING_VERSION)}
+
+
+def session_is_finished(session: object) -> bool:
+    try:
+        status = getattr(session, "session_status", None)
+    except Exception:
+        return False
+    if not isinstance(status, pd.DataFrame) or status.empty or "Status" not in status:
+        return False
+    final_status = status["Status"].iloc[-1]
+    return isinstance(final_status, str) and final_status.casefold() == "finished"
 
 
 def _source_paths(entrypoint: Path, repo_root: Path) -> list[Path]:
@@ -226,10 +359,12 @@ def should_skip(
     fingerprint: Fingerprint,
     expected_identity: AnalysisIdentity,
     force: bool = False,
+    session_input: Mapping[str, object] | None = None,
+    complete: bool = True,
 ) -> bool:
     """Return whether a previous successful analysis is still reusable."""
 
-    if force:
+    if force or not complete or session_input is None:
         return False
     path = Path(manifest_file)
     try:
@@ -252,6 +387,9 @@ def should_skip(
     if source.get("hash") != fingerprint.source_hash:
         return False
     if environment.get("hash") != fingerprint.environment_hash:
+        return False
+    inputs = fingerprints.get("session_input")
+    if not isinstance(inputs, dict) or inputs != dict(session_input):
         return False
     if fingerprint.configuration_hash is not None:
         configuration = fingerprints.get("configuration")
@@ -276,6 +414,7 @@ def write_success_manifest(
     extra_output_dirs: Iterable[str | Path] = (),
     exclude_extra_suffixes: tuple[str, ...] = (),
     required_output_paths: Iterable[str | Path] = (),
+    session_input: Mapping[str, object] | None = None,
 ) -> Path:
     """Atomically record explicitly listed outputs from a successful analysis."""
 
@@ -289,6 +428,8 @@ def write_success_manifest(
     output_paths = {Path(path).resolve() for path in extra_output_paths}
     if not required_paths or not output_paths:
         raise ValueError("at least one required output path must be declared")
+    if session_input is None:
+        raise ValueError("session input fingerprint is required")
     missing = sorted(str(path) for path in required_paths if not path.is_file())
     if missing:
         raise FileNotFoundError(f"required analysis outputs are missing: {missing}")
@@ -304,7 +445,7 @@ def write_success_manifest(
     payload = {
         "schema_version": SCHEMA_VERSION,
         "identity": _identity_dict(identity),
-        "fingerprints": fingerprint.to_dict(),
+        "fingerprints": {**fingerprint.to_dict(), "session_input": dict(session_input)},
         "completed_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
         "output_files": output_files,
     }
