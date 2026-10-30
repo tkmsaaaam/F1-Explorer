@@ -8,17 +8,129 @@ from fastf1.core import Laps
 
 from f1_explorer.visualizations.domain.driver import Driver
 from f1_explorer.visualizations.domain.driver_laps import DriverLaps
+from f1_explorer.visualizations.domain.lap import Lap
+from f1_explorer.visualizations.domain.tyre import Tyre
 from f1_explorer.visualizations.race import (
     gap_to_ahead_graph,
+    gap_to_ahead_table,
     gap_to_top_graph,
+    gap_to_top_table,
     make_driver_laps_set,
     make_lap_start_by_position_by_number,
     make_top_time_map,
     tyres,
 )
+from f1_explorer.visualizations.race_metrics import lap_times_by_position, top_time_map
 
 
 class Race(unittest.TestCase):
+    @staticmethod
+    def _driver_laps(number, name, positions_and_seconds):
+        base = pandas.Timestamp("2026-01-01")
+        laps = {
+            lap_number: Lap(80, base + pandas.to_timedelta(timestamp, unit="s"), position, tyre=Tyre("Soft", True))
+            for lap_number, (position, timestamp) in positions_and_seconds.items()
+        }
+        return DriverLaps(Driver(number, name, f"Team {name}"), laps)
+
+    def test_gap_tables_use_actual_lap_numbers_and_metric_values(self):
+        leader = self._driver_laps(1, "LEADER", {1: (1, 80), 2: (2, 162), 3: (2, 241), 4: (1, 320)})
+        runner = self._driver_laps(2, "RUNNER", {1: (2, 82), 2: (1, 160), 3: (1, 240), 4: (2, 323)})
+        dnf = self._driver_laps(3, "DNF", {1: (3, 84), 2: (3, 164), 3: (3, 244)})
+        hole = self._driver_laps(4, "HOLE", {1: (4, 88), 3: (4, 248)})
+        late_start = self._driver_laps(6, "LATE", {3: (5, 250), 4: (5, 330)})
+        empty = DriverLaps(Driver(5, "EMPTY", "Team EMPTY"), {})
+        lap_logs = [leader, runner, dnf, hole, late_start, empty]
+        position_logs = lap_times_by_position(lap_logs)
+        session = SimpleNamespace(laps=MagicMock())
+        top_times = top_time_map(lap_logs)
+        with (
+            patch("f1_explorer.visualizations.race.make_top_time_map", return_value=top_times),
+            patch("f1_explorer.visualizations.race.save_plotly") as save,
+        ):
+            gap_to_ahead_table(MagicMock(), "ahead.png", lap_logs, position_logs)
+            ahead_fig = save.call_args.args[0]
+            gap_to_top_table(MagicMock(), "top.png", lap_logs, session)
+            top_fig = save.call_args.args[0]
+
+        ahead_cells = ahead_fig.data[0].cells
+        top_cells = top_fig.data[0].cells
+        self.assertEqual([1, 2, 3, 4], list(ahead_cells.values[0]))
+        self.assertEqual([1, 2, 3, 4], list(top_cells.values[0]))
+        headers = list(ahead_fig.data[0].header.values)
+        ahead_by_driver = {name: list(values) for name, values in zip(headers[1:], ahead_cells.values[1:])}
+        headers = list(top_fig.data[0].header.values)
+        top_by_driver = {name: list(values) for name, values in zip(headers[1:], top_cells.values[1:])}
+        self.assertEqual([2.0, "---", "---", 3.0], ahead_by_driver["RUNNER"])
+        self.assertEqual([2.0, 2.0, 3.0, "---"], ahead_by_driver["DNF"])
+        self.assertEqual(["---", "---", "---", "---"], ahead_by_driver["EMPTY"])
+        self.assertEqual([4.0, "---", 4.0, "---"], ahead_by_driver["HOLE"])
+        self.assertEqual(["---", "---", 2.0, "---"], ahead_by_driver["LATE"])
+        self.assertEqual(["---", 2.0, 1.0, "---"], ahead_by_driver["LEADER"])
+        self.assertEqual([0.0, 2.0, 1.0, 0.0], top_by_driver["LEADER"])
+        self.assertEqual([2.0, 0.0, 0.0, 3.0], top_by_driver["RUNNER"])
+        self.assertEqual([4.0, 4.0, 4.0, "---"], top_by_driver["DNF"])
+        self.assertEqual("gold", top_cells.fill.color[1][0])
+        ahead_colors = dict(zip(ahead_fig.data[0].header.values[1:], ahead_cells.fill.color[1:]))
+        top_colors = dict(zip(top_fig.data[0].header.values[1:], top_cells.fill.color[1:]))
+        self.assertEqual("#9966ff", ahead_colors["RUNNER"][0])
+        self.assertEqual("#ffffff", ahead_colors["RUNNER"][3])
+        self.assertEqual("#e95464", top_colors["HOLE"][0])
+
+        for fig in (ahead_fig, top_fig):
+            for column in fig.data[0].cells.values:
+                self.assertEqual(4, len(column))
+            for column in fig.data[0].cells.fill.color:
+                self.assertEqual(4, len(column))
+        for fig, values in ((ahead_fig, ahead_by_driver), (top_fig, top_by_driver)):
+            colors = dict(zip(fig.data[0].header.values[1:], fig.data[0].cells.fill.color[1:]))
+            for name, column in values.items():
+                for index, value in enumerate(column):
+                    if value == "---":
+                        self.assertEqual("#ffffff", colors[name][index])
+
+        session.event = SimpleNamespace(year=2026)
+        nonempty = [driver for driver in lap_logs if driver.laps]
+        with (
+            patch("f1_explorer.visualizations.race.make_top_time_map", return_value=top_times),
+            patch("f1_explorer.visualizations.race.fastf1.plotting.get_team_color", return_value="#123456"),
+            patch("f1_explorer.visualizations.race.save_plotly") as save,
+        ):
+            gap_to_ahead_graph(MagicMock(), "output", "ahead", session, None, nonempty, position_logs)
+            ahead_graph = save.call_args.args[0]
+            gap_to_top_graph(MagicMock(), "output", "top", session, None, nonempty)
+            top_graph = save.call_args.args[0]
+        for graph, table in ((ahead_graph, ahead_by_driver), (top_graph, top_by_driver)):
+            for trace in graph.data:
+                for lap, value in zip(trace.x, trace.y):
+                    self.assertEqual("---" if value is None else value, table[trace.name][lap - 1])
+
+    def test_gap_tables_handle_only_empty_drivers(self):
+        empty = DriverLaps(Driver(1, "EMPTY", "Team"), {})
+        with (
+            patch("f1_explorer.visualizations.race.make_top_time_map", return_value={}),
+            patch("f1_explorer.visualizations.race.save_plotly") as save,
+        ):
+            gap_to_ahead_table(MagicMock(), "ahead.png", [empty], {})
+            ahead = save.call_args.args[0]
+            gap_to_top_table(MagicMock(), "top.png", [empty], SimpleNamespace(laps=None))
+            top = save.call_args.args[0]
+        for fig in (ahead, top):
+            self.assertEqual(["Lap", "EMPTY"], list(fig.data[0].header.values))
+            self.assertEqual([[], []], [list(column) for column in fig.data[0].cells.values])
+
+    def test_gap_tables_handle_no_drivers(self):
+        with patch("f1_explorer.visualizations.race.save_plotly") as save:
+            gap_to_ahead_table(MagicMock(), "ahead.png", [], {})
+            ahead = save.call_args.args[0]
+            gap_to_top_table(MagicMock(), "top.png", [], SimpleNamespace(laps=MagicMock()))
+            top = save.call_args.args[0]
+
+        self.assertEqual(["Lap"], list(ahead.data[0].header.values))
+        self.assertEqual([[]], [list(ahead.data[0].cells.values[0])])
+        self.assertEqual(["Lap"], list(top.data[0].header.values))
+        self.assertEqual([[]], [list(top.data[0].cells.values[0])])
+
     def test_make_lap_log_empty(self):
         data = {
             "DriverNumber": [],

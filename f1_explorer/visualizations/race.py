@@ -160,48 +160,27 @@ def gap_to_ahead_table(log: WarningLoggerLike, filepath: str, lap_logs: list[Dri
     header = ["Lap"]
     all_gaps = []
     fill_colors = []
-    max_laps = 0
+    max_lap_number = max((max(dl.get_laps()) for dl in lap_logs if dl.get_laps()), default=0)
     sorted_lap_logs = sorted(
         lap_logs,
-        key=lambda dl: dl.get_laps()[max(dl.get_laps().keys())].get_position()
+        key=lambda dl: dl.get_laps()[max(dl.get_laps())].get_position() if dl.get_laps() else float("inf")
     )
     for driver_laps in sorted_lap_logs:
+        gap_by_lap = dict(calculate_gap_to_ahead(driver_laps, position_logs))
         gaps = []
         colors = []
-        # ensure we iterate over integer lap numbers; keys may be numpy types
-        lap_keys = driver_laps.get_laps().keys()
-        start = int(min(lap_keys))
-        end = int(max(lap_keys))
-        for i in range(start, end + 1):
-            lap = driver_laps.get_laps().get(i)
-            if lap is None:
-                gaps.append('---')
+        for i in range(1, max_lap_number + 1):
+            diff = gap_by_lap.get(i)
+            gaps.append('---' if diff is None else diff)
+            if diff is None:
                 colors.append('#ffffff')
                 continue
-            if lap.get_position() == 1:
-                gaps.append("{:.3f}".format(0))
-                colors.append('#ffffff')
-                continue
-            positions_by_lap = position_logs.get(i)
-            if positions_by_lap is None:
-                gaps.append('---')
-                colors.append('#ffffff')
-                continue
-            ahead = positions_by_lap.get(lap.get_position() - 1)
-            if ahead is None:
-                gaps.append('---')
-                colors.append('#ffffff')
-                continue
-            diff = (lap.get_at() - ahead).total_seconds()
-            gaps.append(diff)
             if diff < 3:
                 colors.append('#9966ff')
             elif diff > 20:
                 colors.append('#e95464')
             else:
                 colors.append('#ffffff')
-        if len(gaps) > max_laps:
-            max_laps = len(gaps)
         header.append(driver_laps.get_driver().get_name())
         all_gaps.append(gaps)
         fill_colors.append(colors)
@@ -210,8 +189,8 @@ def gap_to_ahead_table(log: WarningLoggerLike, filepath: str, lap_logs: list[Dri
             header=go.table.Header(
                 values=header, fill=go.table.header.Fill(color='lightgrey'), align='center'),
             cells=go.table.Cells(
-                values=[list(range(1, max_laps + 1))] + all_gaps,
-                fill=go.table.cells.Fill(color=[["#f0f0f0"] * max_laps] + fill_colors),
+                values=[list(range(1, max_lap_number + 1))] + all_gaps,
+                fill=go.table.cells.Fill(color=[["#f0f0f0"] * max_lap_number] + fill_colors),
                 align='center'))],
         layout=go.Layout(autosize=True, margin=go.layout.Margin(autoexpand=True)))
 
@@ -230,44 +209,32 @@ def gap_to_top_table(log: WarningLoggerLike, filepath: str, lap_logs: list[Drive
     header = ["Lap"]
     all_gaps = []
     fill_colors = []
-    max_laps = 0
+    max_lap_number = max((max(dl.get_laps()) for dl in lap_logs if dl.get_laps()), default=0)
     top_time_map = make_top_time_map(session.laps)
     sorted_lap_logs = sorted(
         lap_logs,
-        key=lambda dl: dl.get_laps()[max(dl.get_laps().keys())].get_position()
+        key=lambda dl: dl.get_laps()[max(dl.get_laps())].get_position() if dl.get_laps() else float("inf")
     )
     for driver_laps in sorted_lap_logs:
+        gap_by_lap = dict(calculate_gap_to_leader(driver_laps, top_time_map))
         gaps = []
         colors = []
-        # ensure we iterate over integer lap numbers; keys may be numpy types
-        lap_keys = driver_laps.get_laps().keys()
-        start = int(min(lap_keys))
-        end = int(max(lap_keys))
-        for i in range(start, end + 1):
-            lap = driver_laps.get_laps().get(i)
-            if lap is None:
+        for i in range(1, max_lap_number + 1):
+            diff = gap_by_lap.get(i)
+            if diff is None:
                 gaps.append('---')
                 colors.append('#ffffff')
                 continue
-            if lap.get_position() == 1:
-                gaps.append("{:.3f}".format(0))
+            gaps.append(diff)
+            if diff == 0 and driver_laps.get_laps().get(i) is not None and driver_laps.get_laps()[i].get_position() == 1:
                 colors.append('gold')
                 continue
-            top = top_time_map.get(i)
-            if top is None:
-                gaps.append('---')
-                colors.append('#ffffff')
-                continue
-            diff = (lap.get_at() - top).total_seconds()
-            gaps.append(diff)
             if diff < 5:
                 colors.append('#9966ff')
             elif diff < 30:
                 colors.append('#e95464')
             else:
                 colors.append('#ffffff')
-        if len(gaps) > max_laps:
-            max_laps = len(gaps)
         header.append(driver_laps.get_driver().get_name())
         all_gaps.append(gaps)
         fill_colors.append(colors)
@@ -276,9 +243,9 @@ def gap_to_top_table(log: WarningLoggerLike, filepath: str, lap_logs: list[Drive
             header=go.table.Header(
                 values=header, fill=go.table.header.Fill(color='lightgrey'), align='center'),
             cells=go.table.Cells(
-                values=[list(range(1, max_laps + 1))] + all_gaps,
+                values=[list(range(1, max_lap_number + 1))] + all_gaps,
                 fill=go.table.cells.Fill(
-                    color=[["#f0f0f0"] * max_laps] + fill_colors), align='center'))],
+                    color=[["#f0f0f0"] * max_lap_number] + fill_colors), align='center'))],
         layout=go.Layout(autosize=True, margin=go.layout.Margin(autoexpand=True)))
 
     save_plotly(fig, filepath, log, width=1920, height=1620)
