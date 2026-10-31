@@ -1,5 +1,6 @@
 import datetime
 import os
+from collections.abc import Iterable
 from pathlib import Path
 from math import isfinite
 from typing import cast
@@ -578,31 +579,35 @@ def _format_tyre_age(value: object) -> str:
     return str(int(age)) if age.is_integer() else f"{age:g}"
 
 
+def _write_log_lines(log_path: str, rows: Iterable[tuple[str, ...]]):
+    """行リストを1回の書き込みでログファイルに書き出す。
+
+    従来の先頭追記（util.write_to_file_top）と同じ表示順、つまり新しい行ほど上に
+    来る順序を維持する。呼び出し側は時刻が昇順になる行を渡す。
+    """
+    lines = [util.join_with_colon(*values) for values in rows]
+    content = "".join(f"{line}\n" for line in reversed(lines))
+    Path(log_path).write_text(content, encoding="utf-8")
+
+
 @tracer.start_as_current_span("write_messages")
 def write_messages(session: Session, logs_path: str):
     Path(logs_path).mkdir(parents=True, exist_ok=True)
-    Path(f"{logs_path}/race_control.txt").write_text("", encoding="utf-8")
     messages = session.race_control_messages.sort_values('Time')
-    for i in range(0, len(messages)):
-        t = session.race_control_messages.Time.iloc[i]
-        l = session.race_control_messages.Lap.iloc[i]
-        c = session.race_control_messages.Category.iloc[i]
-        f = session.race_control_messages.Flag.iloc[i]
-        s = session.race_control_messages.Scope.iloc[i]
-        n = session.race_control_messages.RacingNumber.iloc[i]
-        m = session.race_control_messages.Message.iloc[i]
-        message = util.join_with_colon(str(t), str(l), str(c), str(f), str(s), str(n), str(m))
-        util.write_to_file_top(f"{logs_path}/race_control.txt", message)
+    rows = (
+        (str(row.Time), str(row.Lap), str(row.Category), str(row.Flag), str(row.Scope),
+         str(row.RacingNumber), str(row.Message))
+        for row in messages.itertuples(index=False)
+    )
+    _write_log_lines(f"{logs_path}/race_control.txt", rows)
 
 
 @tracer.start_as_current_span("write_track_status")
 def write_track_status(session: Session, logs_path: str):
     Path(logs_path).mkdir(parents=True, exist_ok=True)
-    Path(f"{logs_path}/track_status.txt").write_text("", encoding="utf-8")
-    messages = session.track_status.sort_values('Time')
-    for i in range(0, len(messages)):
-        t = session.race_control_messages.Time.iloc[i]
-        s = session.race_control_messages.Status.iloc[i]
-        m = session.race_control_messages.Message.iloc[i]
-        message = util.join_with_colon(str(t), str(s), str(m))
-        util.write_to_file_top(f"{logs_path}/track_status.txt", message)
+    statuses = session.track_status.sort_values('Time')
+    rows = (
+        (str(row.Time), str(row.Status), str(row.Message))
+        for row in statuses.itertuples(index=False)
+    )
+    _write_log_lines(f"{logs_path}/track_status.txt", rows)

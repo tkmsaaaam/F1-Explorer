@@ -1,4 +1,6 @@
 import unittest
+import tempfile
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
@@ -19,6 +21,8 @@ from f1_explorer.visualizations.race import (
     make_lap_start_by_position_by_number,
     make_top_time_map,
     tyres,
+    write_messages,
+    write_track_status,
 )
 from f1_explorer.visualizations.race_metrics import lap_times_by_position, top_time_map
 
@@ -341,6 +345,103 @@ class Race(unittest.TestCase):
         self.assertEqual("FIRST", figure.data[0].name)
         self.assertEqual((60, 0), figure.layout.yaxis.range)
         self.assertEqual("x unified", figure.layout.hovermode)
+
+
+class WriteSessionLogs(unittest.TestCase):
+    """race.execute() が書き出す race_control.txt / track_status.txt の検査。"""
+
+    @staticmethod
+    def _messages_frame(count: int) -> pandas.DataFrame:
+        times = [f"2026-01-01 00:{i:02d}:00" for i in range(count)]
+        return pandas.DataFrame({
+            "Time": pandas.to_datetime(times, format="%Y-%m-%d %H:%M:%S"),
+            "Lap": list(range(count)),
+            "Category": ["Flag"] * count,
+            "Flag": [None] * count,
+            "Scope": [None] * count,
+            "RacingNumber": [None] * count,
+            "Message": [f"M{i}" for i in range(count)],
+        })
+
+    def test_write_track_status_uses_track_status_and_survives_count_mismatch(self):
+        track_status = pandas.DataFrame({
+            "Time": pandas.to_datetime(["2026-01-01 00:00:10", "2026-01-01 00:00:02"], format="%Y-%m-%d %H:%M:%S"),
+            "Status": ["2", "1"],
+            "Message": ["Yellow", "Clear"],
+        })
+        session = SimpleNamespace(track_status=track_status, race_control_messages=self._messages_frame(5))
+        with tempfile.TemporaryDirectory() as tmp:
+            logs_path = Path(tmp) / "logs"
+            write_track_status(session, logs_path)
+            content = (logs_path / "track_status.txt").read_text(encoding="utf-8")
+
+        self.assertEqual(
+            "2026-01-01 00:00:10 : 2 : Yellow\n"
+            "2026-01-01 00:00:02 : 1 : Clear\n",
+            content)
+
+        session = SimpleNamespace(
+            track_status=pandas.DataFrame({
+                "Time": pandas.to_datetime(
+                    [f"2026-01-01 00:{i:02d}:00" for i in range(1, 6)], format="%Y-%m-%d %H:%M:%S"),
+                "Status": ["1", "2", "4", "5", "1"],
+                "Message": ["Clear", "Yellow", "Safety Car", "Red Flag", "AllClear"],
+            }),
+            race_control_messages=self._messages_frame(1),
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            logs_path = Path(tmp) / "logs"
+            write_track_status(session, logs_path)
+            content = (logs_path / "track_status.txt").read_text(encoding="utf-8")
+
+        self.assertEqual(
+            "2026-01-01 00:05:00 : 1 : AllClear\n"
+            "2026-01-01 00:04:00 : 5 : Red Flag\n"
+            "2026-01-01 00:03:00 : 4 : Safety Car\n"
+            "2026-01-01 00:02:00 : 2 : Yellow\n"
+            "2026-01-01 00:01:00 : 1 : Clear\n",
+            content)
+
+    def test_write_log_functions_write_empty_files_without_rows(self):
+        session = SimpleNamespace(
+            track_status=pandas.DataFrame({"Time": [], "Status": [], "Message": []}),
+            race_control_messages=pandas.DataFrame({
+                "Time": [], "Lap": [], "Category": [], "Flag": [], "Scope": [],
+                "RacingNumber": [], "Message": [],
+            }),
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            logs_path = Path(tmp) / "logs"
+            write_track_status(session, logs_path)
+            write_messages(session, logs_path)
+            self.assertTrue((logs_path / "track_status.txt").is_file())
+            self.assertTrue((logs_path / "race_control.txt").is_file())
+            self.assertEqual("", (logs_path / "track_status.txt").read_text(encoding="utf-8"))
+            self.assertEqual("", (logs_path / "race_control.txt").read_text(encoding="utf-8"))
+
+    def test_write_messages_sorts_by_time_and_keeps_newest_first(self):
+        messages = pandas.DataFrame({
+            "Time": pandas.to_datetime(
+                ["2026-01-01 00:02:00", "2026-01-01 00:01:00", "2026-01-01 00:03:00"],
+                format="%Y-%m-%d %H:%M:%S"),
+            "Lap": [3, 2, 4],
+            "Category": ["Other", "Flag", "Flag"],
+            "Flag": [None, "YELLOW", "CLEAR"],
+            "Scope": [None, "Track", "Track"],
+            "RacingNumber": [None, None, None],
+            "Message": ["FIRST", "SECOND", "THIRD"],
+        })
+        session = SimpleNamespace(race_control_messages=messages)
+        with tempfile.TemporaryDirectory() as tmp:
+            logs_path = Path(tmp) / "logs"
+            write_messages(session, logs_path)
+            content = (logs_path / "race_control.txt").read_text(encoding="utf-8")
+
+        self.assertEqual(
+            "2026-01-01 00:03:00 : 4 : Flag : CLEAR : Track : None : THIRD\n"
+            "2026-01-01 00:02:00 : 3 : Other : None : None : None : FIRST\n"
+            "2026-01-01 00:01:00 : 2 : Flag : YELLOW : Track : None : SECOND\n",
+            content)
 
 
 if __name__ == '__main__':
