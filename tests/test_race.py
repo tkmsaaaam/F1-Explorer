@@ -1,4 +1,5 @@
 import unittest
+from contextlib import ExitStack
 import tempfile
 from pathlib import Path
 from types import SimpleNamespace
@@ -13,6 +14,7 @@ from f1_explorer.visualizations.domain.driver_laps import DriverLaps
 from f1_explorer.visualizations.domain.lap import Lap
 from f1_explorer.visualizations.domain.tyre import Tyre
 from f1_explorer.visualizations.race import (
+    execute,
     gap_to_ahead_graph,
     gap_to_ahead_table,
     gap_to_top_graph,
@@ -297,7 +299,7 @@ class Race(unittest.TestCase):
         self.assertEqual(2, len(axis.collections))
         plt.close(figure)
 
-    def test_gap_ahead_graph_is_plotly_and_sorted_by_final_position(self):
+    def test_gap_ahead_graph_is_plotly_and_sorted_by_result_position(self):
         first_lap = MagicMock()
         first_lap.get_position.return_value = 1
         second_lap = MagicMock()
@@ -306,7 +308,10 @@ class Race(unittest.TestCase):
             DriverLaps(Driver(2, "SECOND", "Team B"), {1: second_lap}),
             DriverLaps(Driver(1, "FIRST", "Team A"), {1: first_lap}),
         ]
-        session = SimpleNamespace(event=SimpleNamespace(year=2026))
+        session = SimpleNamespace(
+            event=SimpleNamespace(year=2026),
+            results=pandas.DataFrame({"DriverNumber": ["1", "2"], "Position": [5, 1]}),
+        )
 
         with (
             patch(
@@ -321,10 +326,75 @@ class Race(unittest.TestCase):
         self.assertEqual(2, save.call_count)
         default_figure = save.call_args_list[0].args[0]
         ranged_figure = save.call_args_list[1].args[0]
-        self.assertEqual(["FIRST", "SECOND"], [trace.name for trace in default_figure.data])
+        self.assertEqual(["SECOND", "FIRST"], [trace.name for trace in default_figure.data])
         self.assertEqual((3.29, 1.21), default_figure.layout.yaxis.range)
         self.assertEqual((15, 0), ranged_figure.layout.yaxis.range)
         self.assertEqual("output/gap_ahead_graph.png", save.call_args_list[0].args[1])
+
+    def test_all_gap_outputs_share_classification_and_fallback_order(self):
+        from f1_explorer.visualizations.session_order import driver_order
+
+        # Car 2 retires while second, but is classified fifth. Cars 10/3
+        # share a result rank; car 4 has no result and car 9 no timed lap.
+        lap_logs = [
+            self._driver_laps(2, "DNF", {1: (2, 82)}),
+            self._driver_laps(9, "UNTIMED", {}),
+            self._driver_laps(4, "NORESULT", {1: (4, 84)}),
+            self._driver_laps(3, "TIE3", {1: (3, 83)}),
+            self._driver_laps(10, "TIE10", {1: (1, 80)}),
+        ]
+        for results in (
+            pandas.DataFrame({"DriverNumber": ["2", "10", "3", "4"],
+                              "Position": [5, 1, 1, float("nan")]}),
+            pandas.DataFrame(),
+        ):
+            with self.subTest(results=results.to_dict()):
+                session = SimpleNamespace(
+                    event=SimpleNamespace(year=2026), results=results,
+                    laps=pandas.DataFrame({"DriverNumber": ["2", "10", "3", "4"],
+                                           "LapTime": pandas.to_timedelta([82, 80, 83, 79], unit="s")}),
+                )
+                expected = (["TIE10", "TIE3", "DNF", "NORESULT", "UNTIMED"]
+                            if not results.empty else
+                            ["NORESULT", "TIE10", "DNF", "TIE3", "UNTIMED"])
+                with (
+                    patch("f1_explorer.visualizations.race.make_top_time_map", return_value=top_time_map(lap_logs)),
+                    patch("f1_explorer.visualizations.race.fastf1.plotting.get_team_color", return_value="#123456"),
+                    patch("f1_explorer.visualizations.race.save_plotly") as save,
+                ):
+                    positions = lap_times_by_position(lap_logs)
+                    gap_to_ahead_table(MagicMock(), "ahead.png", lap_logs, positions,
+                                       ranks=driver_order(session))
+                    gap_to_top_table(MagicMock(), "top.png", lap_logs, session)
+                    gap_to_ahead_graph(MagicMock(), "output", "ahead", session, 15, lap_logs, positions)
+                    gap_to_top_graph(MagicMock(), "output", "top", session, 30, lap_logs)
+                figures = [call.args[0] for call in save.call_args_list]
+                for figure in figures[:2]:
+                    self.assertEqual(expected, list(figure.data[0].header.values)[1:])
+                for figure in figures[2:]:
+                    self.assertEqual(expected, [trace.name for trace in figure.data])
+
+    def test_execute_passes_result_ranks_to_ahead_table(self):
+        session = SimpleNamespace(
+            laps=pandas.DataFrame(),
+            results=pandas.DataFrame({"DriverNumber": ["2", "1"], "Position": [1, 5]}),
+        )
+        functions = ("make_driver_laps_set", "make_lap_start_by_position_by_number", "laptime",
+                     "gap_to_ahead_table", "gap_to_top_table", "gap_to_ahead_graph", "gap_to_top_graph",
+                     "positions", "speed_first_10s", "speed_until_turn1", "tyres",
+                     "write_messages", "write_track_status")
+        with tempfile.TemporaryDirectory() as tmp, ExitStack() as stack:
+            mocks = {name: stack.enter_context(patch(f"f1_explorer.visualizations.race.{name}"))
+                     for name in functions}
+            execute(session, MagicMock(), tmp, tmp, None, None, None)
+            self.assertEqual({"2": 1, "1": 5}, mocks["gap_to_ahead_table"].call_args.kwargs["ranks"])
+
+    def test_ahead_table_without_ranks_uses_car_number_string_order(self):
+        logs = [self._driver_laps(2, "SECOND", {1: (1, 80)}),
+                self._driver_laps(10, "TENTH", {1: (2, 82)})]
+        with patch("f1_explorer.visualizations.race.save_plotly") as save:
+            gap_to_ahead_table(MagicMock(), "ahead.png", logs, lap_times_by_position(logs))
+        self.assertEqual(["Lap", "TENTH", "SECOND"], list(save.call_args.args[0].data[0].header.values))
 
     def test_gap_top_graph_is_plotly_and_keeps_zero_at_top(self):
         leader_lap = MagicMock()
@@ -352,9 +422,8 @@ class WriteSessionLogs(unittest.TestCase):
 
     @staticmethod
     def _messages_frame(count: int) -> pandas.DataFrame:
-        times = [f"2026-01-01 00:{i:02d}:00" for i in range(count)]
         return pandas.DataFrame({
-            "Time": pandas.to_datetime(times, format="%Y-%m-%d %H:%M:%S"),
+            "Time": pandas.date_range("2026-01-01", periods=count, freq="min"),
             "Lap": list(range(count)),
             "Category": ["Flag"] * count,
             "Flag": [None] * count,
@@ -372,7 +441,7 @@ class WriteSessionLogs(unittest.TestCase):
         session = SimpleNamespace(track_status=track_status, race_control_messages=self._messages_frame(5))
         with tempfile.TemporaryDirectory() as tmp:
             logs_path = Path(tmp) / "logs"
-            write_track_status(session, logs_path)
+            write_track_status(session, str(logs_path))
             content = (logs_path / "track_status.txt").read_text(encoding="utf-8")
 
         self.assertEqual(
@@ -391,7 +460,7 @@ class WriteSessionLogs(unittest.TestCase):
         )
         with tempfile.TemporaryDirectory() as tmp:
             logs_path = Path(tmp) / "logs"
-            write_track_status(session, logs_path)
+            write_track_status(session, str(logs_path))
             content = (logs_path / "track_status.txt").read_text(encoding="utf-8")
 
         self.assertEqual(
@@ -412,8 +481,8 @@ class WriteSessionLogs(unittest.TestCase):
         )
         with tempfile.TemporaryDirectory() as tmp:
             logs_path = Path(tmp) / "logs"
-            write_track_status(session, logs_path)
-            write_messages(session, logs_path)
+            write_track_status(session, str(logs_path))
+            write_messages(session, str(logs_path))
             self.assertTrue((logs_path / "track_status.txt").is_file())
             self.assertTrue((logs_path / "race_control.txt").is_file())
             self.assertEqual("", (logs_path / "track_status.txt").read_text(encoding="utf-8"))
@@ -434,7 +503,7 @@ class WriteSessionLogs(unittest.TestCase):
         session = SimpleNamespace(race_control_messages=messages)
         with tempfile.TemporaryDirectory() as tmp:
             logs_path = Path(tmp) / "logs"
-            write_messages(session, logs_path)
+            write_messages(session, str(logs_path))
             content = (logs_path / "race_control.txt").read_text(encoding="utf-8")
 
         self.assertEqual(

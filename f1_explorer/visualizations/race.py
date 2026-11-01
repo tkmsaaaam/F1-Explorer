@@ -33,6 +33,7 @@ from f1_explorer.visualizations.race_metrics import (
     lap_times_by_position,
     top_time_map,
 )
+from f1_explorer.visualizations.session_order import driver_order, driver_sort_key
 from f1_explorer.visualizations.style import driver_linestyle
 from f1_explorer.visualizations.race_start import start_samples
 
@@ -46,7 +47,8 @@ def execute(session: Session, log: WarningLoggerLike, images_path: str, logs_pat
     driver_laps_set = make_driver_laps_set(session.laps)
     start_by_position_by_number = make_lap_start_by_position_by_number(session.laps)
     laptime(log, images_path, "laptime_graph", session, lap_time_range, driver_laps_set)
-    gap_to_ahead_table(log, f"{images_path}/gap_ahead_table.png", driver_laps_set, start_by_position_by_number)
+    gap_to_ahead_table(log, f"{images_path}/gap_ahead_table.png", driver_laps_set, start_by_position_by_number,
+                       ranks=driver_order(session))
     gap_to_top_table(log, f"{images_path}/gap_top_table.png", driver_laps_set, session)
     gap_to_ahead_graph(log, images_path, "gap_ahead_graph", session, gap_ahead_range, driver_laps_set,
                        start_by_position_by_number)
@@ -148,24 +150,31 @@ def make_top_time_map(all_laps: Laps) -> dict[int, datetime.datetime]:
     return top_time_map(make_driver_laps_set(all_laps))
 
 
+def result_ranked(lap_logs: list[DriverLaps], ranks: dict[str, int]) -> list[DriverLaps]:
+    """ラップ群を公式結果順位順（未順位は車番文字列順）に並べ替える。"""
+    return sorted(
+        lap_logs,
+        key=lambda item: driver_sort_key(item.get_driver().get_number(), ranks),
+    )
+
+
 @tracer.start_as_current_span("gap_to_ahead_table")
 def gap_to_ahead_table(log: WarningLoggerLike, filepath: str, lap_logs: list[DriverLaps],
-                       position_logs: dict[int, dict[int, datetime.datetime]]):
+                       position_logs: dict[int, dict[int, datetime.datetime]], *,
+                       ranks: dict[str, int] = {}):
     """ラップごとのギャップの一覧を作成する
     Args:
         log: ロガー
         filepath: 画像を保存する先のpathとファイル名
         lap_logs: ドライバーごとのラップ
         position_logs: ラップごとのポジション
+        ranks: 車番ごとの表示順位。空の場合は車番文字列順。
     """
     header = ["Lap"]
     all_gaps = []
     fill_colors = []
     max_lap_number = max((max(dl.get_laps()) for dl in lap_logs if dl.get_laps()), default=0)
-    sorted_lap_logs = sorted(
-        lap_logs,
-        key=lambda dl: dl.get_laps()[max(dl.get_laps())].get_position() if dl.get_laps() else float("inf")
-    )
+    sorted_lap_logs = result_ranked(lap_logs, ranks)
     for driver_laps in sorted_lap_logs:
         gap_by_lap = dict(calculate_gap_to_ahead(driver_laps, position_logs))
         gaps = []
@@ -212,10 +221,8 @@ def gap_to_top_table(log: WarningLoggerLike, filepath: str, lap_logs: list[Drive
     fill_colors = []
     max_lap_number = max((max(dl.get_laps()) for dl in lap_logs if dl.get_laps()), default=0)
     top_time_map = make_top_time_map(session.laps)
-    sorted_lap_logs = sorted(
-        lap_logs,
-        key=lambda dl: dl.get_laps()[max(dl.get_laps())].get_position() if dl.get_laps() else float("inf")
-    )
+    ranks = driver_order(session)
+    sorted_lap_logs = result_ranked(lap_logs, ranks)
     for driver_laps in sorted_lap_logs:
         gap_by_lap = dict(calculate_gap_to_leader(driver_laps, top_time_map))
         gaps = []
@@ -266,13 +273,12 @@ def gap_to_ahead_graph(log: WarningLoggerLike, filepath: str, filename: str, ses
         lap_logs: ドライバーごとのラップ
         position_logs: ラップごとのポジション
     """
+    ranks = driver_order(session)
+
     def make_figure(y_max: int | None) -> go.Figure:
         fig = go.Figure()
         all_gaps: list[float] = []
-        sorted_lap_logs = sorted(
-            lap_logs,
-            key=lambda item: item.get_laps()[max(item.get_laps())].get_position(),
-        )
+        sorted_lap_logs = result_ranked(lap_logs, ranks)
         for driver_laps in sorted_lap_logs:
             gap_series = calculate_gap_to_ahead(driver_laps, position_logs)
             for _, gap in gap_series:
@@ -330,13 +336,11 @@ def gap_to_top_graph(log: WarningLoggerLike, filepath: str, filename: str, sessi
         lap_logs: ドライバーごとのラップ
     """
     top_time_map = make_top_time_map(session.laps)
+    ranks = driver_order(session)
 
     def make_figure(y_max: int) -> go.Figure:
         fig = go.Figure()
-        sorted_lap_logs = sorted(
-            lap_logs,
-            key=lambda item: item.get_laps()[max(item.get_laps())].get_position(),
-        )
+        sorted_lap_logs = result_ranked(lap_logs, ranks)
         for lap_log in sorted_lap_logs:
             driver = lap_log.get_driver()
             gap_series = calculate_gap_to_leader(lap_log, top_time_map)
@@ -579,19 +583,20 @@ def _format_tyre_age(value: object) -> str:
     return str(int(age)) if age.is_integer() else f"{age:g}"
 
 
-def _write_log_lines(log_path: str, rows: Iterable[tuple[str, ...]]):
+def _write_log_lines(log_path: str, rows: Iterable[tuple[str, ...]]) -> None:
     """行リストを1回の書き込みでログファイルに書き出す。
 
     従来の先頭追記（util.write_to_file_top）と同じ表示順、つまり新しい行ほど上に
     来る順序を維持する。呼び出し側は時刻が昇順になる行を渡す。
     """
     lines = [util.join_with_colon(*values) for values in rows]
+    # 空リストでは空文字列を書き、空ファイルを維持する
     content = "".join(f"{line}\n" for line in reversed(lines))
     Path(log_path).write_text(content, encoding="utf-8")
 
 
 @tracer.start_as_current_span("write_messages")
-def write_messages(session: Session, logs_path: str):
+def write_messages(session: Session, logs_path: str) -> None:
     Path(logs_path).mkdir(parents=True, exist_ok=True)
     messages = session.race_control_messages.sort_values('Time')
     rows = (
@@ -603,7 +608,7 @@ def write_messages(session: Session, logs_path: str):
 
 
 @tracer.start_as_current_span("write_track_status")
-def write_track_status(session: Session, logs_path: str):
+def write_track_status(session: Session, logs_path: str) -> None:
     Path(logs_path).mkdir(parents=True, exist_ok=True)
     statuses = session.track_status.sort_values('Time')
     rows = (
