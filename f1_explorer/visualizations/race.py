@@ -66,6 +66,14 @@ def execute(session: Session, log: WarningLoggerLike, images_path: str, logs_pat
 
 
 def make_driver_laps_set(laps: Laps) -> list[DriverLaps]:
+    """Convert session laps into the small analysis-oriented domain model.
+
+    A record with a valid lap number is kept even when its lap time,
+    session-elapsed time, or position is missing; the missing value is
+    stored as ``None`` so each chart can decide whether that lap is
+    usable.  Times are session elapsed times (FastF1 ``Laps.Time``).
+    Present values are never coerced into zero or fabricated times.
+    """
     result = []
     grouped = laps.groupby(['DriverNumber'])
     for _, stint_laps in grouped:
@@ -73,14 +81,12 @@ def make_driver_laps_set(laps: Laps) -> list[DriverLaps]:
         driver = Driver(int(first_lap.DriverNumber), first_lap.Driver, first_lap.Team)
         lap_map: dict[int, Lap] = {}
         for _, lap_row in cast(Laps, stint_laps).iterlaps():
-            if any(pandas.isna(value) for value in (
-                    lap_row.LapNumber, lap_row.LapTime, lap_row.Time, lap_row.Position)):
+            if pandas.isna(lap_row.LapNumber):
                 continue
-            # noinspection PyTypeChecker
             lap = Lap(
-                lap_row.LapTime.total_seconds(),
-                lap_row.Time,
-                lap_row.Position,
+                None if pandas.isna(lap_row.LapTime) else float(lap_row.LapTime.total_seconds()),
+                None if pandas.isna(lap_row.Time) else lap_row.Time,
+                None if _is_invalid_position(lap_row.Position) else int(lap_row.Position),
                 not pandas.isna(lap_row.PitOutTime),
                 Tyre(lap_row.Compound, lap_row.FreshTyre),
             )
@@ -90,7 +96,12 @@ def make_driver_laps_set(laps: Laps) -> list[DriverLaps]:
     return sorted(result, key=lambda item: item.driver.number)
 
 
-def make_lap_start_by_position_by_number(laps: Laps) -> dict[int, dict[int, datetime.datetime]]:
+def _is_invalid_position(position: float) -> bool:
+    """Return whether a session position is missing or cannot be a rank."""
+    return bool(pandas.isna(position)) or not isfinite(float(position)) or position <= 0
+
+
+def make_lap_start_by_position_by_number(laps: Laps) -> dict[int, dict[int, datetime.timedelta]]:
     return lap_times_by_position(make_driver_laps_set(laps))
 
 
@@ -108,11 +119,18 @@ def laptime(log: WarningLoggerLike, filepath: str, filename: str, session: Sessi
     fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
     try:
         for lap_log in lap_logs:
-            lap_numbers = sorted(lap_log.get_laps().keys())
-            lap_times = [
-                lap.get_time() if (lap := lap_log.get_laps().get(i)) is not None else None
-                for i in lap_numbers
+            # R-07 keeps its original content contract: only laps whose
+            # lap number, lap time, session-elapsed time, and position
+            # are all recorded are plotted.
+            complete = [
+                (number, lap) for number, lap in sorted(lap_log.get_laps().items())
+                if lap.get_time() is not None and lap.get_at() is not None and lap.get_position() is not None
             ]
+            if not complete:
+                # A driver without any complete lap gets no line and no legend entry.
+                continue
+            lap_numbers = [number for number, _ in complete]
+            lap_times = [lap.get_time() for _, lap in complete]
             color = fastf1.plotting.get_team_color(lap_log.get_driver().get_team_name(), session)
             ax.plot(lap_numbers, lap_times, color=color, label=lap_log.get_driver().get_name(), linewidth=0.5,
                     linestyle=driver_linestyle(session.event.year, lap_log.get_driver().get_number()))
@@ -146,7 +164,7 @@ def laptime(log: WarningLoggerLike, filepath: str, filename: str, session: Sessi
 
 
 
-def make_top_time_map(all_laps: Laps) -> dict[int, datetime.datetime]:
+def make_top_time_map(all_laps: Laps) -> dict[int, datetime.timedelta]:
     return top_time_map(make_driver_laps_set(all_laps))
 
 
@@ -160,7 +178,7 @@ def result_ranked(lap_logs: list[DriverLaps], ranks: dict[str, int]) -> list[Dri
 
 @tracer.start_as_current_span("gap_to_ahead_table")
 def gap_to_ahead_table(log: WarningLoggerLike, filepath: str, lap_logs: list[DriverLaps],
-                       position_logs: dict[int, dict[int, datetime.datetime]], *,
+                       position_logs: dict[int, dict[int, datetime.timedelta]], *,
                        ranks: dict[str, int] = {}):
     """ラップごとのギャップの一覧を作成する
     Args:
@@ -262,7 +280,7 @@ def gap_to_top_table(log: WarningLoggerLike, filepath: str, lap_logs: list[Drive
 @tracer.start_as_current_span("gap_to_ahead")
 def gap_to_ahead_graph(log: WarningLoggerLike, filepath: str, filename: str, session: Session, r: int | None,
                        lap_logs: list[DriverLaps],
-                       position_logs: dict[int, dict[int, datetime.datetime]]):
+                       position_logs: dict[int, dict[int, datetime.timedelta]]):
     """x = ラップ番号, y = 前走とのギャップのドライバーごとの推移
     Args:
         log: ロガー
@@ -387,10 +405,11 @@ def positions(log: WarningLoggerLike, filepath: str, session: Session, lap_logs:
     for lap_log in lap_logs:
         color = fastf1.plotting.get_team_color(lap_log.get_driver().get_team_name(), session)
         x = sorted(lap_log.get_laps().keys())
-        y = [
-            l.get_position() if (l := lap_log.get_laps().get(i)) is not None else 0
-            for i in x
-        ]
+        # Missing positions are plotted as line gaps, not as zeros.
+        y = [lap_log.get_laps()[i].get_position() for i in x]
+        if all(position is None for position in y):
+            # A driver with no recorded position gets no line and no legend entry.
+            continue
         line_style = driver_linestyle(session.event.year, lap_log.get_driver().get_number())
         ax.plot(x, y, linewidth=1, color=color, label=lap_log.get_driver().get_name(), linestyle=line_style)
 

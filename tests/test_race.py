@@ -1,6 +1,8 @@
 import unittest
 from contextlib import ExitStack
+import math
 import tempfile
+from datetime import timedelta
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
@@ -19,22 +21,29 @@ from f1_explorer.visualizations.race import (
     gap_to_ahead_table,
     gap_to_top_graph,
     gap_to_top_table,
+    laptime,
     make_driver_laps_set,
     make_lap_start_by_position_by_number,
     make_top_time_map,
+    positions,
     tyres,
     write_messages,
     write_track_status,
 )
-from f1_explorer.visualizations.race_metrics import lap_times_by_position, top_time_map
+from f1_explorer.visualizations.race_metrics import (
+    gap_to_ahead,
+    gap_to_leader,
+    lap_times_by_position,
+    top_time_map,
+)
 
 
 class Race(unittest.TestCase):
     @staticmethod
     def _driver_laps(number, name, positions_and_seconds):
-        base = pandas.Timestamp("2026-01-01")
         laps = {
-            lap_number: Lap(80, base + pandas.to_timedelta(timestamp, unit="s"), position, tyre=Tyre("Soft", True))
+            lap_number: Lap(80, pandas.to_timedelta(timestamp, unit="s"), position,
+                            tyre=Tyre("Soft", True))
             for lap_number, (position, timestamp) in positions_and_seconds.items()
         }
         return DriverLaps(Driver(number, name, f"Team {name}"), laps)
@@ -166,7 +175,7 @@ class Race(unittest.TestCase):
             "Compound": ["Soft", "Soft", "Soft"],
             "FreshTyre": [True, True, True],
             "PitOutTime": pandas.to_datetime(["", "", ""]),
-            "Time": pandas.to_datetime(["2026-01-01 00:00:00", "2026-01-01 00:01:23", "2026-01-01 00:00:0"]),
+            "Time": pandas.to_timedelta(["83s", "166s", "84s"]),
             "LapTime": pandas.to_timedelta(["83.456s", "82.789s", "83.000s"]),
         }
         laps = Laps(pandas.DataFrame(data))
@@ -179,13 +188,13 @@ class Race(unittest.TestCase):
         self.assertEqual('Max', result_sorted[1].get_driver().get_name())
         self.assertEqual('Red Bull', result_sorted[1].get_driver().get_team_name())
         self.assertEqual(83.456, result_sorted[1].get_laps()[1].get_time())
-        self.assertEqual(pandas.to_datetime("2026-01-01 00:00:00"), result_sorted[1].get_laps()[1].get_at())
+        self.assertEqual(timedelta(seconds=83), result_sorted[1].get_laps()[1].get_at())
         self.assertEqual(1, result_sorted[1].get_laps()[1].get_position())
         self.assertEqual(False, result_sorted[1].get_laps()[1].get_pit_out())
         self.assertEqual(True, result_sorted[1].get_laps()[1].get_tyre().get_new())
         self.assertEqual('Soft', result_sorted[1].get_laps()[1].get_tyre().get_compound())
         self.assertEqual(82.789, result_sorted[1].get_laps()[2].get_time())
-        self.assertEqual(pandas.to_datetime("2026-01-01 00:01:23"), result_sorted[1].get_laps()[2].get_at())
+        self.assertEqual(timedelta(seconds=166), result_sorted[1].get_laps()[2].get_at())
         self.assertEqual(1, result_sorted[1].get_laps()[2].get_position())
         self.assertEqual(False, result_sorted[1].get_laps()[2].get_pit_out())
         self.assertEqual(True, result_sorted[1].get_laps()[2].get_tyre().get_new())
@@ -196,7 +205,7 @@ class Race(unittest.TestCase):
         self.assertEqual('Lec', result_sorted[0].get_driver().get_name())
         self.assertEqual('Ferrari', result_sorted[0].get_driver().get_team_name())
         self.assertEqual(83.000, result_sorted[0].get_laps()[1].get_time())
-        self.assertEqual(pandas.to_datetime("2026-01-01 00:00:00"), result_sorted[0].get_laps()[1].get_at())
+        self.assertEqual(timedelta(seconds=84), result_sorted[0].get_laps()[1].get_at())
         self.assertEqual(2, result_sorted[0].get_laps()[1].get_position())
         self.assertEqual(False, result_sorted[0].get_laps()[1].get_pit_out())
         self.assertEqual(True, result_sorted[0].get_laps()[1].get_tyre().get_new())
@@ -213,31 +222,30 @@ class Race(unittest.TestCase):
             "Compound": ["Soft", "Soft", "Soft", "Soft"],
             "FreshTyre": [True, True, True, True],
             "PitOutTime": pandas.to_datetime(["", "", "", ""]),
-            "Time": pandas.to_datetime(
-                ["2026-01-01 00:00:00", "2026-01-01 00:01:23", "2026-01-01 00:00:00", "2026-01-01 00:01:24"]),
+            "Time": pandas.to_timedelta(["83s", "166s", "84s", "167s"]),
             "LapTime": pandas.to_timedelta(["83.456s", "82.789s", "84.000s", "83.000s"]),
         }
         laps = Laps(pandas.DataFrame(data))
         result = make_lap_start_by_position_by_number(laps)
         self.assertEqual(2, len(result))
-        self.assertEqual(pandas.to_datetime("2026-01-01 00:00:00"), result[1][1])
-        self.assertEqual(pandas.to_datetime("2026-01-01 00:00:00"), result[1][2])
-        self.assertEqual(pandas.to_datetime("2026-01-01 00:01:23"), result[2][1])
-        self.assertEqual(pandas.to_datetime("2026-01-01 00:01:24"), result[2][2])
+        self.assertEqual(timedelta(seconds=83), result[1][1])
+        self.assertEqual(timedelta(seconds=84), result[1][2])
+        self.assertEqual(timedelta(seconds=166), result[2][1])
+        self.assertEqual(timedelta(seconds=167), result[2][2])
 
     def test_make_lap_log_marks_only_laps_with_pit_out_time(self):
         data = {
             "DriverNumber": ["1"], "Driver": ["Max"], "Stint": [2], "Team": ["Red Bull"],
             "LapNumber": [10], "Position": [1], "Compound": ["Soft"], "FreshTyre": [True],
             "PitOutTime": pandas.to_timedelta(["12s"]),
-            "Time": pandas.to_datetime(["2026-01-01 00:12:00"]),
+            "Time": pandas.to_timedelta(["720s"]),
             "LapTime": pandas.to_timedelta(["90s"]),
         }
         result = make_driver_laps_set(Laps(pandas.DataFrame(data)))
 
         self.assertTrue(result[0].get_laps()[10].get_pit_out())
 
-    def test_make_lap_log_skips_incomplete_laps_and_empty_drivers(self):
+    def test_make_lap_log_keeps_incomplete_rows_with_none_values(self):
         data = {
             "DriverNumber": ["1", "1", "16"],
             "Driver": ["Max", "Max", "Lec"],
@@ -254,8 +262,214 @@ class Race(unittest.TestCase):
 
         result = make_driver_laps_set(Laps(pandas.DataFrame(data)))
 
-        self.assertEqual([1], [driver_laps.driver.number for driver_laps in result])
-        self.assertEqual([1], list(result[0].laps))
+        self.assertEqual([1, 16], [driver_laps.driver.number for driver_laps in result])
+        self.assertEqual([1, 2], list(result[0].laps))
+        self.assertEqual(1, result[0].laps[1].get_position())
+        # Missing positions stay missing: no zero rank is fabricated.
+        self.assertIsNone(result[0].laps[2].get_position())
+        self.assertEqual([1], list(result[1].laps))
+        self.assertIsNone(result[1].laps[1].get_position())
+
+    def test_make_lap_log_keeps_lap_missing_lap_time_only(self):
+        """A lap missing only its LapTime keeps position and gap values."""
+        laps = Laps(pandas.DataFrame({
+            "DriverNumber": ["1", "2"],
+            "Driver": ["Max", "Lec"],
+            "Stint": [1, 1],
+            "Team": ["Red Bull", "Ferrari"],
+            "LapNumber": [1, 1],
+            "Position": [1, 2],
+            "Compound": ["Soft", "Soft"],
+            "FreshTyre": [True, True],
+            "PitOutTime": pandas.to_datetime(["", ""]),
+            "Time": pandas.to_timedelta(["83s", "84s"]),
+            "LapTime": pandas.to_timedelta([pandas.NaT, "83s"]),
+        }))
+        result = make_driver_laps_set(laps)
+        self.assertIsNone(result[0].laps[1].get_time())
+        self.assertEqual(timedelta(seconds=83), result[0].laps[1].get_at())
+        self.assertEqual(1, result[0].laps[1].get_position())
+
+        positions = lap_times_by_position(result)
+        self.assertEqual({1: 83.0, 2: 84.0}, {p: t.total_seconds() for p, t in positions[1].items()})
+        self.assertEqual([(1, 1.0)], gap_to_ahead(result[1], positions))
+        self.assertEqual([(1, 1.0)], gap_to_leader(result[1], top_time_map(result)))
+
+    def test_make_lap_log_keeps_lap_missing_session_time_only(self):
+        """A lap missing only its session-elapsed time keeps its position."""
+        laps = Laps(pandas.DataFrame({
+            "DriverNumber": ["1", "2"],
+            "Driver": ["Max", "Lec"],
+            "Stint": [1, 1],
+            "Team": ["Red Bull", "Ferrari"],
+            "LapNumber": [1, 1],
+            "Position": [1, 2],
+            "Compound": ["Soft", "Soft"],
+            "FreshTyre": [True, True],
+            "PitOutTime": pandas.to_datetime(["", ""]),
+            "Time": pandas.to_timedelta(["83s", pandas.NaT]),
+            "LapTime": pandas.to_timedelta(["83s", "83s"]),
+        }))
+        result = make_driver_laps_set(laps)
+        self.assertEqual(2, result[1].laps[1].get_position())
+        self.assertIsNone(result[1].laps[1].get_at())
+        self.assertEqual({1: 83.0}, {k: t.total_seconds() for k, t in lap_times_by_position(result)[1].items()})
+
+        # Without a session-elapsed time the lap provides no gap value,
+        # and none is fabricated in its place.
+        self.assertEqual([(1, None)], gap_to_ahead(result[1], lap_times_by_position(result)))
+        self.assertEqual([(1, None)], gap_to_leader(result[1], top_time_map(result)))
+
+    def test_make_lap_log_rejects_unrankable_positions(self):
+        laps = Laps(pandas.DataFrame({
+            "DriverNumber": ["1", "1", "1"],
+            "Driver": ["Max", "Max", "Max"],
+            "Stint": [1, 1, 1],
+            "Team": ["Red Bull", "Red Bull", "Red Bull"],
+            "LapNumber": [1, 2, 3],
+            "Position": [0, 1.0, float("inf")],
+            "Compound": ["Soft", "Soft", "Soft"],
+            "FreshTyre": [True, True, True],
+            "PitOutTime": pandas.to_datetime(["", "", ""]),
+            "Time": pandas.to_timedelta(["83s", "166s", "249s"]),
+            "LapTime": pandas.to_timedelta(["83s", "83s", "83s"]),
+        }))
+        result = make_driver_laps_set(laps)
+        self.assertIsNone(result[0].laps[1].get_position())
+        self.assertEqual(1, result[0].laps[2].get_position())
+        self.assertIsNone(result[0].laps[3].get_position())
+        self.assertEqual([(1, None), (2, None), (3, None)],
+                         gap_to_ahead(result[0], lap_times_by_position(result)))
+
+    def test_laptime_graph_keeps_original_complete_lap_target(self):
+        """R-07 keeps plotting only fully recorded laps, even when the
+        adapter now retains laps that miss only a non-identifier value."""
+        fixture_laps = pandas.DataFrame({
+            "DriverNumber": ["1", "1", "1"],
+            "Driver": ["Max", "Max", "Max"],
+            "Stint": [1, 1, 1],
+            "Team": ["Red Bull", "Red Bull", "Red Bull"],
+            "LapNumber": [1, 2, 3],
+            "Position": [1.0, 1.0, 1.0],
+            "Compound": ["Soft", "Soft", "Soft"],
+            "FreshTyre": [True, True, True],
+            "PitOutTime": pandas.to_datetime(["", "", ""]),
+            "Time": pandas.to_timedelta(["83s", "166s", pandas.NaT]),
+            "LapTime": pandas.to_timedelta(["83s", "83s", "83s"]),
+        })
+        lap_logs = make_driver_laps_set(Laps(fixture_laps))
+        self.assertEqual(3, len(lap_logs[0].get_laps()))
+
+        session = SimpleNamespace(
+            event=SimpleNamespace(year=2026),
+            laps=Laps(fixture_laps.assign(IsAccurate=[True] * 3, Deleted=[False] * 3, TrackStatus=["1"] * 3)),
+        )
+        with (
+            patch("f1_explorer.visualizations.race.save_matplotlib") as save,
+            patch("f1_explorer.visualizations.race.current_report", return_value=MagicMock()),
+            patch("f1_explorer.visualizations.race.fastf1.plotting.get_team_color", return_value="#123456"),
+        ):
+            laptime(MagicMock(), "output", "laptime_graph", session, None, lap_logs)
+
+        figure = save.call_args.args[0]
+        lines = figure.axes[0].get_lines()
+        self.assertEqual([[1, 2]], [list(line.get_xdata()) for line in lines])
+        self.assertEqual([[83.0, 83.0]], [list(line.get_ydata()) for line in lines])
+
+    def test_positions_graph_keeps_missing_position_out_of_the_line(self):
+        lap_logs = [
+            DriverLaps(Driver(1, "MAX", "Red Bull"), {
+                1: Lap(80, timedelta(seconds=83), 1, tyre=Tyre("Soft", True)),
+                2: Lap(80, timedelta(seconds=166), None, tyre=Tyre("Soft", True)),
+            }),
+        ]
+        session = SimpleNamespace(event=SimpleNamespace(year=2026))
+        with (
+            patch("f1_explorer.visualizations.race.save_matplotlib") as save,
+            patch("f1_explorer.visualizations.race.fastf1.plotting.get_team_color", return_value="#123456"),
+        ):
+            positions(MagicMock(), "output", session, lap_logs)
+
+        line = save.call_args.args[0].axes[0].get_lines()[0]
+        points = line.get_xydata()
+        self.assertEqual([1, 2], [float(point[0]) for point in points])
+        self.assertEqual(1.0, points[0][1])
+        self.assertTrue(math.isnan(points[1][1]))
+
+    def test_positions_graph_hides_driver_without_any_recorded_position(self):
+        """A driver whose laps all miss the position gets no ghost line or legend entry."""
+        lap_logs = [
+            DriverLaps(Driver(1, "MAX", "Red Bull"), {
+                1: Lap(80, timedelta(seconds=83), None, tyre=Tyre("Soft", True)),
+                2: Lap(80, timedelta(seconds=166), None, tyre=Tyre("Soft", True)),
+            }),
+        ]
+        session = SimpleNamespace(event=SimpleNamespace(year=2026))
+        with (
+            patch("f1_explorer.visualizations.race.save_matplotlib") as save,
+            patch("f1_explorer.visualizations.race.fastf1.plotting.get_team_color", return_value="#123456"),
+        ):
+            positions(MagicMock(), "output", session, lap_logs)
+
+        self.assertEqual([], list(save.call_args.args[0].axes[0].get_lines()))
+
+    def test_laptime_graph_hides_driver_without_any_complete_lap(self):
+        """A driver retained with only partial laps gets no ghost line or legend entry."""
+        fixture_laps = pandas.DataFrame({
+            "DriverNumber": ["1", "1"],
+            "Driver": ["Max", "Max"],
+            "Stint": [1, 1],
+            "Team": ["Red Bull", "Red Bull"],
+            "LapNumber": [1, 2],
+            "Position": [None, None],
+            "Compound": ["Soft", "Soft"],
+            "FreshTyre": [True, True],
+            "PitOutTime": pandas.to_datetime(["", ""]),
+            "Time": pandas.to_timedelta(["83s", "166s"]),
+            "LapTime": pandas.to_timedelta(["83s", "83s"]),
+        })
+        lap_logs = make_driver_laps_set(Laps(fixture_laps))
+        self.assertEqual(2, len(lap_logs[0].get_laps()))
+
+        session = SimpleNamespace(
+            event=SimpleNamespace(year=2026),
+            laps=Laps(fixture_laps.assign(IsAccurate=[True] * 2, Deleted=[False] * 2, TrackStatus=["1"] * 2)),
+        )
+        with (
+            patch("f1_explorer.visualizations.race.save_matplotlib") as save,
+            patch("f1_explorer.visualizations.race.current_report", return_value=MagicMock()),
+        ):
+            laptime(MagicMock(), "output", "laptime_graph", session, None, lap_logs)
+
+        self.assertEqual([], list(save.call_args.args[0].axes[0].get_lines()))
+
+    def test_gap_graphs_keep_legend_for_driver_without_any_gaps(self):
+        """Like empty drivers, a driver whose every lap misses position or
+        time still gets a classification-order legend trace; its series
+        carries null gaps instead of fabricated zeros.  The committed
+        classification-order contract keeps empty driver traces, and this
+        new no-gap case follows the same rule."""
+        lap_logs = [
+            DriverLaps(Driver(1, "FIRST", "Team A"), {
+                1: Lap(80, timedelta(seconds=83), None, tyre=Tyre("Soft", True)),
+                2: Lap(80, timedelta(seconds=166), None, tyre=Tyre("Soft", True)),
+            }),
+        ]
+        session = SimpleNamespace(event=SimpleNamespace(year=2026), laps=MagicMock())
+        with (
+            patch("f1_explorer.visualizations.race.make_top_time_map", return_value={}),
+            patch("f1_explorer.visualizations.race.fastf1.plotting.get_team_color", return_value="#123456"),
+            patch("f1_explorer.visualizations.race.save_plotly") as save,
+        ):
+            gap_to_ahead_graph(MagicMock(), "output", "ahead", session, None, lap_logs, {})
+            ahead = save.call_args.args[0]
+            gap_to_top_graph(MagicMock(), "output", "top", session, None, lap_logs)
+            top = save.call_args.args[0]
+
+        self.assertEqual(["FIRST"], [trace.name for trace in ahead.data])
+        self.assertEqual([None, None], list(ahead.data[0].y))
+        self.assertEqual(["FIRST"], [trace.name for trace in top.data])
+        self.assertEqual([None, None], list(top.data[0].y))
 
     def test_make_top_time_map(self):
         data = {
@@ -268,15 +482,14 @@ class Race(unittest.TestCase):
             "Compound": ["Soft", "Soft", "Soft", "Soft"],
             "FreshTyre": [True, True, True, True],
             "PitOutTime": pandas.to_datetime(["", "", "", ""]),
-            "Time": pandas.to_datetime(
-                ["2026-01-01 00:00:00", "2026-01-01 00:01:23", "2026-01-01 00:00:00", "2026-01-01 00:01:24"]),
+            "Time": pandas.to_timedelta(["83s", "166s", "84s", "167s"]),
             "LapTime": pandas.to_timedelta(["83.456s", "82.789s", "84.000s", "83.000s"]),
         }
         laps = Laps(pandas.DataFrame(data))
         result = make_top_time_map(laps)
         self.assertEqual(2, len(result))
-        self.assertEqual(pandas.to_datetime("2026-01-01 00:00:00"), result[1])
-        self.assertEqual(pandas.to_datetime("2026-01-01 00:01:23"), result[2])
+        self.assertEqual(timedelta(seconds=83), result[1])
+        self.assertEqual(timedelta(seconds=166), result[2])
 
     def test_tyre_chart_marks_stint_changes_and_labels_age_and_condition(self):
         laps = Laps(pandas.DataFrame({

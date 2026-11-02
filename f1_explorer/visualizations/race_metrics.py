@@ -9,7 +9,7 @@ which makes the calculations useful in plots, tables, and tests alike.
 from __future__ import annotations
 
 from collections.abc import Iterable, Mapping, Sequence
-from datetime import datetime
+from datetime import timedelta
 from typing import TypeAlias
 
 from f1_explorer.visualizations.domain.driver_laps import DriverLaps
@@ -17,8 +17,8 @@ from f1_explorer.visualizations.domain.lap import Lap
 
 LapNumber: TypeAlias = int
 LapSpan: TypeAlias = list[tuple[LapNumber, Lap | None]]
-TimestampByLap: TypeAlias = dict[LapNumber, datetime]
-PositionTimesByLap: TypeAlias = dict[LapNumber, dict[int, datetime]]
+TimestampByLap: TypeAlias = dict[LapNumber, timedelta]
+PositionTimesByLap: TypeAlias = dict[LapNumber, dict[int, timedelta]]
 GapSeries: TypeAlias = list[tuple[LapNumber, float | None]]
 
 
@@ -44,14 +44,16 @@ def inclusive_lap_span(driver_laps: DriverLaps) -> LapSpan:
 def top_time_map(driver_laps: Sequence[DriverLaps]) -> TimestampByLap:
     """Map each lap number to the leader's timestamp for that lap.
 
-    If malformed input contains more than one position-one record for a lap,
-    the earliest timestamp is chosen.  Keys are inserted in ascending order,
-    making iteration deterministic while retaining the useful mapping API.
+    Laps without a position or session-elapsed time can never be the
+    leader and are skipped.  If malformed input contains more than one
+    position-one record for a lap, the earliest timestamp is chosen.
+    Keys are inserted in ascending order, making iteration deterministic
+    while retaining the useful mapping API.
     """
-    result: dict[int, datetime] = {}
+    result: dict[int, timedelta] = {}
     for driver in _ordered_driver_laps(driver_laps):
         for number, lap in sorted(driver.laps.items()):
-            if lap.position != 1:
+            if lap.position is None or lap.position != 1 or lap.at is None:
                 continue
             previous = result.get(number)
             if previous is None or lap.at < previous:
@@ -62,13 +64,17 @@ def top_time_map(driver_laps: Sequence[DriverLaps]) -> TimestampByLap:
 def lap_times_by_position(driver_laps: Sequence[DriverLaps]) -> PositionTimesByLap:
     """Map each lap to timestamps indexed by race position.
 
-    The result has the shape ``{lap_number: {position: timestamp}}``.  Both
-    levels are sorted by their numeric keys.  A duplicate position uses the
-    earliest timestamp, matching :func:`top_time_map`'s malformed-input rule.
+    The result has the shape ``{lap_number: {position: timestamp}}``.
+    Laps without a position or session-elapsed time provide no mapping
+    entry.  Both levels are sorted by their numeric keys.  A duplicate
+    position uses the earliest timestamp, matching :func:`top_time_map`'s
+    malformed-input rule.
     """
-    unsorted: dict[int, dict[int, datetime]] = {}
+    unsorted: dict[int, dict[int, timedelta]] = {}
     for driver in _ordered_driver_laps(driver_laps):
         for number, lap in sorted(driver.laps.items()):
+            if lap.position is None or lap.at is None:
+                continue
             positions = unsorted.setdefault(number, {})
             previous = positions.get(lap.position)
             if previous is None or lap.at < previous:
@@ -79,20 +85,21 @@ def lap_times_by_position(driver_laps: Sequence[DriverLaps]) -> PositionTimesByL
     }
 
 
-def _seconds_between(later: datetime, earlier: datetime) -> float:
+def _seconds_between(later: timedelta, earlier: timedelta) -> float:
     return (later - earlier).total_seconds()
 
 
 def gap_to_leader(
     driver_laps: DriverLaps,
-    leader_times: Mapping[int, datetime] | None = None,
+    leader_times: Mapping[int, timedelta] | None = None,
     *,
-    top_times: Mapping[int, datetime] | None = None,
+    top_times: Mapping[int, timedelta] | None = None,
 ) -> GapSeries:
     """Return the driver's gap to the leader for each inclusive lap.
 
-    A missing driver lap or missing leader timestamp yields ``None``.  A
-    leader's own gap is therefore ``0.0`` when its timing record exists.
+    A missing driver lap, a lap without a session-elapsed time or
+    position, or a missing leader timestamp yields ``None``.  A leader's
+    own gap is therefore ``0.0`` when its timing record exists.
     ``top_times`` is a descriptive keyword alias for ``leader_times``.
     """
     if leader_times is not None and top_times is not None:
@@ -103,21 +110,25 @@ def gap_to_leader(
     result: GapSeries = []
     for number, lap in inclusive_lap_span(driver_laps):
         leader = times.get(number)
-        result.append((number, None if lap is None or leader is None else _seconds_between(lap.at, leader)))
+        if lap is None or lap.position is None or lap.at is None or leader is None:
+            result.append((number, None))
+            continue
+        result.append((number, _seconds_between(lap.at, leader)))
     return result
 
 
 def gap_to_ahead(
     driver_laps: DriverLaps,
-    position_times: Mapping[int, Mapping[int, datetime]] | None = None,
+    position_times: Mapping[int, Mapping[int, timedelta]] | None = None,
     *,
-    lap_times: Mapping[int, Mapping[int, datetime]] | None = None,
+    lap_times: Mapping[int, Mapping[int, timedelta]] | None = None,
 ) -> GapSeries:
     """Return the driver's gap to the car immediately ahead.
 
     ``position_times`` normally comes from :func:`lap_times_by_position`.
-    A leader (position one), an absent ahead car, or a missing timing record
-    produces ``None`` rather than a fabricated zero gap.
+    A leader (position one), a lap or ahead car without a recorded
+    position or session-elapsed time, or an absent ahead car produces
+    ``None`` rather than a fabricated zero gap.
     """
     if position_times is not None and lap_times is not None:
         raise TypeError("provide position_times or lap_times, not both")
@@ -126,11 +137,14 @@ def gap_to_ahead(
         positions = {}
     result: GapSeries = []
     for number, lap in inclusive_lap_span(driver_laps):
-        if lap is None or lap.position <= 1:
+        if lap is None or lap.position is None or lap.position <= 1:
             result.append((number, None))
             continue
         ahead = positions.get(number, {}).get(lap.position - 1)
-        result.append((number, None if ahead is None else _seconds_between(lap.at, ahead)))
+        if ahead is None or lap.at is None:
+            result.append((number, None))
+            continue
+        result.append((number, _seconds_between(lap.at, ahead)))
     return result
 
 
