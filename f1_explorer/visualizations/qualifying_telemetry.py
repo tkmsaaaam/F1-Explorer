@@ -187,7 +187,7 @@ def make_telemetry_comparison(session: Any) -> go.Figure:
 def make_track_map_comparison(session: Any) -> go.Figure:
     """Build one driver-selectable speed/gear track map for short-session reports."""
     drivers = _ordered_quicklap_drivers(session)
-    entries: list[tuple[str, Any, np.ndarray, np.ndarray, np.ndarray, np.ndarray]] = []
+    entries: list[tuple[str, Any, str, np.ndarray, np.ndarray, np.ndarray]] = []
     for number in drivers:
         try:
             lap = session.laps.pick_drivers(number).pick_fastest()
@@ -196,71 +196,65 @@ def make_track_map_comparison(session: Any) -> go.Figure:
             telemetry: Telemetry = lap_telemetry_without_driver_ahead(lap)
             x = np.asarray(telemetry.X, dtype=float)
             y = np.asarray(telemetry.Y, dtype=float)
-            speed = np.asarray(telemetry.Speed, dtype=float)
-            gear = np.asarray(telemetry.nGear, dtype=float)
         except (AttributeError, KeyError, TypeError, ValueError):
             continue
-        valid = np.isfinite(x) & np.isfinite(y)
-        if not valid.any():
-            continue
-        entries.append((str(number), lap, x[valid], y[valid], speed[valid], gear[valid]))
+        for metric in ("Speed", "nGear"):
+            try:
+                values = np.asarray(telemetry[metric], dtype=float)
+                valid = np.isfinite(x) & np.isfinite(y) & np.isfinite(values)
+            except (AttributeError, KeyError, TypeError, ValueError):
+                continue
+            if valid.any():
+                entries.append((str(number), lap, metric, x[valid], y[valid], values[valid]))
 
     figure = go.Figure()
-    groups: dict[str, list[int]] = {"速度": [], "ギア": []}
-    driver_indices: dict[str, list[int]] = {}
-    all_speed = np.concatenate([entry[4] for entry in entries]) if entries else np.array([])
-    speed_min = float(np.nanmin(all_speed)) if all_speed.size else 0.0
-    speed_max = float(np.nanmax(all_speed)) if all_speed.size else 1.0
+    speed_values = [values for _, _, metric, _, _, values in entries if metric == "Speed"]
+    all_speed = np.concatenate(speed_values) if speed_values else np.array([])
+    speed_min = float(all_speed.min()) if all_speed.size else 0.0
+    speed_max = float(all_speed.max()) if all_speed.size else 1.0
     if speed_min == speed_max:
         speed_min, speed_max = speed_min - 0.5, speed_max + 0.5
-
-    for number, lap, x, y, speed, gear in entries:
+    selected_driver = next((number for number, _, metric, *_ in entries if metric == "Speed"), None)
+    driver_labels: dict[str, str] = {}
+    for number, lap, metric, x, y, values in entries:
+        driver_labels[number] = str(lap.Driver)
         try:
             color = fastf1.plotting.get_team_color(lap.Team, session)
         except (AttributeError, KeyError, ValueError):
             color = "gray"
-        driver_indices[number] = []
-        for label, values, colorscale, cmin, cmax, unit, hover_format in (
-            ("速度", speed, "Plasma", speed_min, speed_max, "Speed [km/h]", ".1f"),
-            ("ギア", gear, _gear_colorscale(), 0.5, max(8.5, float(np.nanmax(gear, initial=1) + 0.5)), "Gear", ".0f"),
-        ):
-            valid = np.isfinite(values)
-            idx = len(figure.data)
-            figure.add_trace(go.Scattergl(
-                x=x[valid], y=y[valid], customdata=values[valid], mode="lines+markers",
-                name=str(lap.Driver), visible=label == "速度" and not driver_indices[number],
-                showlegend=False, line={"color": color, "width": 1},
-                marker={"color": values[valid], "colorscale": colorscale,
-                        "cmin": cmin, "cmax": cmax, "size": 5, "showscale": True,
-                        "colorbar": {"title": {"text": unit},
-                                     **({"tickvals": list(range(1, 9)), "ticktext": [str(i) for i in range(1, 9)]} if label == "ギア" else {})}},
-                hovertemplate=f"{lap.Driver}<br>{unit}: %{{customdata:{hover_format}}}<extra></extra>",
-            ))
-            driver_indices[number].append(idx)
-            groups[label].append(idx)
-
-    driver_labels = [number for number, *_ in entries]
-    buttons = []
-    for label in ("速度", "ギア"):
-        for number in driver_labels:
-            visible = [False] * len(figure.data)
-            metric_index = 0 if label == "速度" else 1
-            selected = driver_indices[number][metric_index]
-            visible[selected] = True
-            buttons.append({"label": f"{label} — {next(lap.Driver for n, lap, *_ in entries if n == number)}",
-                            "method": "update", "args": [{"visible": visible}, {"title.text": f"{label} — {next(lap.Driver for n, lap, *_ in entries if n == number)}"}]})
-    driver_buttons = []
-    for number in driver_labels:
-        driver_name = next(lap.Driver for n, lap, *_ in entries if n == number)
-        visible = [False] * len(figure.data)
-        visible[driver_indices[number][0]] = True
-        driver_buttons.append({"label": str(driver_name), "method": "update", "args": [{"visible": visible}, {"title.text": f"速度 — {driver_name}"}]})
+        is_speed = metric == "Speed"
+        unit, hover_format = ("Speed [km/h]", ".1f") if is_speed else ("Gear", ".0f")
+        figure.add_trace(go.Scattergl(
+            x=x, y=y, customdata=values, mode="lines+markers",
+            name=str(lap.Driver), visible=is_speed and number == selected_driver,
+            meta={"driverNumber": number, "metric": metric},
+            showlegend=False, line={"color": color, "width": 1},
+            marker={"color": values, "colorscale": "Plasma" if is_speed else _gear_colorscale(),
+                    "cmin": speed_min if is_speed else 0.5,
+                    "cmax": speed_max if is_speed else max(8.5, float(values.max() + 0.5)),
+                    "size": 5, "showscale": True,
+                    "colorbar": {"title": {"text": unit},
+                                 **({"tickvals": list(range(1, 9)), "ticktext": [str(i) for i in range(1, 9)]} if not is_speed else {})}},
+            hovertemplate=f"{lap.Driver}<br>{unit}: %{{customdata:{hover_format}}}<extra></extra>",
+        ))
+    speed_drivers = [number for number, _, metric, *_ in entries if metric == "Speed"]
+    driver_buttons = [
+        {"label": driver_labels[number], "method": "update", "execute": False,
+         "args": [{"driverNumber": number}]} for number in speed_drivers
+    ]
     figure.update_layout(
-        title="速度 — " + (str(entries[0][1].Driver) if entries else "有効なテレメトリーデータなし"),
-        template="plotly_white", meta={"f1ExplorerKind": "trackMapComparison"},
+        title={"text": "速度 — " + (driver_labels[selected_driver] if selected_driver else "有効なデータなし"),
+               "x": 0.5, "xanchor": "center", "y": 0.98, "yanchor": "top"},
+        template="plotly_white",
+        meta={"f1ExplorerKind": "trackMapComparison",
+              "drivers": [{"number": number, "label": label} for number, label in driver_labels.items()],
+              "selectedDriver": selected_driver, "selectedMetric": "Speed"},
         updatemenus=[
-            {"buttons": [{"label": label, "method": "update", "args": [{"visible": [i in groups[label] and i == driver_indices[driver_labels[0]][0 if label == '速度' else 1] for i in range(len(figure.data))]}, {"title.text": label}]} for label in ("速度", "ギア")], "type": "buttons", "direction": "right", "x": 0, "y": 1.16},
-            {"buttons": driver_buttons, "type": "dropdown", "x": 0.28, "y": 1.16},
+            {"buttons": [{"label": label, "method": "update", "execute": False,
+                          "args": [{"metric": metric}]} for label, metric in (("速度", "Speed"), ("ギア", "nGear"))],
+             "type": "buttons", "direction": "right", "x": 0, "y": 1.16, "active": 0},
+            {"buttons": driver_buttons, "type": "dropdown", "x": 0.28, "y": 1.16,
+             "active": 0 if driver_buttons else -1},
         ],
         margin={"l": 30, "r": 90, "t": 110, "b": 30},
     )

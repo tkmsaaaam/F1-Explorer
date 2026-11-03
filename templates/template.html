@@ -88,6 +88,35 @@ main { width: 100%; margin: 0 auto; padding: 1rem clamp(1rem, 2vw, 2rem) 4rem; }
       }
     }
     window.Plotly.newPlot(node, figure.data || [], figure.layout || {}, {responsive: true, displaylogo: false, scrollZoom: trackMap}).then(() => {
+      if (figure.layout.meta && figure.layout.meta.f1ExplorerKind === "trackMapComparison") {
+        const meta = figure.layout.meta;
+        let selectedDriver = meta.selectedDriver;
+        let selectedMetric = meta.selectedMetric;
+        node.on("plotly_buttonclicked", (event) => {
+          const choice = event && event.button && event.button.args && event.button.args[0];
+          if (!choice || (!choice.metric && !choice.driverNumber)) return;
+          if (choice.metric) selectedMetric = choice.metric;
+          if (choice.driverNumber) selectedDriver = choice.driverNumber;
+          const candidates = meta.drivers.filter((driver) => figure.data.some((trace) =>
+            trace.meta.driverNumber === driver.number && trace.meta.metric === selectedMetric));
+          if (!candidates.some((driver) => driver.number === selectedDriver)) {
+            selectedDriver = candidates.length ? candidates[0].number : null;
+          }
+          const visible = figure.data.map((trace) =>
+            trace.meta.driverNumber === selectedDriver && trace.meta.metric === selectedMetric);
+          const label = selectedMetric === "Speed" ? "速度" : "ギア";
+          const driver = candidates.find((driver) => driver.number === selectedDriver);
+          const buttons = candidates.map((driver) => ({
+            label: driver.label, method: "update", execute: false, args: [{driverNumber: driver.number}],
+          }));
+          window.Plotly.update(node, {visible}, {
+            "title.text": `${label} — ${driver ? driver.label : "有効なデータなし"}`,
+            "updatemenus[0].active": selectedMetric === "Speed" ? 0 : 1,
+            "updatemenus[1].buttons": buttons,
+            "updatemenus[1].active": candidates.findIndex((driver) => driver.number === selectedDriver),
+          });
+        });
+      }
       if (qualifyingBest) {
         node.on("plotly_buttonclicked", (event) => {
           const label = event && event.button ? event.button.label : "";

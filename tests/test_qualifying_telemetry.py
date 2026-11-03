@@ -97,3 +97,72 @@ def test_circuit_fetch_failure_keeps_telemetry_series():
     assert len(figure.data) == 10
     assert len(figure.layout.annotations or ()) == 0
     session.get_circuit_info.assert_called_once_with()
+
+
+def build_track_map(frames=None):
+    from f1_explorer.visualizations.qualifying_telemetry import make_track_map_comparison
+
+    session, laps, default_frames = make_session()
+    if frames is None:
+        frames = default_frames
+    for frame in frames:
+        if "X" not in frame:
+            frame["X"] = [0., 1., 2., 3., np.nan][:len(frame)]
+        if "Y" not in frame:
+            frame["Y"] = [0., 2., 1., 0., 1.][:len(frame)]
+    with patch("f1_explorer.visualizations.qualifying_telemetry._ordered_quicklap_drivers", return_value=["1", "2"]), \
+            patch("f1_explorer.visualizations.qualifying_telemetry.lap_telemetry_without_driver_ahead",
+                  side_effect=lambda lap: frames[laps.index(lap)]), \
+            patch("fastf1.plotting.get_team_color", return_value="gray"):
+        return make_track_map_comparison(session)
+
+
+def test_track_map_initially_shows_only_first_speed_driver():
+    figure = build_track_map()
+    assert len(figure.data) == 4
+    assert [trace.meta for trace in figure.data if trace.visible] == [
+        {"driverNumber": "1", "metric": "Speed"}]
+    assert figure.layout.title.text == "速度 — D1"
+    assert figure.layout.meta["selectedDriver"] == "1"
+    for menu in figure.layout.updatemenus:
+        assert all(button.execute is False for button in menu.buttons)
+    speed = figure.data[0]
+    np.testing.assert_allclose(speed.x, [0, 2, 3])
+    np.testing.assert_allclose(speed.customdata, [100, 120, 130])
+    assert figure.data[1].marker.colorbar.tickvals == tuple(range(1, 9))
+
+
+@pytest.mark.filterwarnings("error::RuntimeWarning")
+@pytest.mark.parametrize("missing", ["Speed", "nGear", "all", "coordinates", "empty"])
+def test_track_map_missing_channels_are_independent(missing):
+    _, _, frames = make_session()
+    if missing in ("Speed", "nGear"):
+        frames[0].drop(columns=missing, inplace=True)
+        frames[1][missing] = np.nan
+    elif missing == "all":
+        for frame in frames:
+            frame[["Speed", "nGear"]] = np.nan
+    elif missing == "coordinates":
+        for frame in frames:
+            frame["X"] = np.inf
+    elif missing == "empty":
+        for frame in frames:
+            frame.drop(index=frame.index, inplace=True)
+    figure = build_track_map(frames)
+    if missing == "nGear":
+        assert [trace.meta["metric"] for trace in figure.data] == ["Speed", "Speed"]
+        assert sum(bool(trace.visible) for trace in figure.data) == 1
+    else:
+        assert not any(trace.visible for trace in figure.data)
+        assert figure.layout.title.text == "速度 — 有効なデータなし"
+        assert len(figure.layout.updatemenus[1].buttons) == 0
+        assert len(figure.data) == (2 if missing == "Speed" else 0)
+
+
+def test_track_map_initial_driver_skips_missing_speed():
+    _, _, frames = make_session()
+    frames[0]["Speed"] = np.nan
+    figure = build_track_map(frames)
+    assert [trace.meta for trace in figure.data if trace.visible] == [
+        {"driverNumber": "2", "metric": "Speed"}]
+    assert figure.layout.title.text == "速度 — D2"
