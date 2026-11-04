@@ -35,6 +35,7 @@ def _lap_data(data: Any, key: str) -> tuple[np.ndarray, np.ndarray] | None:
 
 
 def _distance_time(data: Any) -> tuple[np.ndarray, np.ndarray] | None:
+    """Keep finite samples in acquisition order, rejecting backward progress."""
     try:
         distance = np.asarray(data.Distance, dtype=float)
         times = np.asarray([value.total_seconds() for value in data.Time], dtype=float)
@@ -47,7 +48,9 @@ def _distance_time(data: Any) -> tuple[np.ndarray, np.ndarray] | None:
     indices = np.unique(distance, return_index=True)[1]
     indices = np.sort(indices)
     distance, times = distance[indices], times[indices]
-    return (distance, times) if len(distance) >= 2 else None
+    if len(distance) < 2 or np.any(np.diff(distance) < 0) or np.any(np.diff(times) < 0):
+        return None
+    return distance, times
 
 
 def make_telemetry_comparison(session: Any) -> go.Figure:
@@ -81,7 +84,9 @@ def make_telemetry_comparison(session: Any) -> go.Figure:
         reference_distance, reference_time = time_data[reference_number]
         common_distance = np.arange(0.0, reference_distance.max(), 5.0)
         if len(common_distance) >= 2:
-            reference_values = np.interp(common_distance, reference_distance, reference_time)
+            reference_values = np.interp(
+                common_distance, reference_distance, reference_time, left=np.nan, right=np.nan,
+            )
         else:
             common_distance = np.array([], dtype=float)
             reference_values = np.array([], dtype=float)
@@ -114,16 +119,22 @@ def make_telemetry_comparison(session: Any) -> go.Figure:
 
         if len(common_distance) >= 2 and str(number) in time_data:
             distance, times = time_data[str(number)]
-            delta = np.interp(common_distance, distance, times) - reference_values
-            index = len(figure.data)
-            figure.add_trace(go.Scatter(
-                x=common_distance, y=delta, mode="lines", name=str(lap.Driver),
-                line={"color": color, "dash": dash},
-                hovertemplate=f"{lap.Driver}<br>Distance: %{{x:.1f}} m<br>Delta: %{{y:.3f}} s<extra></extra>",
-                visible=True,
-            ))
-            trace_groups[0].append(index)
-            values_by_tab[0].extend(delta.tolist())
+            valid = (np.isfinite(reference_values)
+                     & (common_distance >= distance[0]) & (common_distance <= distance[-1]))
+            if np.count_nonzero(valid) >= 2:
+                delta = np.interp(common_distance[valid], distance, times) - reference_values[valid]
+                delta_values: list[float | None] = [None] * len(common_distance)
+                for sample_index, value in zip(np.flatnonzero(valid), delta):
+                    delta_values[sample_index] = float(value)
+                index = len(figure.data)
+                figure.add_trace(go.Scatter(
+                    x=common_distance, y=delta_values, mode="lines", name=str(lap.Driver),
+                    line={"color": color, "dash": dash}, connectgaps=False,
+                    hovertemplate=f"{lap.Driver}<br>Distance: %{{x:.1f}} m<br>Delta: %{{y:.3f}} s<extra></extra>",
+                    visible=True,
+                ))
+                trace_groups[0].append(index)
+                values_by_tab[0].extend(delta.tolist())
 
         for tab_index, (_, label, key, step) in enumerate(tabs[1:], start=1):
             series = _lap_data(car_data[str(number)], key)
@@ -139,6 +150,12 @@ def make_telemetry_comparison(session: Any) -> go.Figure:
             ))
             trace_groups[tab_index].append(index)
             values_by_tab[tab_index].extend(values.tolist())
+
+    # When no delta series exists, show the first tab that still has traces.
+    initial_tab = next((index for index, group in enumerate(trace_groups) if group), 0)
+    if figure.data:
+        for index in trace_groups[initial_tab]:
+            figure.data[index].visible = True
 
     labels = [tab[0] for tab in tabs]
     axis_labels = [tab[1] for tab in tabs]
@@ -163,14 +180,14 @@ def make_telemetry_comparison(session: Any) -> go.Figure:
         buttons.append(dict(label=label, method="update", args=[{"visible": visible}, layout_update]))
 
     figure.update_layout(
-        title=labels[0] if figure.data else "有効なテレメトリーデータなし",
+        title=labels[initial_tab] if figure.data else "有効なテレメトリーデータなし",
         hovermode="x unified", template="plotly_white",
         meta={"f1ExplorerKind": "telemetryComparison"},
         updatemenus=[dict(buttons=buttons, type="buttons", direction="right", x=0, y=1.16, xanchor="left")],
         margin={"l": 70, "r": 30, "t": 110, "b": 70},
     )
     figure.update_xaxes(title="Distance [m]")
-    figure.update_yaxes(title=axis_labels[0])
+    figure.update_yaxes(title=axis_labels[initial_tab])
     if reference_number is not None:
         figure.add_hline(y=0, line_dash="dash", line_color="grey")
     circuit_info = circuit_info_or_none(session)

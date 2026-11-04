@@ -1,4 +1,5 @@
 from datetime import timedelta
+import json
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
@@ -97,6 +98,144 @@ def test_circuit_fetch_failure_keeps_telemetry_series():
     assert len(figure.data) == 10
     assert len(figure.layout.annotations or ()) == 0
     session.get_circuit_info.assert_called_once_with()
+
+
+def replace_car_data(lap, distances, seconds):
+    frame = pd.DataFrame({
+        "Distance": distances,
+        "Time": pd.to_timedelta(seconds, unit="s"),
+        "Speed": 100., "Throttle": 80., "Brake": False, "nGear": 4.,
+    })
+    lap.get_car_data.return_value.add_distance.return_value = frame
+    return frame
+
+
+def tab_traces(figure, tab_index):
+    visible = figure.layout.updatemenus[0].buttons[tab_index].args[0]["visible"]
+    return [trace for trace, selected in zip(figure.data, visible) if selected]
+
+
+@pytest.mark.parametrize(("reference_distances", "comparison_distances"), [
+    ([0., 100.], [20., 80.]),
+    ([20., 80.], [0., 100.]),
+    ([10., 90.], [20., 80.]),
+    ([20., 100.], [0., 80.]),
+])
+def test_delta_only_uses_shared_measured_range(reference_distances, comparison_distances):
+    session, laps, _ = make_session()
+    replace_car_data(laps[0], reference_distances, np.asarray(reference_distances) / 10 + .25)
+    replace_car_data(laps[1], comparison_distances, np.asarray(comparison_distances) / 5 + 1.5)
+    figure = build(session)
+    reference, comparison = tab_traces(figure, 0)
+    grid = np.arange(0., max(reference_distances), 5.)
+    np.testing.assert_array_equal(comparison.x, grid)
+    low = max(min(reference_distances), min(comparison_distances))
+    high = min(max(reference_distances), max(comparison_distances))
+    for distance, value in zip(grid, comparison.y):
+        if low <= distance <= high:
+            # Keep measured time origins; do not force the lap endpoints to agree.
+            assert value == pytest.approx(distance / 10 + 1.25)
+        else:
+            assert value is None
+    for distance, value in zip(grid, reference.y):
+        assert value == (0. if min(reference_distances) <= distance <= max(reference_distances) else None)
+    assert comparison.connectgaps is False
+    assert len(tab_traces(figure, 1)) == 2
+    serialized = json.loads(figure.to_json())
+    assert serialized["data"][5]["y"] == list(comparison.y)
+
+
+def test_delta_duplicate_distance_keeps_first_sample_before_checking_progress():
+    session, laps, _ = make_session()
+    replace_car_data(laps[0], [0., 100.], [0., 10.])
+    frame = replace_car_data(laps[1], [0., 50., 50., 100.], [1., 11., 200., 21.])
+    original = frame.copy(deep=True)
+    reference, comparison = tab_traces(build(session), 0)
+    np.testing.assert_allclose(reference.y, np.zeros(20))
+    np.testing.assert_allclose(comparison.y, np.arange(0., 100., 5.) / 10 + 1)
+    pd.testing.assert_frame_equal(frame, original)
+
+
+@pytest.mark.parametrize("invalid_driver", [0, 1])
+@pytest.mark.parametrize(("distances", "seconds"), [
+    ([0., 60., 40., 100.], [0., 6., 7., 10.]),
+    ([100., 50., 0.], [0., 5., 10.]),
+    ([0., 50., 100.], [0., 10., 5.]),
+])
+def test_backward_progress_only_omits_delta(invalid_driver, distances, seconds):
+    session, laps, _ = make_session()
+    replace_car_data(laps[0], [0., 100.], [0., 10.])
+    replace_car_data(laps[1], [0., 100.], [0., 20.])
+    frame = replace_car_data(laps[invalid_driver], distances, seconds)
+    original = frame.copy(deep=True)
+    figure = build(session)
+    deltas = tab_traces(figure, 0)
+    # An invalid reference never falls back to a slower driver's telemetry.
+    assert [trace.name for trace in deltas] == ([] if invalid_driver == 0 else ["D1"])
+    for tab_index in range(1, 5):
+        assert [trace.name for trace in tab_traces(figure, tab_index)] == ["D1", "D2"]
+    pd.testing.assert_frame_equal(frame, original)
+
+
+@pytest.mark.filterwarnings("error::RuntimeWarning")
+def test_delta_filters_nonfinite_distance_and_time_samples():
+    session, laps, _ = make_session()
+    replace_car_data(laps[0], [0., 100.], [0., 10.])
+    frame = replace_car_data(
+        laps[1], [0., np.nan, 20., 40., 60., 80., 100., np.inf, -np.inf],
+        [1., 3., np.nan, 9., 13., 17., 21., 23., 25.],
+    )
+    original = frame.copy(deep=True)
+    _, comparison = tab_traces(build(session), 0)
+    np.testing.assert_allclose(comparison.y, np.arange(0., 100., 5.) / 10 + 1)
+    pd.testing.assert_frame_equal(frame, original)
+
+
+@pytest.mark.parametrize(("distances", "seconds"), [
+    ([21., 24.], [0., 1.]),  # No common grid points.
+    ([20., 24.], [0., 1.]),  # One common grid point.
+    ([100., 120.], [0., 1.]),  # Beyond the reference grid.
+    ([0., 0.], [0., 1.]),  # One unique distance.
+    ([0., 100.], [np.nan, np.nan]),
+    ([0., 100.], [np.nan, 1.]),
+    ([np.nan, np.inf], [0., 1.]),
+])
+def test_insufficient_comparable_points_only_omit_delta(distances, seconds):
+    session, laps, _ = make_session()
+    replace_car_data(laps[0], [0., 100.], [0., 10.])
+    replace_car_data(laps[1], distances, seconds)
+    figure = build(session)
+    assert [trace.name for trace in tab_traces(figure, 0)] == ["D1"]
+    for tab_index in range(1, 5):
+        expected = ["D1"] if not np.isfinite(distances).any() else ["D1", "D2"]
+        assert [trace.name for trace in tab_traces(figure, tab_index)] == expected
+
+
+def test_equal_time_samples_are_not_backward_progress():
+    session, laps, _ = make_session()
+    replace_car_data(laps[0], [0., 100.], [0., 10.])
+    replace_car_data(laps[1], [0., 50., 100.], [0., 0., 10.])
+    _, comparison = tab_traces(build(session), 0)
+    assert comparison.y[10] == -5.
+
+
+def test_missing_reference_time_does_not_change_reference_driver():
+    session, _, frames = make_session()
+    frames[0].drop(columns="Time", inplace=True)
+    figure = build(session)
+    assert tab_traces(figure, 0) == []
+    for tab_index in range(1, 5):
+        assert len(tab_traces(figure, tab_index)) == 2
+
+
+def test_no_delta_series_falls_back_to_first_available_tab():
+    session, laps, _ = make_session()
+    replace_car_data(laps[0], [100., 50., 0.], [0., 5., 10.])  # Backward reference.
+    replace_car_data(laps[1], [0., 100.], [0., 20.])
+    figure = build(session)
+    assert figure.layout.title.text == "速度"
+    assert figure.layout.yaxis.title.text == "Speed [km/h]"
+    assert [trace.name for trace in figure.data if trace.visible] == ["D1", "D2"]
 
 
 def build_track_map(frames=None):
