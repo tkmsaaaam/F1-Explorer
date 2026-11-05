@@ -6,12 +6,13 @@ from typing import Any
 
 from f1_explorer.circuit import circuit_info_or_none
 
-from fastf1.core import Lap, Telemetry
+from fastf1.core import Telemetry
 import fastf1.plotting
 import numpy as np
 import plotly.graph_objects as go
 
-from f1_explorer.visualizations.short_runs import _plotly_driver_dash, _ordered_quicklap_drivers
+from f1_explorer.visualizations.lap_selection import fastest_laps_by_driver
+from f1_explorer.visualizations.short_runs import _plotly_driver_dash
 from f1_explorer.visualizations.short_runs import _gear_colorscale
 from f1_explorer.telemetry import lap_telemetry_without_driver_ahead
 
@@ -55,15 +56,7 @@ def _distance_time(data: Any) -> tuple[np.ndarray, np.ndarray] | None:
 
 def make_telemetry_comparison(session: Any) -> go.Figure:
     """Build one five-tab telemetry chart for short-session reports."""
-    driver_numbers = _ordered_quicklap_drivers(session)
-    laps: dict[str, Lap] = {}
-    for number in driver_numbers:
-        try:
-            lap: Lap | None = session.laps.pick_drivers(number).pick_fastest()
-        except (AttributeError, KeyError, TypeError, ValueError):
-            lap = None
-        if lap is not None:
-            laps[str(number)] = lap
+    laps = fastest_laps_by_driver(session)
 
     # Scope reuse to this figure: car data and merged position telemetry differ.
     car_data: dict[str, Telemetry | None] = {}
@@ -74,11 +67,7 @@ def make_telemetry_comparison(session: Any) -> go.Figure:
             car_data[number] = None
     time_data = {number: _distance_time(data) for number, data in car_data.items()}
     time_data = {number: value for number, value in time_data.items() if value is not None}
-    reference_number = min(
-        laps,
-        key=lambda number: laps[number].LapTime.total_seconds(),
-        default=None,
-    )
+    reference_number = next(iter(laps), None)
     common_distance = np.array([], dtype=float)
     if reference_number is not None and reference_number in time_data:
         reference_distance, reference_time = time_data[reference_number]
@@ -104,10 +93,7 @@ def make_telemetry_comparison(session: Any) -> go.Figure:
     trace_groups: list[list[int]] = [[] for _ in tabs]
     values_by_tab: list[list[float]] = [[] for _ in tabs]
 
-    for number in driver_numbers:
-        lap: Lap | None = laps.get(str(number))
-        if lap is None:
-            continue
+    for number, lap in laps.items():
         try:
             color = fastf1.plotting.get_team_color(lap.Team, session)
         except (AttributeError, KeyError, ValueError):
@@ -203,13 +189,9 @@ def make_telemetry_comparison(session: Any) -> go.Figure:
 
 def make_track_map_comparison(session: Any) -> go.Figure:
     """Build one driver-selectable speed/gear track map for short-session reports."""
-    drivers = _ordered_quicklap_drivers(session)
     entries: list[tuple[str, Any, str, np.ndarray, np.ndarray, np.ndarray]] = []
-    for number in drivers:
+    for number, lap in fastest_laps_by_driver(session).items():
         try:
-            lap = session.laps.pick_drivers(number).pick_fastest()
-            if lap is None:
-                continue
             telemetry: Telemetry = lap_telemetry_without_driver_ahead(lap)
             x = np.asarray(telemetry.X, dtype=float)
             y = np.asarray(telemetry.Y, dtype=float)

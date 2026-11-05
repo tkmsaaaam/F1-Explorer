@@ -24,6 +24,7 @@ from f1_explorer import constants
 from f1_explorer.visualizations.output import resolve_output_dir, save_matplotlib, save_plotly, save_plotly_batch
 from f1_explorer.visualizations.segment_metrics import deltas_to_reference, rank_segment_durations, segment_durations
 from f1_explorer.visualizations.style import driver_linestyle
+from f1_explorer.visualizations.lap_selection import fastest_laps_by_driver
 from f1_explorer.separator_estimator import SeparatorBoundary
 from f1_explorer.telemetry import lap_telemetry_without_driver_ahead
 
@@ -123,11 +124,11 @@ def prepare_segment_car_data(session: Session) -> dict[str, Telemetry]:
     raw car samples with distance added, rather than merged position telemetry.
     """
     samples: dict[str, Telemetry] = {}
-    for driver_number in session.drivers:
-        lap = session.laps.pick_drivers(driver_number).pick_fastest()
-        if lap is None or lap.empty:
+    for driver_number, lap in fastest_laps_by_driver(session).items():
+        try:
+            samples[driver_number] = lap.get_car_data().add_distance()
+        except (AttributeError, KeyError, TypeError, ValueError):
             continue
-        samples[str(driver_number)] = lap.get_car_data().add_distance()
     return samples
 
 
@@ -153,15 +154,18 @@ def compute_and_save_segment_tables_plotly(
         segment_boundaries = segment_boundaries.distances
     segment_boundaries = sorted(segment_boundaries)
     driver_times: dict[str, list[float | None]] = {}
+    drivers = list(fastest_laps_by_driver(session))
 
     with tracer.start_as_current_span("segment_table.driver_times") as span:
         span.set_attribute("segment.boundary_count", len(segment_boundaries))
-        span.set_attribute("segment.driver_count", len(session.drivers))
+        span.set_attribute("segment.driver_count", len(drivers))
         if car_data_by_driver is None:
             car_data_by_driver = prepare_segment_car_data(session)
-        for driver_number in session.drivers:
-            car_data = car_data_by_driver.get(str(driver_number))
+        for driver_number in drivers:
+            car_data = car_data_by_driver.get(driver_number)
             if car_data is None:
+                continue
+            if "Distance" not in car_data or "Time" not in car_data:
                 continue
             driver_times[driver_number] = [
                 None if (last_point := car_data[car_data.Distance < dist]).empty else
@@ -170,7 +174,6 @@ def compute_and_save_segment_tables_plotly(
     circuit = circuit_info_or_none(session, log)
     if circuit is None:
         return
-    drivers = session.laps.pick_quicklaps().sort_values(by="LapTime").DriverNumber.unique().tolist()
     durations_by_driver = segment_durations(driver_times)
     segment_rows = []
     for i in range(1, len(segment_boundaries)):
@@ -193,11 +196,14 @@ def compute_and_save_segment_tables_plotly(
     if color_by_corner_speed:
         fastest_lap = session.laps.pick_fastest()
         if fastest_lap is not None and not fastest_lap.empty:
-            row_colors = _corner_segment_colors(
-                fastest_lap,
-                [float(distance) for distance in circuit.corners.Distance],
-                segment_boundaries,
-            )
+            try:
+                row_colors = _corner_segment_colors(
+                    fastest_lap,
+                    [float(distance) for distance in circuit.corners.Distance],
+                    segment_boundaries,
+                )
+            except (AttributeError, KeyError, TypeError, ValueError):
+                log.warning("Fastest lap telemetry unavailable for corner speed colors.")
         else:
             log.warning("Fastest lap telemetry unavailable for corner speed colors.")
 
@@ -253,10 +259,10 @@ def compute_and_save_segment_tables_plotly(
     table_paths.append(f"{filename_base}_ranks.png")
 
     best = session.laps.pick_fastest()
-    if best is None:
+    if best is None or best.empty:
         save_tables()
         return
-    best_driver_number = best.DriverNumber
+    best_driver_number = str(best.DriverNumber)
     best_durations = durations_by_driver.get(best_driver_number)
     if not best_durations:
         log.warning("Fastest lap driver has insufficient segment data.")

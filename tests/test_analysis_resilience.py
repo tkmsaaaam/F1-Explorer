@@ -33,7 +33,7 @@ def test_optional_circuit_metadata_preserves_telemetry_figure():
     from f1_explorer.visualizations.qualifying_telemetry import make_telemetry_comparison
 
     session = MagicMock()
-    session.laps.pick_quicklaps.return_value.empty = True
+    session.drivers = []
     session.get_circuit_info.side_effect = ConnectionError("offline")
     figure = make_telemetry_comparison(session)
     assert figure.layout.xaxis.title.text == "Distance [m]"

@@ -25,13 +25,14 @@ def make_session():
         data = Mock()
         data.add_distance.return_value = frame
         lap = SimpleNamespace(
-            Driver=f"D{number}", Team="Team", LapTime=timedelta(seconds=number * 2),
+            Driver=f"D{number}", Team="Team", LapTime=timedelta(seconds=number * 2), empty=False,
             get_car_data=Mock(return_value=data),
         )
         frames.append(frame)
         laps.append(lap)
     session = SimpleNamespace(
         event=SimpleNamespace(year=2026),
+        drivers=["2", "1"],
         laps=SimpleNamespace(pick_drivers=lambda number: SimpleNamespace(
             pick_fastest=lambda: laps[int(number) - 1])),
     )
@@ -39,8 +40,7 @@ def make_session():
 
 
 def build(session):
-    with patch("f1_explorer.visualizations.qualifying_telemetry._ordered_quicklap_drivers", return_value=["1", "2"]), \
-            patch("fastf1.plotting.get_team_color", return_value="gray"):
+    with patch("fastf1.plotting.get_team_color", return_value="gray"):
         return make_telemetry_comparison(session)
 
 
@@ -98,6 +98,34 @@ def test_circuit_fetch_failure_keeps_telemetry_series():
     assert len(figure.data) == 10
     assert len(figure.layout.annotations or ()) == 0
     session.get_circuit_info.assert_called_once_with()
+
+
+def test_telemetry_includes_slow_personal_fastest_lap_in_every_available_tab():
+    session, laps, _ = make_session()
+    laps[0].LapTime = timedelta(seconds=90)
+    laps[1].LapTime = timedelta(seconds=180)
+    figure = build(session)
+    for tab_index in range(5):
+        assert [trace.name for trace in tab_traces(figure, tab_index)] == ['D1', 'D2']
+
+
+@pytest.mark.parametrize('invalid_time', [pd.NaT, pd.Timedelta(0, unit='s'), pd.Timedelta(-1, unit='s')])
+def test_telemetry_excludes_driver_without_valid_personal_fastest(invalid_time):
+    session, laps, _ = make_session()
+    laps[1].LapTime = invalid_time
+    figure = build(session)
+    for tab_index in range(5):
+        assert [trace.name for trace in tab_traces(figure, tab_index)] == ['D1']
+    laps[1].get_car_data.assert_not_called()
+
+
+def test_missing_reference_car_data_does_not_promote_a_slower_driver():
+    session, laps, _ = make_session()
+    laps[0].get_car_data.side_effect = ValueError('unavailable')
+    figure = build(session)
+    assert tab_traces(figure, 0) == []
+    for tab_index in range(1, 5):
+        assert [trace.name for trace in tab_traces(figure, tab_index)] == ['D2']
 
 
 def replace_car_data(lap, distances, seconds):
@@ -249,8 +277,7 @@ def build_track_map(frames=None):
             frame["X"] = [0., 1., 2., 3., np.nan][:len(frame)]
         if "Y" not in frame:
             frame["Y"] = [0., 2., 1., 0., 1.][:len(frame)]
-    with patch("f1_explorer.visualizations.qualifying_telemetry._ordered_quicklap_drivers", return_value=["1", "2"]), \
-            patch("f1_explorer.visualizations.qualifying_telemetry.lap_telemetry_without_driver_ahead",
+    with patch("f1_explorer.visualizations.qualifying_telemetry.lap_telemetry_without_driver_ahead",
                   side_effect=lambda lap: frames[laps.index(lap)]), \
             patch("fastf1.plotting.get_team_color", return_value="gray"):
         return make_track_map_comparison(session)
@@ -305,3 +332,38 @@ def test_track_map_initial_driver_skips_missing_speed():
     assert [trace.meta for trace in figure.data if trace.visible] == [
         {"driverNumber": "2", "metric": "Speed"}]
     assert figure.layout.title.text == "速度 — D2"
+
+
+def test_track_map_includes_slow_driver_and_uses_fastest_lap_order():
+    from f1_explorer.visualizations.qualifying_telemetry import make_track_map_comparison
+
+    session, laps, frames = make_session()
+    laps[0].LapTime = timedelta(seconds=90)
+    laps[1].LapTime = timedelta(seconds=180)
+    for frame in frames:
+        frame['X'] = frame['Distance']
+        frame['Y'] = 0.
+    with patch('fastf1.plotting.get_team_color', return_value='gray'), \
+            patch('f1_explorer.visualizations.qualifying_telemetry.lap_telemetry_without_driver_ahead',
+                  side_effect=lambda lap: frames[laps.index(lap)]):
+        figure = make_track_map_comparison(session)
+    assert figure.layout.meta['drivers'] == [
+        {'number': '1', 'label': 'D1'}, {'number': '2', 'label': 'D2'}]
+    assert [trace.meta for trace in figure.data] == [
+        {'driverNumber': number, 'metric': metric}
+        for number in ['1', '2'] for metric in ['Speed', 'nGear']]
+
+
+def test_track_map_excludes_driver_without_a_fastest_lap():
+    from f1_explorer.visualizations.qualifying_telemetry import make_track_map_comparison
+
+    session, laps, frames = make_session()
+    laps[1].empty = True
+    frames[0]['X'] = frames[0]['Distance']
+    frames[0]['Y'] = 0.
+    with patch('fastf1.plotting.get_team_color', return_value='gray'), \
+            patch('f1_explorer.visualizations.qualifying_telemetry.lap_telemetry_without_driver_ahead',
+                  return_value=frames[0]) as get_telemetry:
+        figure = make_track_map_comparison(session)
+    get_telemetry.assert_called_once_with(laps[0])
+    assert figure.layout.meta['drivers'] == [{'number': '1', 'label': 'D1'}]

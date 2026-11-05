@@ -49,14 +49,11 @@ def test_segment_tables_save_two_figures_when_session_fastest_is_missing() -> No
     })
     lap = MagicMock()
     lap.empty = False
+    lap.LapTime = pd.Timedelta(90, unit='s')
     lap.get_car_data.return_value.add_distance.return_value = car_data
-    quick = MagicMock()
-    quick.sort_values.return_value = quick
-    quick.DriverNumber = pd.Series(["1"])
     session = MagicMock()
     session.drivers = ["1"]
     session.laps.pick_drivers.return_value.pick_fastest.return_value = lap
-    session.laps.pick_quicklaps.return_value = quick
     session.laps.pick_fastest.return_value = None
     session.get_circuit_info.return_value.corners = pd.DataFrame({
         "Distance": [100.0], "Number": [1],
