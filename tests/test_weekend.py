@@ -295,3 +295,87 @@ def test_each_plot_call_saves_its_own_report_figure(monkeypatch, tmp_path: Path)
     assert len(saved) == 2
     assert [path for _, path in saved] == [tmp_path / "tyres.png"] * 2
     assert saved[0][0].to_json() == saved[1][0].to_json()
+
+
+@pytest.mark.parametrize(
+    ("flags", "stints", "compounds", "expected_rows"),
+    [
+        pytest.param(
+            pd.Series([True, False, True, True]), [1, 1, 2, 2],
+            ["HARD", "HARD", "SOFT", "SOFT"], [(1, "HARD"), (2, "SOFT")],
+            id="plain-bool",
+        ),
+        pytest.param(
+            pd.Series([None, True, True, None], dtype=object), [1, 1, 2, 2],
+            ["HARD", "HARD", "SOFT", "SOFT"], [(1, "HARD"), (2, "SOFT")],
+            id="missing-rows-inside-stints",
+        ),
+        pytest.param(
+            pd.Series([pd.NA, False, True, True], dtype="boolean"), [1, 1, 2, 2],
+            ["HARD", "HARD", "SOFT", "SOFT"], [(2, "SOFT")],
+            id="nullable-boolean-NA",
+        ),
+        pytest.param(
+            pd.Series([True, "yes", False, False], dtype=object), [1, 2, 3, 4],
+            ["HARD", "MEDIUM", "SOFT", "INTER"], [(1, "HARD")],
+            id="truthy-string-not-true",
+        ),
+        pytest.param(
+            pd.Series([float("nan")] * 4), [1, 1, 2, 2],
+            ["HARD", "HARD", "SOFT", "SOFT"], [],
+            id="float-all-missing",
+        ),
+        pytest.param(
+            pd.Series([], dtype=object), [],
+            [], [],
+            id="empty",
+        ),
+    ],
+)
+def test_fresh_tyre_requires_explicit_true(monkeypatch, flags, stints, compounds, expected_rows):
+    frame = pd.DataFrame({
+        "Driver": ["AAA"] * len(flags), "FreshTyre": flags,
+        "Stint": stints, "Compound": compounds,
+    })
+    # Literal oracle: the rows that must survive are spelled out per case,
+    # so this comparison does not mirror the production filter expression.
+    canonical = pd.DataFrame({
+        "Driver": ["AAA"] * len(expected_rows),
+        "FreshTyre": [True] * len(expected_rows),
+        "Stint": [stint for stint, _compound in expected_rows],
+        "Compound": [compound for _stint, compound in expected_rows],
+    })
+    session = _FakeWeekendSession("Practice 1")
+    session.laps = _FakeLaps(frame)
+    canonical_session = _FakeWeekendSession("Practice 1")
+    canonical_session.laps = _FakeLaps(canonical)
+    assert (weekend._loaded_session_signature(session)
+            == weekend._loaded_session_signature(canonical_session))
+
+    def unavailable(*args):
+        raise ValueError("unavailable")
+
+    monkeypatch.setattr(weekend.fastf1, "get_session", unavailable)
+    monkeypatch.setattr(weekend, "_input_signature", lambda *args: "files")
+    aggregate = weekend.aggregate_tyres(2026, 13, Mock(), current_session=session)
+    if not expected_rows:
+        assert aggregate is None
+    else:
+        assert aggregate["drivers"] == {
+            "AAA": {
+                "Compounds": [compound for _stint, compound in expected_rows],
+                "Sessions": ["FP1"] * len(expected_rows),
+            },
+        }
+
+
+def test_merge_asof_produces_missing_fresh_tyre_before_first_record():
+    # Documentation test for pandas-side behaviour (no repo code involved):
+    # FastF1 builds FreshTyre with pd.merge_asof, so laps before a driver's
+    # first tyre record carry missing values instead of False, which is why
+    # the weekend aggregation must test for explicit True only.
+    laps = pd.DataFrame({"Time": [1, 2, 3]})
+    tyres = pd.DataFrame({"Time": [2], "FreshTyre": [True]})
+    merged = pd.merge_asof(laps, tyres, on="Time")
+    assert pd.isna(merged.FreshTyre.iloc[0])
+    assert merged.loc[merged.FreshTyre.eq(True).fillna(False), "Time"].tolist() == [2, 3]

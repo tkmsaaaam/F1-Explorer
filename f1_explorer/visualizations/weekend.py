@@ -122,12 +122,29 @@ def _input_signature(year: int, race_number: int, current_session=None) -> str |
     return hashlib.sha256(json.dumps(snapshot, separators=(",", ":")).encode()).hexdigest()
 
 
-def _loaded_session_signature(session) -> str:
-    records = []
+def _fresh_tyre_stints(session) -> list[tuple[str, pd.DataFrame]]:
+    """Collect each driver's explicitly-fresh tyre records.
+
+    Only rows whose ``FreshTyre`` is explicitly True count; missing values
+    (pd.merge_asof leaves NaN before a driver's first tyre record) are not
+    fresh tyres (P-27 / Q-22 / R-13). Each driver's records are reduced to
+    their first record per stint, and drivers without fresh records are
+    omitted.
+    """
+    stints = []
     for driver in session.drivers:
         laps = session.laps.pick_drivers(driver)
-        laps = laps[laps.FreshTyre].drop_duplicates(subset=["Stint"], keep="first")
+        laps = laps[laps["FreshTyre"].eq(True).fillna(False)]
+        if laps.empty:
+            continue
         abbreviation = session.get_driver(driver).Abbreviation
+        stints.append((abbreviation, laps.drop_duplicates(subset=["Stint"], keep="first")))
+    return stints
+
+
+def _loaded_session_signature(session) -> str:
+    records = []
+    for abbreviation, laps in _fresh_tyre_stints(session):
         records.extend((abbreviation, str(lap.Stint), str(lap.Compound)) for lap in laps.itertuples())
     payload = {
         "name": str(session.name),
@@ -274,12 +291,7 @@ def aggregate_tyres(year: int, race_number: int, log, current_session=None) -> T
             span.set_attribute("session", session_name)
             span.set_attribute("year", year)
             span.set_attribute("round", race_number)
-            for driver in session.drivers:
-                driver_laps = session.laps.pick_drivers(driver)
-                laps = driver_laps[driver_laps.FreshTyre].drop_duplicates(subset=['Stint'], keep='first')
-                if laps.empty:
-                    continue
-                abbreviation = session.get_driver(driver).Abbreviation
+            for abbreviation, laps in _fresh_tyre_stints(session):
                 data = drivers.setdefault(abbreviation, {'Sessions': [], 'Compounds': []})
                 data['Sessions'].extend([session_name for _ in range(len(laps))])
                 data['Compounds'].extend(laps["Compound"].tolist())
