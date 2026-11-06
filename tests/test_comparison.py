@@ -77,3 +77,49 @@ def test_empty_comparison_closes_the_created_figure():
         )
 
     close.assert_called_once_with(fig)
+
+
+def test_yearly_gear_comparison_uses_previous_lap_and_both_ranges(tmp_path, monkeypatch):
+    # Inline import keeps compare.py's plotly / fastf1.mvapi imports out of test collection;
+    # resolves because tests run as `python -m pytest` from the repo root (AGENTS.md).
+    import compare
+
+    def _year_summary(driver, number, distances, gears):
+        data = SimpleNamespace(
+            Distance=pandas.Series(distances),
+            nGear=pandas.Series(gears),
+        )
+        data.add_distance = lambda: data
+        lap = SimpleNamespace(Driver=driver, DriverNumber=number, get_car_data=lambda: data)
+        return compare.SessionSummary(lap, pandas.DataFrame())
+
+    current = _year_summary("VER", "1", [0.0, 100.0], [4, 6])
+    previous = _year_summary("HAM", "44", [0.0, 120.0], [2, 8])
+    circuit = SimpleNamespace(corners=pandas.DataFrame({"Number": [1], "Distance": [50.0]}))
+    comparison = compare.Comparison(2026, "Test", "Q", current, previous, circuit)
+    fig, ax = MagicMock(), MagicMock()
+    monkeypatch.chdir(tmp_path)
+    with (
+        patch("compare.plt.subplots", return_value=(fig, ax)),
+        patch("compare.plt.close"),
+    ):
+        compare.plot_n_gear_distance(MagicMock(), comparison)
+
+    assert len(ax.plot.call_args_list) == 2
+    for call, expected, label in zip(
+        ax.plot.call_args_list,
+        [current, previous],
+        ["2026: VER", "2025: HAM"],
+    ):
+        data = expected.get_lap().get_car_data()
+        pandas.testing.assert_series_equal(call.args[0], data.Distance)
+        pandas.testing.assert_series_equal(call.args[1], data.nGear)
+        assert call.kwargs["label"] == label
+    assert ax.plot.call_args_list[0].kwargs["color"] == "#ff8000"  # team_color[2026].get(int("1"))
+    assert ax.plot.call_args_list[1].kwargs["linestyle"] == "dashed"
+    ax.set_ylim.assert_called_once_with(1.5, 8.5)
+    assert ax.vlines.call_args.kwargs["ymin"] == 2
+    assert ax.vlines.call_args.kwargs["ymax"] == 8
+    fig.savefig.assert_called_once_with(
+        "./images/comparison/Test/Q/gear_distance.png", bbox_inches="tight"
+    )

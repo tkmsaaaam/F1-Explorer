@@ -117,7 +117,7 @@ def plot_n_gear_distance(log: structlog.stdlib.BoundLogger, comparison: Comparis
             label=f"{comparison.get_year()}: {comparison.get_current().get_lap().Driver}",
             color=constants.team_color[comparison.get_year()].get(
                 int(comparison.get_current().get_lap().DriverNumber), '#808080'))
-    previous_car_data = comparison.get_current().get_lap().get_car_data().add_distance()
+    previous_car_data = comparison.get_previous().get_lap().get_car_data().add_distance()
     ax.plot(previous_car_data.Distance, previous_car_data.nGear, color='black', linestyle='dashed',
             label=f"{comparison.get_previous_year()}: {comparison.get_previous().get_lap().Driver}")
     v_min = min(int(previous_car_data.nGear.min()), int(current_car_data.nGear.min()))
