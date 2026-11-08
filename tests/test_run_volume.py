@@ -5,6 +5,7 @@ import pandas
 import pytest
 from fastf1.core import Laps
 
+from f1_explorer.visualizations import run_volume
 from f1_explorer.visualizations.run_volume import (
     _laps_without_pit_laps,
     _make_interactive_laptime_by_lap_number,
@@ -308,3 +309,50 @@ def test_missing_session_start_keeps_missing_lap_start(session_start):
     starts = _lap_start_dates(SimpleNamespace(t0_date=session_start), laps)
     assert starts.iloc[0] == pandas.Timestamp("2026-10-01")
     assert pandas.isna(starts.iloc[1])
+
+
+@pytest.mark.parametrize(
+    "plot_function",
+    [run_volume.plot_laptime_by_lap_number, run_volume.plot_laptime_by_timing],
+    ids=["lap_number", "timing"],
+)
+@pytest.mark.parametrize("seconds", [[], [None, None], [81.5, None, 80.75]])
+def test_static_laptime_minimum_is_finite_and_preserves_fraction(plot_function, seconds):
+    laps = _laps(["1"] * len(seconds), list(range(1, len(seconds) + 1)))
+    laps["LapTime"] = pandas.to_timedelta(seconds, unit="s")
+    laps["Team"] = ""
+    session = SimpleNamespace(laps=laps, event=SimpleNamespace(year=2026))
+    fig, ax, log = MagicMock(), MagicMock(), MagicMock()
+    with (
+        patch.object(run_volume.plt, "subplots", return_value=(fig, ax)) as create,
+        patch.object(run_volume.plt, "close") as close,
+        patch.object(run_volume, "save_matplotlib") as save,
+        patch.object(run_volume, "current_report", return_value=None),
+    ):
+        plot_function(session, log, output_dir="test-output")
+    if not seconds or all(value is None for value in seconds):
+        create.assert_not_called()
+        save.assert_not_called()
+        log.info.assert_called_once()
+    else:
+        ax.set_ylim.assert_called_once_with(top=80.75, bottom=80.75 * 1.25)
+        save.assert_called_once()
+        close.assert_called_once_with(fig)
+
+
+def test_timing_minimum_ignores_pit_lap_when_excluded():
+    laps = _laps(["1"] * 3, [1, 2, 3])
+    laps["LapTime"] = pandas.to_timedelta([78.5, 80.75, 81.5], unit="s")
+    laps["Team"] = ""
+    laps.loc[laps.index[0], "PitOutTime"] = pandas.to_timedelta(10, unit="s")
+    session = SimpleNamespace(laps=laps, event=SimpleNamespace(year=2026))
+    fig, ax, log = MagicMock(), MagicMock(), MagicMock()
+    with (
+        patch.object(run_volume.plt, "subplots", return_value=(fig, ax)) as create,
+        patch.object(run_volume, "save_matplotlib") as save,
+        patch.object(run_volume, "current_report", return_value=None),
+    ):
+        run_volume.plot_laptime_by_timing(session, log, output_dir="test-output", exclude_pit_laps=True)
+    create.assert_called_once()
+    ax.set_ylim.assert_called_once_with(top=80.75, bottom=80.75 * 1.25)
+    save.assert_called_once()

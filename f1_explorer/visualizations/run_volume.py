@@ -270,6 +270,13 @@ def _laps_without_pit_laps(laps: pandas.DataFrame) -> pandas.DataFrame:
     return laps[laps.PitOutTime.isna() & laps.PitInTime.isna()]
 
 
+def _minimum_lap_seconds(laps: pandas.DataFrame) -> float | None:
+    """Return the fastest timed lap in seconds, or None when no timed lap exists."""
+
+    minimum = laps.LapTime.dt.total_seconds().min()
+    return float(minimum) if pandas.notna(minimum) else None
+
+
 def _lap_start_dates(session: Session, laps: pandas.DataFrame) -> pandas.Series:
     """Return absolute lap-start timestamps, filling from session time when needed."""
 
@@ -385,6 +392,10 @@ def plot_laptime_by_lap_number(session: Session, log: structlog.stdlib.BoundLogg
         session: 分析対象のセッション
         log: ロガー
     """
+    minimum = _minimum_lap_seconds(session.laps)
+    if minimum is None:
+        log.info("Skipping plot_laptime_by_lap_number: no finite lap time")
+        return
     fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
     try:
         grouped = session.laps.groupby(['DriverNumber'])
@@ -399,8 +410,6 @@ def plot_laptime_by_lap_number(session: Session, log: structlog.stdlib.BoundLogg
             ax.plot(lap_numbers, lap_times, color=color,
                     linestyle=driver_linestyle(session.event.year, int(stint_laps.DriverNumber.iloc[0])),
                     label=stint_laps.Driver.iloc[0])
-        # noinspection PyUnresolvedReferences
-        minimum = session.laps.LapTime.min().total_seconds()
         ax.set_ylim(top=minimum, bottom=minimum * 1.25)
         ax.legend(fontsize='small')
         ax.grid(True)
@@ -521,6 +530,10 @@ def plot_laptime_by_timing(
         log: ロガー
     """
     laps = _laps_without_pit_laps(session.laps) if exclude_pit_laps else session.laps
+    minimum = _minimum_lap_seconds(laps)
+    if minimum is None:
+        log.info("Skipping plot_laptime_by_timing: no finite lap time")
+        return
     fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
     try:
         grouped = laps.groupby(['DriverNumber'])
@@ -545,8 +558,6 @@ def plot_laptime_by_timing(
                     label=stint_laps.Driver.iloc[0] if show_label else None,
                 )
                 show_label = False
-        # noinspection PyUnresolvedReferences
-        minimum = laps.LapTime.min().seconds
         ax.set_ylim(top=minimum, bottom=minimum * 1.25)
         ax.xaxis.set_major_formatter(mdates.DateFormatter('%H:%M'))
         output_path = resolve_output_dir(session, output_dir) / "laptime_by_timing.png"
