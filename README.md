@@ -51,18 +51,28 @@ pip install -r requirements.txt
 
 ## Tests and coverage
 
-From the repository root, run the full test suite through Coverage.py, then
-print the coverage summary:
+Install development dependencies in a virtual environment from the repository root:
 
 ```bash
-coverage run -m pytest tests -q -W error::DeprecationWarning
-coverage report -m
+python -m venv .venv
+.venv/bin/python -m pip install -r requirements-dev.txt
+```
+
+Node.js must be available on PATH for the report HTML JavaScript tests.
+Those tests are skipped when Node.js is unavailable.
+
+Run a focused test or the full suite through Coverage.py, then print the summary:
+
+```bash
+.venv/bin/python -m pytest tests/test_report.py -q -W error::DeprecationWarning
+.venv/bin/python -m coverage run -m pytest tests -q -W error::DeprecationWarning
+.venv/bin/python -m coverage report -m
 ```
 
 To generate a detailed HTML coverage report, run:
 
 ```bash
-coverage html
+.venv/bin/python -m coverage html
 ```
 
 Open `htmlcov/index.html` in a browser to view it. The `-W` option makes
@@ -124,11 +134,38 @@ These estimates do not identify every aborted lap; their thresholds are
 documented in [specs/SEASON.md](specs/SEASON.md). The report distinguishes
 missing data, non-participation, and provisional totals.
 
+Race and Sprint gap tables use actual lap numbers from 1 through the last
+recorded lap across all drivers. Missing laps or comparison cars display `---`;
+the leader's gap to the car ahead is also `---`, while its gap to the leader is zero.
+All four Race/Sprint gap charts and tables follow the official session result
+order. Drivers without a result rank follow in fastest-lap order, computed
+excluding deleted laps; ties and drivers without either rank are ordered by
+driver-number string.
+
+A lap that records a number stays eligible even when its lap time,
+session-elapsed time, or position is missing. Each chart shows the laps whose
+own required values exist and never substitutes zero or interpolated times:
+missing positions leave a line gap in the lap-position history, laps missing
+only their lap time still appear in position and gap charts, and laps without
+a session-elapsed time or position provide no gap value (`---` in the tables,
+line gaps in the graphs).
+
 Session analyses write independent offline reports to
 `reports/<year>/<round>_<location>/<session>/report.html`. Open
 `reports/index.html` to select a year, Grand Prix, and session. The index is
 updated when a session report is written. To rebuild it from existing reports,
 run `python -m f1_explorer.visualizations.report_index` from the repository root.
+
+The pit-time table counts stops with matching consecutive laps and complete,
+chronologically ordered pit-in, lap-start, and pit-out timestamps. With no valid
+stops, it shows count 0 and `—` for the mean, minimum, and maximum. Missing lap
+times are shown as `—` while valid pit durations remain in the statistics.
+
+Optional flat-out and ideal-best charts omit drivers whose telemetry or sector
+times do not contain the required finite, positive measurements. Missing telemetry
+samples are not bridged to calculate flat-out ratios. Circuit-dependent charts are
+skipped when the fastest lap has no finite, positive distance sample; the report
+continues without those charts.
 
 Session analyses save only `laptime_table.png` for every session and
 `laptime_graph.png` for Sprint/Race.
@@ -144,6 +181,30 @@ data without generating PNGs. Images can be downloaded from the charts'
 camera button while viewing the report offline. Existing PNG files are retained, but unused PNGs
 are excluded from the new success manifest. Visualization calls outside an
 active session report continue to save their images.
+
+Practice, Qualifying, and Sprint Qualifying telemetry comparisons, track maps,
+and segment tables include every driver with a valid personal fastest lap,
+without a session-wide lap-time cutoff. Selection follows FastF1's default
+`pick_fastest()` rules and requires a finite, positive lap time. Drivers appear
+in personal-fastest order, with ties ordered by driver-number string. Missing
+telemetry omits the affected series or leaves table cells missing; it does not
+change the fastest-lap reference to another driver.
+
+The five-tab telemetry comparison for Practice, Qualifying, and Sprint Qualifying
+interpolates time deltas on the fastest lap's distance grid, starting at 0 m in
+5 m steps and stopping before its last valid distance. Deltas appear only within
+both drivers' measured distance ranges; unobserved ends remain gaps. Nonfinite
+samples are removed and duplicate distances keep their first sample. Backward
+distance or time progress, or fewer than two comparable grid points, omits only
+that driver's delta. An unavailable reference leaves all deltas unavailable;
+other channels remain usable. These are interpolated telemetry differences,
+not official sector times, and lap endpoints are not adjusted to match lap times.
+
+Practice, Qualifying, and Sprint Qualifying track maps show one driver at a time.
+Switching speed/gear keeps the selected driver when data is available, and changing
+drivers keeps the selected metric. Each metric has its own driver list; switching
+to an unavailable combination selects the first valid driver, or displays
+“有効なデータなし” when the metric has no data.
 
 ### Batch analysis
 
@@ -170,10 +231,28 @@ Useful options are `--dry-run`, `--force`, `--refresh-separators`,
 The Practice, Qualifying (including SQ), and Race (including Sprint) commands
 exit with code 0 after successful analysis or a normal skip (a future session
 or an unchanged report). Future sessions are skipped before loading lap data.
+For an existing session, each command loads FastF1 data before checking whether
+the report can be reused. A report is reusable only when the final loaded
+session status is `Finished`, its normalized event/results/laps/weather/status/
+track-status/car/position inputs match the successful manifest, and every
+recorded output still exists. Reuse also requires matching analysis source,
+Python and installed dependency versions, effective configuration, and the
+year/round/session/entrypoint identity. Git commit and dirty state are diagnostic
+information only. Race and Sprint also include race-control messages.
+Missing or unsupported inputs and non-finished sessions are analyzed
+again and do not create a reusable success manifest. Input comparison covers
+the data FastF1 returned; it cannot detect upstream corrections that FastF1 has
+not fetched, and offline use cannot fetch them. `--force` always re-analyzes the
+loaded data but does not refresh FastF1's upstream cache or guarantee corrected
+data. When refreshed source data is required, follow
+[Refreshing source data](#refreshing-source-data) below before `--force`.
 Invalid configuration, the wrong session category, and session lookup failures
 exit with code 1. Unhandled loading, analysis, or report/manifest write errors
-also exit nonzero, without writing a new success manifest. Existing manifests
-are retained. Optional chart omissions and separator-save warnings remain
+also exit nonzero, without writing a new success manifest. Once regeneration
+starts, its previous success manifest is removed; failed runs cannot reuse it.
+The new manifest lists only files explicitly produced by that run, including
+the report, required PNGs, and Race logs. Prior chart files are kept but do not
+make a failed or incomplete run reusable. Optional chart omissions and separator-save warnings remain
 recoverable and do not by themselves fail the analysis.
 
 The batch exits with code 1 if any analyzer fails. It continues with the next
@@ -185,6 +264,95 @@ Within one batch, completed weekends can reuse the tyre aggregate across session
 reports. The cache lives only for that batch, is checked against the local
 FastF1 event files and analysis inputs, and is removed when the batch exits.
 The currently analyzed session is reused for the aggregate when available.
+
+### Refreshing source data
+
+The following procedure was checked against FastF1 3.9.0. FastF1 stores HTTP
+responses in a stage 1 SQLite cache and parsed API data in stage 2 `.ff1pkl`
+files. Normal loading can reuse both; the HTTP cache uses a 12-hour expiry,
+cache-control, and stale responses on request errors. Cache file timestamps,
+sizes, and report creation times do not establish upstream freshness.
+
+`fastf1.Cache.configure(cache_dir=..., force_renew=True)` immediately clears
+the entire stage 1 cache at that location. While enabled in that Python
+process, it also bypasses existing stage 2 entries and overwrites them when
+their data is loaded. It is not limited to one session. The analysis entrypoints
+configure `./cache`, so setting `FASTF1_CACHE` alone does not isolate them.
+Use a temporary project copy with an empty cache to preserve local data.
+
+From the repository root, with the project's dependencies installed in `.venv`:
+
+```bash
+F1_REFRESH_ROOT="$PWD"
+F1_REFRESH_COPY="$(mktemp -d)/F1-Explorer"
+mkdir -p "$F1_REFRESH_COPY"
+rsync -a --exclude='.git/' --exclude='.venv/' --exclude='cache/' \
+  --exclude='images/' --exclude='reports/' --exclude='live/' \
+  --exclude='htmlcov/' --exclude='tmp/' --exclude='__pycache__/' \
+  "$F1_REFRESH_ROOT/" "$F1_REFRESH_COPY/"
+ln -s "$F1_REFRESH_ROOT/.venv" "$F1_REFRESH_COPY/.venv"
+mkdir -p "$F1_REFRESH_COPY/cache"
+cd "$F1_REFRESH_COPY"
+```
+
+This copies the current code, including uncommitted changes and `config.json`,
+but excludes existing caches and generated reports. In this copy's
+`config.json`, select the intended `Year`, `Round`, and `Session`, then prefetch:
+
+```bash
+.venv/bin/python - <<'PY'
+import json
+import fastf1
+
+with open("config.json", encoding="utf-8") as config_file:
+    selected = json.load(config_file)
+fastf1.Cache.configure(cache_dir="./cache", force_renew=True)
+session = fastf1.get_session(selected["Year"], selected["Round"], selected["Session"])
+session.load()
+print("loaded", session.event["EventName"], session.name, "laps", len(session.laps))
+print(session.session_status.tail())
+PY
+```
+
+Inspect the logs and loaded inputs for request failures, missing data, and rate
+limits. FastF1 can suppress individual loading exceptions, so exit code 0 alone
+does not confirm a complete refresh. After a successful prefetch, run the
+appropriate analyzer in the same copy, using the same `./cache`:
+
+```bash
+.venv/bin/python analyze_qualifying.py --force
+```
+
+Use `analyze_practice.py` for Practice or `analyze_race.py` for Race/Sprint.
+The new process reuses the refreshed cache without inheriting the prefetch
+process's force-renew flag. Confirm that the report's `.analysis-manifest.json`
+was written: a reusable success requires final status `Finished`, a complete
+input fingerprint, and all recorded outputs. An unchanged fingerprint is
+expected when the provider has made no correction. The resulting reports stay
+in the temporary copy until you explicitly copy them elsewhere.
+
+The refresh covers the selected session's metadata, driver/results inputs,
+session and track status, lap count and timing/tyres, car and position telemetry,
+weather, and race-control messages loaded by `Session.load()`. It does not
+guarantee refresh of every auxiliary source used by a report, such as the event
+schedule, Jolpica results, circuit information, or the Live Timing archive used
+for separator estimation. Weekend tyre aggregates can load FP1–FP3, SQ, S, Q,
+and R; prefetch each session whose updated inputs are needed.
+
+Refreshing requires network access. Do not combine force renewal with offline
+mode: clearing the HTTP cache removes its fallback responses, and a failed
+prefetch can leave partial data. Discard a failed temporary cache and retry
+after connectivity recovers. Offline mode and force-renew flags apply only to
+their Python process. Request only the sessions needed and respect provider
+rate limits; an upstream correction that has not yet been published cannot be
+detected by this procedure.
+
+`Cache.delete_response(url)` removes only one HTTP response and leaves parsed
+stage 2 data intact; it is not a session refresh. Avoid `Cache.clear_cache()`
+for this workflow: deep clearing can delete stage 2 files even offline, and its
+directory argument and active HTTP backend can refer to different locations.
+Saved separators remain unchanged by `--force`; replace them only with
+`--refresh-separators` when explicitly intended.
 
 ### Exporting OpenTelemetry data
 
@@ -302,3 +470,9 @@ or 2 seconds) and mini-sector progress is monotonic.
       the visualization of telemetry and timing data while the session is in progress.
 
 サーキット情報の取得に失敗してもセッションレポートの生成は継続します。コーナー情報が必須の図は省略し、その他の図はコーナー注記なしで生成します。取得例外は警告ログに記録します。
+
+週末の新品タイヤ投入履歴は、各セッションで FreshTyre が明示的に True の記録をスティントごとに1件集計します。欠測は新品投入の記録なしとして除外します。
+
+ラップ番号別・時刻別ラップタイム図は、最小タイムが欠測・非有限なら理由をログに残して省略します。時刻別PNGのY軸は小数秒を切り捨てずに計算します。
+
+テレメトリー比較はタブごとにY軸の範囲と目盛りを更新し、データのない項目は「欠測」と表示します。

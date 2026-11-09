@@ -17,6 +17,22 @@ from f1_explorer.visualizations.short_runs import _gear_colorscale
 from f1_explorer.telemetry import lap_telemetry_without_driver_ahead
 
 
+# Tab definitions for make_telemetry_comparison:
+# (label, y-axis title, car-data key, step line, axis spec).
+# Axis spec keys:
+#   "range": fixed y-axis range, used with or without data;
+#   "ticks": fixed explicit tick values rendered as array-mode ticks;
+#   "empty": y-axis range shown when the tab has no data;
+#   "fallback": gear maximum assumed when the tab has no data.
+TELEMETRY_TABS = (
+    ("タイム差", "Delta Time [s]", "delta", False, {"empty": [-1, 1]}),
+    ("速度", "Speed [km/h]", "Speed", False, {"empty": [0, 300]}),
+    ("スロットル", "Throttle [%]", "Throttle", False, {"range": [0, 100]}),
+    ("ブレーキ", "Brake", "Brake", False, {"range": [-0.05, 1.05], "ticks": [0, 1]}),
+    ("ギア", "Gear", "nGear", True, {"fallback": 8}),
+)
+
+
 def _finite_series(data: Any, key: str) -> tuple[np.ndarray, np.ndarray] | None:
     if not hasattr(data, "Distance") or not hasattr(data, key):
         return None
@@ -82,13 +98,7 @@ def make_telemetry_comparison(session: Any) -> go.Figure:
     else:
         reference_values = np.array([], dtype=float)
 
-    tabs = (
-        ("タイム差", "Delta Time [s]", "delta", False),
-        ("速度", "Speed [km/h]", "Speed", False),
-        ("スロットル", "Throttle [%]", "Throttle", False),
-        ("ブレーキ", "Brake", "Brake", False),
-        ("ギア", "Gear", "nGear", True),
-    )
+    tabs = TELEMETRY_TABS
     figure = go.Figure()
     trace_groups: list[list[int]] = [[] for _ in tabs]
     values_by_tab: list[list[float]] = [[] for _ in tabs]
@@ -122,7 +132,7 @@ def make_telemetry_comparison(session: Any) -> go.Figure:
                 trace_groups[0].append(index)
                 values_by_tab[0].extend(delta.tolist())
 
-        for tab_index, (_, label, key, step) in enumerate(tabs[1:], start=1):
+        for tab_index, (_, label, key, step, _axis) in enumerate(tabs[1:], start=1):
             series = _lap_data(car_data[str(number)], key)
             if series is None:
                 continue
@@ -143,37 +153,47 @@ def make_telemetry_comparison(session: Any) -> go.Figure:
         for index in trace_groups[initial_tab]:
             figure.data[index].visible = True
 
-    labels = [tab[0] for tab in tabs]
-    axis_labels = [tab[1] for tab in tabs]
     buttons = []
-    for tab_index, label in enumerate(labels):
+    initial_layout: dict[str, Any] | None = None
+    for tab_index, (label, axis_label, _, step, axis) in enumerate(tabs):
         visible = [False] * len(figure.data)
         for index in trace_groups[tab_index]:
             visible[index] = True
         values = values_by_tab[tab_index]
-        layout_update = {"title.text": label, "yaxis.title.text": axis_labels[tab_index]}
-        if label == "スロットル":
-            layout_update["yaxis.range"] = [0, 100]
-        elif label == "ブレーキ":
-            layout_update.update({"yaxis.range": [-0.05, 1.05], "yaxis.tickvals": [0, 1]})
-        elif label == "ギア":
-            maximum = int(max(values, default=0))
-            layout_update.update({"yaxis.range": [-0.5, maximum + 0.5], "yaxis.tickvals": list(range(maximum + 1))})
-        elif values:
+        if step:  # Gear: one integer tick per gear up to the observed maximum.
+            maximum = int(max(values, default=axis["fallback"]))
+            axis_range, ticks = [-0.5, maximum + 0.5], list(range(maximum + 1))
+        elif "range" in axis:  # Fixed axes: throttle and brake.
+            axis_range, ticks = axis["range"], axis.get("ticks")
+        elif values:  # Data-driven axes wrap the observed values with padding.
             low, high = min(values), max(values)
             padding = max((high - low) * 0.02, abs(high) * 0.01, 0.01)
-            layout_update["yaxis.range"] = [low - padding, high + padding]
+            axis_range, ticks = [low - padding, high + padding], None
+        else:  # Missing data: show the tab's placeholder range.
+            axis_range, ticks = axis["empty"], None
+        # Reset the whole axis state on every switch: "auto" plus the null
+        # tick properties undo the array ticks of the previously shown tab.
+        layout_update = {
+            "title.text": label if values else f"{label}（欠測）",
+            "yaxis.title.text": axis_label,
+            "yaxis.tickmode": "auto" if ticks is None else "array",
+            "yaxis.tickvals": ticks,
+            "yaxis.ticktext": None,
+            "yaxis.range": axis_range,
+            "yaxis.autorange": False,
+        }
         buttons.append(dict(label=label, method="update", args=[{"visible": visible}, layout_update]))
+        if tab_index == initial_tab:
+            initial_layout = layout_update
 
     figure.update_layout(
-        title=labels[initial_tab] if figure.data else "有効なテレメトリーデータなし",
         hovermode="x unified", template="plotly_white",
         meta={"f1ExplorerKind": "telemetryComparison"},
         updatemenus=[dict(buttons=buttons, type="buttons", direction="right", x=0, y=1.16, xanchor="left")],
         margin={"l": 70, "r": 30, "t": 110, "b": 70},
     )
     figure.update_xaxes(title="Distance [m]")
-    figure.update_yaxes(title=axis_labels[initial_tab])
+    figure.update_layout(initial_layout)
     if reference_number is not None:
         figure.add_hline(y=0, line_dash="dash", line_color="grey")
     circuit_info = circuit_info_or_none(session)

@@ -157,3 +157,46 @@ Promise.resolve().then(() => {
 '''.replace("CHANNELS", json.dumps(channels)).replace("SCRIPT", script)
     result = subprocess.run(["node", "-"], input=harness, text=True, capture_output=True, timeout=15)
     assert result.returncode == 0, result.stderr
+
+
+def test_telemetry_tab_updates_replace_previous_axis_state():
+    if shutil.which("node") is None:
+        pytest.skip("Node.js is required for the embedded JavaScript test")
+
+    from telemetry_helpers import build, make_session
+
+    session, _, frames = make_session()
+    populated = build(session).to_plotly_json()["layout"]["updatemenus"][0]["buttons"]
+    for frame in frames:
+        frame.drop(columns=["Speed", "Throttle", "Brake", "nGear", "Time"], inplace=True)
+    missing = build(session).to_plotly_json()["layout"]["updatemenus"][0]["buttons"]
+    harness = r"""
+const assert = require("node:assert/strict");
+const fixture = FIXTURE;
+let state = {}, visible;
+function apply(button) {
+  Object.assign(state, button.args[1]);
+  visible = button.args[0].visible;
+  assert.equal(state["yaxis.autorange"], false);
+}
+for (const index of [4, 1, 3, 0]) {
+  const button = fixture.populated[index];
+  apply(button);
+  assert.equal(state["yaxis.tickmode"], [3,4].includes(index) ? "array" : "auto");
+  if (![3,4].includes(index)) assert.equal(state["yaxis.tickvals"], null);
+  assert.equal(state["yaxis.ticktext"], null);
+  assert(visible.some(Boolean));
+  assert.equal(state["title.text"], button.label);
+  assert(state["yaxis.title.text"]);
+}
+for (let index = 0; index < 5; index++) {
+  apply(fixture.missing[index]);
+  assert(state["title.text"].includes("欠測"));
+  assert(!visible.some(Boolean));
+  apply(fixture.populated[index]);
+  assert.equal(state["title.text"], fixture.populated[index].label);
+  assert(visible.some(Boolean));
+}
+""".replace("FIXTURE", json.dumps({"populated": populated, "missing": missing}))
+    result = subprocess.run(["node", "-"], input=harness, text=True, capture_output=True, timeout=15)
+    assert result.returncode == 0, result.stderr
