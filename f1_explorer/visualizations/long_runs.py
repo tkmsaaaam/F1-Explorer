@@ -1,7 +1,8 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
+import math
 from pathlib import Path
 from collections.abc import Hashable
-from f1_explorer.scalars import as_int
+from f1_explorer.scalars import as_float, as_int, as_seconds
 from typing import cast
 
 import fastf1
@@ -14,7 +15,7 @@ from fastf1.core import Session, Laps
 from opentelemetry import trace
 
 from f1_explorer.visualizations.domain.driver import Driver
-from f1_explorer.visualizations.domain.stint import Stint
+from f1_explorer.visualizations.domain.long_run import LongRun, LongRunPoint
 from f1_explorer.visualizations.output import resolve_output_dir, save_matplotlib
 from f1_explorer.visualizations.report import current_report
 from f1_explorer.visualizations.session_order import driver_order, driver_sort_key
@@ -37,9 +38,9 @@ class LongRunCriteria:
 @dataclass(slots=True)
 class _Phase:
     driver: Driver
-    stint_id: object
+    stint_id: int | None
     compound: str
-    laps: dict[int, float]
+    points: tuple[LongRunPoint, ...]
     median: float
     starts_stint: bool
     preceded_by_slow_lap: bool
@@ -51,7 +52,7 @@ def _present_and_true(row: pandas.Series, column: str) -> bool:
 
 
 def _is_usable_lap(row: pandas.Series) -> bool:
-    if pandas.isna(row.get("LapTime")):
+    if pandas.isna(row.get("LapNumber")) or pandas.isna(row.get("LapTime")):
         return False
     if _present_and_true(row, "Deleted"):
         return False
@@ -66,14 +67,14 @@ def _is_usable_lap(row: pandas.Series) -> bool:
 
 
 def _lap_number(row: pandas.Series) -> int:
-    return as_int(row.get("LapNumber", row.get("TyreLife")))
+    return as_int(row["LapNumber"])
 
 
 def _slow_lap_indexes(rows: list[tuple[Hashable, pandas.Series]], criteria: LongRunCriteria) -> set[int]:
     """Find obvious interior cooldown/traffic blocks conservatively."""
     if len(rows) < 3:
         return set()
-    times = [cast(pandas.Timedelta, row[1]["LapTime"]).total_seconds() for row in rows]
+    times = [as_seconds(row[1]["LapTime"]) for row in rows]
     prefix_min, current = [], float("inf")
     for value in times:
         prefix_min.append(current)
@@ -95,15 +96,23 @@ def _slow_lap_indexes(rows: list[tuple[Hashable, pandas.Series]], criteria: Long
     return slow
 
 
-def _make_phases(stint_laps: pandas.DataFrame, driver: Driver, stint_id: object,
+def _point(lap_number: int, row: pandas.Series) -> LongRunPoint:
+    """Convert one lap row into a selection point; a missing tyre age is kept."""
+    age = as_float(row.get("TyreLife")) if pandas.notna(row.get("TyreLife")) else None
+    if age is not None and not math.isfinite(age):
+        age = None
+    return LongRunPoint(lap_number, age, as_seconds(row["LapTime"]))
+
+
+def _make_phases(stint_laps: pandas.DataFrame, driver: Driver, stint_id: int | None,
                  compound: str, criteria: LongRunCriteria) -> tuple[list[_Phase], list[float]]:
-    order_column = "LapNumber" if "LapNumber" in stint_laps.columns else "TyreLife"
+    order_column = "LapNumber"
     ordered = stint_laps.sort_values(by=order_column).reset_index(drop=True)
     usable = [(index, row) for index, (_, row) in enumerate(ordered.iterrows()) if _is_usable_lap(row)]
     slow_indexes = _slow_lap_indexes(usable, criteria)
     clean = [(original_index, row) for clean_index, (original_index, row) in enumerate(usable)
              if clean_index not in slow_indexes]
-    clean_times = [cast(pandas.Timedelta, row["LapTime"]).total_seconds() for _, row in clean]
+    clean_times = [as_seconds(row["LapTime"]) for _, row in clean]
 
     phase_rows: list[list[tuple[int, pandas.Series]]] = []
     for original_index, row in clean:
@@ -120,37 +129,29 @@ def _make_phases(stint_laps: pandas.DataFrame, driver: Driver, stint_id: object,
     for rows in phase_rows:
         if len(rows) < criteria.min_consecutive_clean_laps:
             continue
-        lap_map = {
-            int(row.get("TyreLife", _lap_number(row))): cast(pandas.Timedelta, row["LapTime"]).total_seconds()
-            for _, row in rows
-        }
+        points = tuple(_point(_lap_number(row), row) for _, row in rows)
         phases.append(_Phase(
-            driver, stint_id, compound, lap_map,
-            float(pandas.Series(list(lap_map.values())).median()),
+            driver, stint_id, compound, points,
+            float(pandas.Series([point.lap_time_seconds for point in points]).median()),
             bool(usable) and rows[0][0] == usable[0][0],
             rows[0][0] - 1 in removed_original_indexes,
         ))
     return phases, clean_times
 
 
-def make_stint_set(min_consecutive_laps: int, all_laps: Laps, compound: str,
-                   criteria: LongRunCriteria | None = None) -> list[Stint]:
+def select_long_runs(min_consecutive_laps: int, all_laps: Laps, compound: str,
+                   criteria: LongRunCriteria | None = None) -> list[LongRun]:
     """Return independently drawable long-run phases for a compound."""
     base = criteria or LongRunCriteria()
-    criteria = LongRunCriteria(
-        min_consecutive_clean_laps=min_consecutive_laps,
-        automatic_long_run_laps=base.automatic_long_run_laps,
-        traffic_absolute_margin=base.traffic_absolute_margin,
-        traffic_relative_margin=base.traffic_relative_margin,
-        qualifying_max_laps=base.qualifying_max_laps,
-        qualifying_absolute_margin=base.qualifying_absolute_margin,
-        qualifying_relative_margin=base.qualifying_relative_margin,
-    )
+    criteria = replace(base, min_consecutive_clean_laps=min_consecutive_laps)
+    if "LapNumber" not in all_laps.columns:
+        return []
     laps = all_laps[all_laps.Compound == compound]
     phases: list[_Phase] = []
-    clean_times_by_stint: dict[tuple[int, object], list[float]] = {}
+    clean_times_by_stint: dict[tuple[int, int | None], list[float]] = {}
     grouped = laps.groupby(["DriverNumber", "Stint", "Compound"], dropna=False, sort=False)
     for (driver_number_value, stint_id, phase_compound), stint_laps in grouped:
+        stint_id = as_int(stint_id) if pandas.notna(stint_id) else None
         first_lap = stint_laps.iloc[0]
         driver_number = int(cast(str, driver_number_value))
         driver = Driver(driver_number, first_lap.Driver, first_lap.Team)
@@ -162,17 +163,17 @@ def make_stint_set(min_consecutive_laps: int, all_laps: Laps, compound: str,
 
     retained: list[_Phase] = []
     for phase in phases:
-        if len(phase.laps) >= criteria.automatic_long_run_laps:
+        if len(phase.points) >= criteria.automatic_long_run_laps:
             retained.append(phase)
             continue
         same_stint = [item for item in phases
                       if item.driver.number == phase.driver.number and item.stint_id == phase.stint_id]
         later = [item for item in same_stint
-                 if min(item.laps) > max(phase.laps)
-                 and len(item.laps) >= criteria.min_consecutive_clean_laps]
+                 if item.points[0].lap_number > phase.points[-1].lap_number
+                 and len(item.points) >= criteria.min_consecutive_clean_laps]
         margin = max(criteria.qualifying_absolute_margin,
                      phase.median * criteria.qualifying_relative_margin)
-        if (phase.starts_stint and len(phase.laps) <= criteria.qualifying_max_laps
+        if (phase.starts_stint and len(phase.points) <= criteria.qualifying_max_laps
                 and any(item.preceded_by_slow_lap and phase.median + margin < item.median
                         for item in later)):
             continue
@@ -190,8 +191,29 @@ def make_stint_set(min_consecutive_laps: int, all_laps: Laps, compound: str,
                 continue
         retained.append(phase)
 
-    result = [Stint(item.compound, item.laps, item.driver) for item in retained]
-    return sorted(result, key=lambda item: (item.driver.number, min(item.laps, default=0)))
+    # Phase indexes number the retained runs, so a dropped early interval
+    # leaves no gaps: each stint's runs stay 1-based and contiguous.
+    retained_by_key: dict[tuple[int, int | None], int] = {}
+    result: list[LongRun] = []
+    for item in retained:
+        key = (item.driver.number, item.stint_id)
+        retained_by_key[key] = retained_by_key.get(key, 0) + 1
+        result.append(LongRun(item.driver, item.stint_id, retained_by_key[key],
+                              item.compound, item.points))
+    return sorted(result, key=lambda item: (item.driver.number, item.points[0].lap_number))
+
+
+def _displayed_points(run: LongRun) -> tuple[LongRunPoint, ...]:
+    """Points with a known tyre age; missing-age laps stay in the result un-drawn."""
+    return tuple(point for point in run.points if point.tyre_age is not None)
+
+
+def _run_label(run: LongRun) -> str:
+    stint = run.stint_id if run.stint_id is not None else "?"
+    displayed = len(_displayed_points(run))
+    return (f"{run.driver.name} / Stint {stint} / "
+            f"laps {run.points[0].lap_number}–{run.points[-1].lap_number}"
+            f" / selected {len(run.points)}, displayed {displayed}")
 
 
 @tracer.start_as_current_span("plot_by_tyre_age_and_tyre")
@@ -208,20 +230,17 @@ def plot_by_tyre_age_and_tyre(
         fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
         try:
             minimum_laps = criteria.min_consecutive_clean_laps if criteria else 2
-            stint_set = make_stint_set(minimum_laps, session.laps, compound, criteria)
-            legends = set()
-            for stint in stint_set:
-                team = stint.driver.team_name
+            runs = select_long_runs(minimum_laps, session.laps, compound, criteria)
+            for run in runs:
+                team = run.driver.team_name
                 color = fastf1.plotting.get_team_color(team, session) if team != '' else 'white'
-                x = sorted(stint.laps.keys())
-                y = [stint.laps[i] for i in x]
-                line_style = driver_linestyle(session.event.year, stint.driver.number)
-                if stint.driver.number in legends:
-                    ax.plot(x, y, linewidth=0.5, color=color, linestyle=line_style)
-                else:
-                    ax.plot(x, y, linewidth=0.5, color=color, linestyle=line_style, label=stint.driver.name)
-                    legends.add(stint.driver.number)
-            if legends:
+                displayed = _displayed_points(run)
+                line_style = driver_linestyle(session.event.year, run.driver.number)
+                ax.plot([point.tyre_age for point in displayed],
+                        [point.lap_time_seconds for point in displayed],
+                        linewidth=0.5, marker=".", color=color, linestyle=line_style,
+                        label=_run_label(run))
+            if runs:
                 ax.legend(fontsize='small')
             ax.invert_yaxis()
             ax.set_xlabel("Tyre age [laps]")
@@ -232,7 +251,7 @@ def plot_by_tyre_age_and_tyre(
             report = current_report()
             if report is not None:
                 report.register_plotly(
-                    _make_interactive_long_run_figure(session, compound, stint_set),
+                    _make_interactive_long_run_figure(session, compound, runs),
                     output_path,
                 )
         finally:
@@ -242,42 +261,42 @@ def plot_by_tyre_age_and_tyre(
 def _make_interactive_long_run_figure(
         session: Session,
         compound: str,
-        stint_set: list[Stint],
+        runs: list[LongRun],
 ) -> go.Figure:
     """Build an interactive long-run counterpart while retaining the PNG."""
     fig = go.Figure()
     ranks = driver_order(session)
-    ordered_stints = sorted(
-        stint_set,
-        key=lambda stint: driver_sort_key(stint.driver.number, ranks),
+    ordered_runs = sorted(
+        runs,
+        key=lambda run: driver_sort_key(run.driver.number, ranks),
     )
-    for stint in ordered_stints:
-        laps = sorted(stint.laps)
-        if not laps:
-            continue
-        name = f"{stint.driver.name} / laps {laps[0]}–{laps[-1]}"
-        customdata = [[stint.driver.name, stint.driver.team_name, lap] for lap in laps]
+    for run in ordered_runs:
+        name = _run_label(run)
+        customdata = [[run.driver.name, run.driver.team_name, point.lap_number,
+                       point.tyre_age] for point in run.points]
         try:
-            color = (fastf1.plotting.get_team_color(stint.driver.team_name, session)
-                     if stint.driver.team_name else "gray")
+            color = (fastf1.plotting.get_team_color(run.driver.team_name, session)
+                     if run.driver.team_name else "gray")
         except (AttributeError, KeyError, TypeError, ValueError):
             color = "gray"
         try:
-            line_style = driver_linestyle(session.event.year, stint.driver.number)
+            line_style = driver_linestyle(session.event.year, run.driver.number)
             dash = "dash" if line_style == "dashed" else "solid"
         except (AttributeError, TypeError, ValueError):
             dash = "solid"
         fig.add_trace(go.Scatter(
-            x=laps,
-            y=[stint.laps[lap] for lap in laps],
+            x=[point.tyre_age for point in run.points],
+            y=[point.lap_time_seconds if point.tyre_age is not None else None
+               for point in run.points],
+            connectgaps=False,
             mode="lines+markers",
             name=name,
             line={"color": color, "dash": dash},
-            legendrank=ranks.get(str(stint.driver.number), 1_000_000),
+            legendrank=ranks.get(str(run.driver.number), 1_000_000),
             customdata=customdata,
             hovertemplate=(
                 "Driver: %{customdata[0]}<br>Team: %{customdata[1]}"
-                "<br>Tyre age: %{customdata[2]} laps<br>Lap time: %{y:.3f}s<extra></extra>"
+                "<br>Lap: %{customdata[2]}<br>Tyre age: %{customdata[3]} laps<br>Lap time: %{y:.3f}s<extra></extra>"
             ),
         ))
     fig.update_layout(
