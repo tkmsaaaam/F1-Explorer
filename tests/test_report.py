@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import asdict
 import json
 import re
 from pathlib import Path
@@ -11,6 +12,8 @@ import unittest
 
 import plotly.graph_objects as go
 
+from f1_explorer.visualizations.domain.driver import Driver
+from f1_explorer.visualizations.domain.long_run import LongRunDecision
 from f1_explorer.visualizations.report import SessionReport, current_report
 from f1_explorer.visualizations.qualifying_layout import QUALIFYING_SECTIONS, organize_qualifying_report_html
 from f1_explorer.visualizations.report_layout import PRACTICE_SECTIONS, RACE_SECTIONS, organize_session_report_html
@@ -338,6 +341,34 @@ class SessionReportTest(unittest.TestCase):
             self.assertEqual(path, report_dir / "report.html")
             self.assertTrue(path.is_file())
             self.assertIn("air_temp.png", path.read_text(encoding="utf-8"))
+
+    def test_long_run_selection_details_escape_and_include_all_excluded(self):
+        # Authored via asdict so the meta contract cannot drift from the
+        # LongRunDecision fields handed to the renderer.
+        records = [
+            asdict(LongRunDecision(Driver(1, "<driver>", "Team"), None, "<SOFT>",
+                                   (None,), None, "lap", False,
+                                   ("missing", "deleted"))),
+            asdict(LongRunDecision(Driver(2, "Driver", "Team"), 2, "SOFT",
+                                   (4, 5), "00:10:00", "phase", False,
+                                   ("qualifying_other_stint",))),
+        ]
+        figure = go.Figure()
+        figure.update_layout(meta={"f1ExplorerKind": "longRunSelection",
+                                   "longRunSelection": records})
+        with TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            with SessionReport(SimpleNamespace(name="Practice 1"), root) as report:
+                report.register_plotly(figure, root / "long_runs" / "SOFT.png")
+                html = report.write().read_text()
+        self.assertIn("<details>", html)
+        self.assertIn("ロングラン候補の採否一覧", html)
+        self.assertIn("&lt;driver&gt;", html)
+        self.assertIn("&lt;SOFT&gt;", html)
+        self.assertNotIn("<driver>", html)
+        self.assertIn("qualifying_other_stint", html)
+        self.assertIn("燃料・路面進化の補正なし", html)
+        self.assertIn("トラフィックはタイム差による推定", html)
 
 
 if __name__ == "__main__":

@@ -17,6 +17,7 @@ from pathlib import Path
 import re
 from typing import Any, Iterable
 
+from f1_explorer.visualizations.long_run_report import selection_details
 from f1_explorer.visualizations.report_layout import organize_session_report_html, is_spec_output
 
 
@@ -301,6 +302,7 @@ class SessionReport:
                 body.append(f'<article class="figure-card" id="{escape(item.anchor)}"><h3>{escape(item.title)}</h3>')
                 figure_json = item.figure_json
                 if figure_json is not None:
+                    is_long_run_selection = '"f1ExplorerKind":"longRunSelection"' in figure_json
                     data_id = f"figure-data-{_slug(item.anchor)}"
                     safe_json = figure_json.replace("<", "\\u003c") if figure_json else "{}"
                     is_table = '"type":"table"' in figure_json
@@ -313,6 +315,16 @@ class SessionReport:
                         body.append('''<div class="r02-rules"><strong>マーカーの見方</strong><table><thead><tr><th>ラップ開始時の状況</th><th>クリーンラップ</th><th>非クリーンラップ</th></tr></thead><tbody><tr><th>前走車とのギャップが2.000秒以内</th><td><span class="r02-swatch r02-close-clean"></span>白塗り＋チームカラー枠</td><td><span class="r02-swatch r02-close-unclean"></span>白塗り＋細い黒枠</td></tr><tr><th>2.000秒超またはギャップ不明</th><td><span class="r02-swatch r02-normal-clean"></span>チームカラー塗り</td><td><span class="r02-swatch r02-normal-unclean"></span>チームカラー塗り＋細い黒枠</td></tr></tbody></table><p>前走車は順位ではなく、ラップ開始時点で直前にコントロールラインを通過した車です。非クリーンラップにはSC・VSC・黄旗、ピットイン／アウト、計測精度不足などを含みます。判定はラップ開始時点を基準とし、ラップ途中で追いついたケースは含みません。</p></div>''')
                     if is_speed_chart:
                         body.append('''<div class="speed-rules"><strong>速度ラベルの見方</strong><p>太字は、計測地点で前走車が0秒超〜2.000秒以内にいたことを示します。スリップストリームによる速度向上の可能性を示すもので、因果関係を確定するものではありません。<code>SpeedST</code>はFastF1のデータに正確な計測位置・時刻がないため、太字判定の対象外です。Q-02の「トウあり」は太字、「トウなし」は通常表示です。ギャップ不明時も通常表示です。</p></div>''')
+                    if is_long_run_selection:
+                        # A shape drift in one figure's meta must not abort the
+                        # whole report write; skip the card's details instead.
+                        try:
+                            meta = json.loads(figure_json).get("layout", {}).get("meta", {})
+                            records = meta.get("longRunSelection") if isinstance(meta, dict) else None
+                            if isinstance(records, list):
+                                body.append(selection_details(records))
+                        except (KeyError, TypeError, ValueError):
+                            pass
                     body.append(
                         f'<div class="plotly-container{kind}" data-plotly-source="{escape(data_id)}" '
                         f'data-report-section="{escape(item.section)}"></div>'

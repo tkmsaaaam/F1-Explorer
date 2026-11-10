@@ -11,6 +11,7 @@ from f1_explorer.visualizations.domain.long_run import LongRun, LongRunPoint
 from f1_explorer.visualizations.long_runs import (
     LongRunCriteria,
     select_long_runs,
+    select_long_run_selection,
     _make_interactive_long_run_figure,
     plot_by_tyre_age_and_tyre,
 )
@@ -376,6 +377,45 @@ class LongRuns(unittest.TestCase):
         self.assertEqual([1, 2], [run.phase_index for run in runs])
         self.assertEqual([[20, 21, 22, 23], [25, 26, 27, 28]],
                          [[p.lap_number for p in run.points] for run in runs])
+
+    def test_selection_records_multiple_lap_reasons_and_phase_outcomes(self):
+        frame = pandas.DataFrame({
+            "DriverNumber": ["1"] * 8, "Driver": ["Max"] * 8, "Team": ["Team"] * 8,
+            "Compound": ["SOFT"] * 8, "Stint": [1] * 8,
+            "LapNumber": list(range(1, 9)), "TyreLife": list(range(1, 9)),
+            "LapTime": pandas.to_timedelta([90, 90, 110, 90, 90, 90, 90, None], unit="s"),
+            "Deleted": [False] * 7 + [True],
+            "IsAccurate": [True] * 7 + [False],
+            "PitInTime": pandas.to_timedelta([None] * 7 + [1], unit="s"),
+            "TrackStatus": ["1"] * 7 + ["2"],
+            "LapStartTime": pandas.to_timedelta(list(range(8)), unit="m"),
+        })
+        selection = select_long_run_selection(2, Laps(frame), "SOFT")
+        excluded = next(d for d in selection.decisions if d.lap_numbers == (8,))
+        self.assertEqual({"missing", "deleted", "inaccurate", "pit", "track_status"},
+                         set(excluded.reasons))
+        self.assertEqual("lap", excluded.scope)
+        self.assertFalse(excluded.accepted)
+        self.assertTrue(any(d.reasons == ("slow_interior",) and d.lap_numbers == (3,)
+                            for d in selection.decisions))
+        self.assertEqual([1, 4], [r.points[0].lap_number for r in selection.runs])
+        self.assertEqual(
+            6, sum(len(d.lap_numbers) for d in selection.decisions
+                   if d.scope == "phase" and d.accepted))
+        self.assertTrue(all(d.start_time is not None for d in selection.decisions))
+
+    def test_selection_records_insufficient_and_qualifying_phases(self):
+        frame = pandas.DataFrame({
+            "DriverNumber": ["1"] * 8, "Driver": ["Max"] * 8, "Team": ["Team"] * 8,
+            "Compound": ["SOFT"] * 8, "Stint": [1] * 8,
+            "LapNumber": list(range(1, 9)), "TyreLife": list(range(1, 9)),
+            "LapTime": pandas.to_timedelta([89, 89.2, 110, 95, 95.2, 95.4, None, 96], unit="s"),
+        })
+        selection = select_long_run_selection(2, Laps(frame), "SOFT")
+        self.assertTrue(any(d.reasons == ("qualifying_same_stint",) for d in selection.decisions))
+        self.assertTrue(any(d.reasons == ("insufficient_consecutive",) and d.lap_numbers == (8,)
+                            for d in selection.decisions))
+        self.assertEqual([[4, 5, 6]], [[p.lap_number for p in r.points] for r in selection.runs])
 
 
 if __name__ == '__main__':

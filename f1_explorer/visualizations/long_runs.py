@@ -1,4 +1,4 @@
-from dataclasses import dataclass, replace
+from dataclasses import asdict, dataclass, replace
 import math
 from pathlib import Path
 from collections.abc import Hashable
@@ -15,7 +15,9 @@ from fastf1.core import Session, Laps
 from opentelemetry import trace
 
 from f1_explorer.visualizations.domain.driver import Driver
-from f1_explorer.visualizations.domain.long_run import LongRun, LongRunPoint
+from f1_explorer.visualizations.domain.long_run import (
+    LongRun, LongRunPoint, LongRunDecision, LongRunSelection, LongRunScope,
+)
 from f1_explorer.visualizations.output import resolve_output_dir, save_matplotlib
 from f1_explorer.visualizations.report import current_report
 from f1_explorer.visualizations.session_order import driver_order, driver_sort_key
@@ -44,6 +46,7 @@ class _Phase:
     median: float
     starts_stint: bool
     preceded_by_slow_lap: bool
+    start_time: str | None
 
 
 def _present_and_true(row: pandas.Series, column: str) -> bool:
@@ -51,19 +54,38 @@ def _present_and_true(row: pandas.Series, column: str) -> bool:
     return column in row.index and pandas.notna(value) and bool(value)
 
 
-def _is_usable_lap(row: pandas.Series) -> bool:
+def _lap_exclusion_reasons(row: pandas.Series) -> tuple[str, ...]:
+    reasons = []
     if pandas.isna(row.get("LapNumber")) or pandas.isna(row.get("LapTime")):
-        return False
+        reasons.append("missing")
     if _present_and_true(row, "Deleted"):
-        return False
+        reasons.append("deleted")
     if "IsAccurate" in row.index and pandas.notna(row["IsAccurate"]) and not bool(row["IsAccurate"]):
-        return False
+        reasons.append("inaccurate")
     if _present_and_true(row, "PitInTime") or _present_and_true(row, "PitOutTime"):
-        return False
-    if "TrackStatus" in row.index and pandas.notna(row["TrackStatus"]):
-        if str(row["TrackStatus"]) not in {"1", "1.0"}:
-            return False
-    return True
+        reasons.append("pit")
+    if pandas.notna(row.get("TrackStatus")) and str(row["TrackStatus"]) not in {"1", "1.0"}:
+        reasons.append("track_status")
+    return tuple(reasons)
+
+
+def _start_time(row: pandas.Series) -> str | None:
+    """First lap's start instant: absolute date when known, else session-relative time."""
+    start = next((row.get(key) for key in ("LapStartDate", "LapStartTime")
+                  if pandas.notna(row.get(key))), None)
+    return str(start) if start is not None else None
+
+
+def _decision(driver: Driver, stint_id: int | None, compound: str,
+              rows: list[pandas.Series], scope: LongRunScope, accepted: bool,
+              reasons: tuple[str, ...]) -> LongRunDecision:
+    return LongRunDecision(
+        driver, stint_id, compound,
+        tuple(as_int(row["LapNumber"]) if pandas.notna(row.get("LapNumber")) else None
+              for row in rows),
+        _start_time(rows[0]) if rows else None,
+        scope, accepted, reasons,
+    )
 
 
 def _lap_number(row: pandas.Series) -> int:
@@ -105,11 +127,24 @@ def _point(lap_number: int, row: pandas.Series) -> LongRunPoint:
 
 
 def _make_phases(stint_laps: pandas.DataFrame, driver: Driver, stint_id: int | None,
-                 compound: str, criteria: LongRunCriteria) -> tuple[list[_Phase], list[float]]:
+                 compound: str, criteria: LongRunCriteria,
+                 decisions: list[LongRunDecision] | None) -> tuple[list[_Phase], list[float]]:
     order_column = "LapNumber"
     ordered = stint_laps.sort_values(by=order_column).reset_index(drop=True)
-    usable = [(index, row) for index, (_, row) in enumerate(ordered.iterrows()) if _is_usable_lap(row)]
+    usable: list[tuple[int, pandas.Series]] = []
+    for original_index, (_, row) in enumerate(ordered.iterrows()):
+        reasons = _lap_exclusion_reasons(row)
+        if reasons:
+            if decisions is not None:
+                decisions.append(_decision(driver, stint_id, compound, [row], "lap", False, reasons))
+        else:
+            usable.append((original_index, row))
     slow_indexes = _slow_lap_indexes(usable, criteria)
+    if decisions is not None:
+        for index in sorted(slow_indexes):
+            decisions.append(_decision(driver, stint_id, compound, [usable[index][1]],
+                                       "lap", False, ("slow_interior",)))
+
     clean = [(original_index, row) for clean_index, (original_index, row) in enumerate(usable)
              if clean_index not in slow_indexes]
     clean_times = [as_seconds(row["LapTime"]) for _, row in clean]
@@ -128,6 +163,10 @@ def _make_phases(stint_laps: pandas.DataFrame, driver: Driver, stint_id: int | N
     }
     for rows in phase_rows:
         if len(rows) < criteria.min_consecutive_clean_laps:
+            if decisions is not None:
+                decisions.append(_decision(driver, stint_id, compound,
+                                           [row for _, row in rows], "phase", False,
+                                           ("insufficient_consecutive",)))
             continue
         points = tuple(_point(_lap_number(row), row) for _, row in rows)
         phases.append(_Phase(
@@ -135,17 +174,20 @@ def _make_phases(stint_laps: pandas.DataFrame, driver: Driver, stint_id: int | N
             float(pandas.Series([point.lap_time_seconds for point in points]).median()),
             bool(usable) and rows[0][0] == usable[0][0],
             rows[0][0] - 1 in removed_original_indexes,
+            _start_time(rows[0][1]),
         ))
     return phases, clean_times
 
 
-def select_long_runs(min_consecutive_laps: int, all_laps: Laps, compound: str,
-                   criteria: LongRunCriteria | None = None) -> list[LongRun]:
+def _select_long_runs(min_consecutive_laps: int | None, all_laps: Laps, compound: str,
+                      criteria: LongRunCriteria | None,
+                      decisions: list[LongRunDecision] | None) -> list[LongRun]:
     """Return independently drawable long-run phases for a compound."""
-    base = criteria or LongRunCriteria()
-    criteria = replace(base, min_consecutive_clean_laps=min_consecutive_laps)
+    criteria = criteria or LongRunCriteria()
+    if min_consecutive_laps is not None:
+        criteria = replace(criteria, min_consecutive_clean_laps=min_consecutive_laps)
     if "LapNumber" not in all_laps.columns:
-        return []
+        all_laps = all_laps.assign(LapNumber=float("nan"))
     laps = all_laps[all_laps.Compound == compound]
     phases: list[_Phase] = []
     clean_times_by_stint: dict[tuple[int, int | None], list[float]] = {}
@@ -156,15 +198,24 @@ def select_long_runs(min_consecutive_laps: int, all_laps: Laps, compound: str,
         driver_number = int(cast(str, driver_number_value))
         driver = Driver(driver_number, first_lap.Driver, first_lap.Team)
         stint_phases, clean_times = _make_phases(
-            stint_laps, driver, stint_id, cast(str, phase_compound), criteria
+            stint_laps, driver, stint_id, cast(str, phase_compound), criteria, decisions
         )
         phases.extend(stint_phases)
         clean_times_by_stint[(driver_number, stint_id)] = clean_times
+
+    def record_phase(phase: _Phase, accepted: bool, reason: str) -> None:
+        if decisions is not None:
+            decisions.append(LongRunDecision(
+                phase.driver, phase.stint_id, phase.compound,
+                tuple(point.lap_number for point in phase.points),
+                phase.start_time, "phase", accepted, (reason,),
+            ))
 
     retained: list[_Phase] = []
     for phase in phases:
         if len(phase.points) >= criteria.automatic_long_run_laps:
             retained.append(phase)
+            record_phase(phase, True, "automatic_long_run")
             continue
         same_stint = [item for item in phases
                       if item.driver.number == phase.driver.number and item.stint_id == phase.stint_id]
@@ -176,6 +227,7 @@ def select_long_runs(min_consecutive_laps: int, all_laps: Laps, compound: str,
         if (phase.starts_stint and len(phase.points) <= criteria.qualifying_max_laps
                 and any(item.preceded_by_slow_lap and phase.median + margin < item.median
                         for item in later)):
+            record_phase(phase, False, "qualifying_same_stint")
             continue
 
         external_times = [
@@ -188,8 +240,10 @@ def select_long_runs(min_consecutive_laps: int, all_laps: Laps, compound: str,
             margin = max(criteria.qualifying_absolute_margin,
                          reference * criteria.qualifying_relative_margin)
             if phase.median <= reference + margin:
+                record_phase(phase, False, "qualifying_other_stint")
                 continue
         retained.append(phase)
+        record_phase(phase, True, "retained_short_run")
 
     # Phase indexes number the retained runs, so a dropped early interval
     # leaves no gaps: each stint's runs stay 1-based and contiguous.
@@ -201,6 +255,20 @@ def select_long_runs(min_consecutive_laps: int, all_laps: Laps, compound: str,
         result.append(LongRun(item.driver, item.stint_id, retained_by_key[key],
                               item.compound, item.points))
     return sorted(result, key=lambda item: (item.driver.number, item.points[0].lap_number))
+
+
+def select_long_run_selection(min_consecutive_laps: int | None = None, all_laps: Laps = None,
+                              compound: str = None,
+                              criteria: LongRunCriteria | None = None) -> LongRunSelection:
+    decisions: list[LongRunDecision] = []
+    runs = _select_long_runs(min_consecutive_laps, all_laps, compound, criteria, decisions)
+    return LongRunSelection(tuple(runs), tuple(decisions))
+
+
+def select_long_runs(min_consecutive_laps: int | None = None, all_laps: Laps = None,
+                     compound: str = None,
+                     criteria: LongRunCriteria | None = None) -> list[LongRun]:
+    return list(select_long_run_selection(min_consecutive_laps, all_laps, compound, criteria).runs)
 
 
 def _displayed_points(run: LongRun) -> tuple[LongRunPoint, ...]:
@@ -229,8 +297,8 @@ def plot_by_tyre_age_and_tyre(
         fastf1.plotting.setup_mpl(mpl_timedelta_support=True, color_scheme='light')
         fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
         try:
-            minimum_laps = criteria.min_consecutive_clean_laps if criteria else 2
-            runs = select_long_runs(minimum_laps, session.laps, compound, criteria)
+            selection = select_long_run_selection(None, session.laps, compound, criteria)
+            runs = list(selection.runs)
             for run in runs:
                 team = run.driver.team_name
                 color = fastf1.plotting.get_team_color(team, session) if team != '' else 'white'
@@ -250,10 +318,17 @@ def plot_by_tyre_age_and_tyre(
             save_matplotlib(fig, output_path, log, report_interactive=True)
             report = current_report()
             if report is not None:
-                report.register_plotly(
-                    _make_interactive_long_run_figure(session, compound, runs),
-                    output_path,
-                )
+                figure = _make_interactive_long_run_figure(session, compound, runs)
+                # Lap-scope decisions lead so the 採否一覧 can keep the
+                # per-lap and per-phase sections apart by order alone.
+                figure.update_layout(meta={
+                    "f1ExplorerKind": "longRunSelection",
+                    "longRunSelection": [
+                        asdict(d) for d in sorted(
+                            selection.decisions, key=lambda d: d.scope != "lap")
+                    ],
+                })
+                report.register_plotly(figure, output_path)
         finally:
             plt.close(fig)
 
