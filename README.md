@@ -26,6 +26,7 @@ The repository is organized into the following components:
 * **[f1_explorer/visualizations/](f1_explorer/visualizations/)**: A directory containing core visualization methods. The analysis scripts above
   call functions from
   this directory to generate plots.
+* **[segment_analysis.py](f1_explorer/visualizations/segment_analysis.py)**: Segment layouts, maps, and tables. Numerical metrics remain in segment_metrics.py; short_runs.py re-exports the existing segment APIs for compatibility.
 * **[templates/template.html](templates/template.html)**: Shared HTML layout and browser behavior for session reports.
 
 ### Live tracking

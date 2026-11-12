@@ -205,8 +205,8 @@ def test_missing_fastest_distance_skips_circuit_charts_and_writes_report(analysi
     module = analysis.module
     mini_segment = MagicMock()
     segment_tables = MagicMock()
-    monkeypatch.setattr(module.short_runs, "plot_mini_segment_on_circuit", mini_segment)
-    monkeypatch.setattr(module.short_runs, "compute_and_save_segment_tables_plotly", segment_tables)
+    monkeypatch.setattr(module.segment_analysis, "plot_mini_segment_on_circuit", mini_segment)
+    monkeypatch.setattr(module.segment_analysis, "compute_and_save_segment_tables_plotly", segment_tables)
     fastest = MagicMock()
     analysis.session.laps.pick_fastest.return_value = fastest
     module._circuit_info_or_none.return_value = SimpleNamespace(

@@ -5,7 +5,7 @@ from unittest.mock import MagicMock, patch
 import pandas as pd
 import pytest
 
-from f1_explorer.visualizations import short_runs
+from f1_explorer.visualizations import segment_analysis
 
 
 def _session(*, no_reference=False):
@@ -44,10 +44,10 @@ def _tables(session, **kwargs):
     captured = []
     def save(figures, paths, *args, **settings):
         captured.extend((path, json.loads(figure.to_json())) for figure, path in zip(figures, paths))
-    with patch.object(short_runs, 'save_plotly_batch', side_effect=save):
+    with patch.object(segment_analysis, 'save_plotly_batch', side_effect=save):
         for name, boundaries in [('corners', [0.0, 50.0, 100.0, 200.0]),
                                  ('mini_segments', [0.0, 25.0, 75.0, 125.0, 200.0])]:
-            short_runs.compute_and_save_segment_tables_plotly(
+            segment_analysis.compute_and_save_segment_tables_plotly(
                 session, name, boundaries, MagicMock(), **kwargs)
     return captured
 
@@ -60,7 +60,7 @@ def test_shared_samples_match_standalone_tables_and_reduce_reads(no_reference):
     for lap in laps.values():
         if lap is not None:
             lap.get_car_data.reset_mock()
-    samples = short_runs.prepare_segment_car_data(session)
+    samples = segment_analysis.prepare_segment_car_data(session)
     originals = {number: data.copy(deep=True) for number, data in samples.items()}
     assert list(samples) == ['1', '2', '3']
     assert samples['3'].empty  # A valid lap with empty telemetry remains present.

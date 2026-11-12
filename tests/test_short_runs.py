@@ -15,20 +15,23 @@ import numpy as np
 import pytest
 
 from f1_explorer.separator_estimator import SeparatorBoundary
-from f1_explorer.visualizations.short_runs import (
-    compute_and_save_segment_tables_plotly, plot_flat_out, plot_speed_on_track,
-)
-from f1_explorer.visualizations.short_runs import (
+from f1_explorer.visualizations.segment_analysis import (
     CORNER_SPEED_COLORS,
     _corner_segment_colors,
     _corner_speed_color,
+    _sector_boundary_distances,
+    _structured_sector_boundary_distances,
+    compute_and_save_segment_tables_plotly,
+    make_mini_segment_layout,
+    plot_mini_segment_on_circuit,
+)
+from f1_explorer.visualizations.short_runs import (
+    plot_flat_out, plot_speed_on_track,
+)
+from f1_explorer.visualizations.short_runs import (
     _gear_colorscale,
     _save_interactive_driver_telemetry,
     _save_interactive_track_map,
-    _sector_boundary_distances,
-    _structured_sector_boundary_distances,
-    make_mini_segment_layout,
-    plot_mini_segment_on_circuit,
 )
 
 
@@ -60,7 +63,7 @@ def test_segment_tables_save_two_figures_when_session_fastest_is_missing() -> No
     })
     session.get_driver.return_value.Abbreviation = "AAA"
 
-    with patch("f1_explorer.visualizations.short_runs.save_plotly_batch") as save:
+    with patch("f1_explorer.visualizations.segment_analysis.save_plotly_batch") as save:
         compute_and_save_segment_tables_plotly(
             session, "plots/corners", [0.0, 100.0, 200.0], MagicMock(),
         )
@@ -126,7 +129,7 @@ def test_mini_segment_functions_reuse_supplied_fastest_telemetry(tmp_path: Path)
         session, MagicMock(), {}, [], fastest_lap=lap, telemetry=telemetry,
     )
     assert layout.distances == [0.0, 200.0]
-    with patch("f1_explorer.visualizations.short_runs.save_matplotlib") as save:
+    with patch("f1_explorer.visualizations.segment_analysis.save_matplotlib") as save:
         plot_mini_segment_on_circuit(
             session, MagicMock(), layout, "mini_segments",
             fastest_lap=lap, telemetry=telemetry, output_dir=tmp_path,
@@ -151,7 +154,7 @@ def test_mini_segment_map_uses_structured_markers_instead_of_fastest_lap_times(t
         get_telemetry=lambda: telemetry,
     )
     session = SimpleNamespace(laps=SimpleNamespace(pick_fastest=lambda: lap))
-    with patch("f1_explorer.visualizations.short_runs.save_matplotlib") as save:
+    with patch("f1_explorer.visualizations.segment_analysis.save_matplotlib") as save:
         plot_mini_segment_on_circuit(
             session, MagicMock(), [0.0, 200.0, 400.0], "mini_segments",
             separator_boundaries=[
@@ -178,7 +181,7 @@ def test_mini_segment_map_skips_sparse_empty_interval(tmp_path: Path) -> None:
     lap = SimpleNamespace(Driver="VER", get_telemetry=lambda: telemetry)
     session = SimpleNamespace(laps=SimpleNamespace(pick_fastest=lambda: lap))
 
-    with patch("f1_explorer.visualizations.short_runs.save_matplotlib") as save:
+    with patch("f1_explorer.visualizations.segment_analysis.save_matplotlib") as save:
         plot_mini_segment_on_circuit(
             session, MagicMock(), [0.0, 50.0, 60.0, 200.0], "mini_segments",
             output_dir=tmp_path,

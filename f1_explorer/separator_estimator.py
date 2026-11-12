@@ -1207,7 +1207,8 @@ def _scoped_separator_value(config: Mapping[str, Any], year: int, location: str)
     return None
 
 
-def _coerce_separator_boundary(value: Any) -> SeparatorBoundary | None:
+def coerce_separator_boundary(value: Any) -> SeparatorBoundary | None:
+    """Parse one stored separator entry; distances must be positive and finite."""
     if isinstance(value, SeparatorBoundary):
         candidate = value
     elif isinstance(value, Mapping):
@@ -1232,7 +1233,7 @@ def _structured_separator_boundaries(value: Any) -> list[SeparatorBoundary]:
         return []
     result = []
     for item in value:
-        boundary = _coerce_separator_boundary(item)
+        boundary = coerce_separator_boundary(item)
         if boundary is not None:
             result.append(boundary)
     return result
@@ -1288,7 +1289,7 @@ def save_scoped_separator(
         maps[str(int(year))] = year_map
     structured = []
     for item in (boundaries or _structured_separator_boundaries(separators)):
-        boundary = _coerce_separator_boundary(item)
+        boundary = coerce_separator_boundary(item)
         if boundary is not None:
             structured.append(boundary)
     if structured:
