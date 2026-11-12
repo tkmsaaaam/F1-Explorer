@@ -3,14 +3,16 @@ import math
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Mapping, Sequence
-from f1_explorer.circuit import circuit_info_or_none
+
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas
 import plotly.graph_objects as go
 import structlog
-from fastf1.core import Session, Lap, Telemetry
+from fastf1.core import CircuitInfo, Session, Lap, Telemetry
 from opentelemetry import trace
+
+from f1_explorer.circuit import circuit_info_or_none
 from f1_explorer.scalars import as_float, as_seconds
 from f1_explorer.visualizations.output import resolve_output_dir, save_matplotlib, save_plotly_batch
 from f1_explorer.visualizations.segment_metrics import deltas_to_reference, rank_segment_durations, segment_durations
@@ -19,6 +21,7 @@ from f1_explorer.separator_estimator import SeparatorBoundary, coerce_separator_
 from f1_explorer.telemetry import lap_telemetry_without_driver_ahead
 
 tracer = trace.get_tracer(__name__)
+
 
 @dataclass(frozen=True, slots=True)
 class MiniSegmentLayout:
@@ -97,7 +100,7 @@ def prepare_segment_car_data(session: Session) -> dict[str, Telemetry]:
     return samples
 
 
-def _segment_descriptor_rows(segment_boundaries: list[float], circuit) -> list[list]:
+def _segment_descriptor_rows(segment_boundaries: list[float], circuit: CircuitInfo) -> list[list[Any]]:
     """Per-segment [name, distance, corner numbers] prefixes shared by the tables."""
     corners_df = circuit.corners
     rows = []
@@ -119,7 +122,28 @@ def _rounded_driver_column(
     return round(value, 3) if value is not None else None
 
 
-def _segment_table(headers: list, rows: list[list], row_colors: list[str]) -> go.Figure:
+def _rank_driver_column(
+        ranks_by_driver: Mapping[str, Sequence[int]],
+        driver_number: str, segment_index: int,
+) -> int | None:
+    ranks = ranks_by_driver.get(driver_number)
+    return ranks[segment_index] if ranks is not None and segment_index < len(ranks) else None
+
+
+def _driver_value_rows(
+        descriptor_rows: list[list[Any]],
+        drivers: list[str],
+        values_by_driver: Mapping[str, Sequence[float | None]],
+) -> list[list[Any]]:
+    """Append one rounded value column per driver to the descriptor prefixes."""
+    return [
+        descriptor + [_rounded_driver_column(values_by_driver, driver_number, i - 1)
+                      for driver_number in drivers]
+        for i, descriptor in enumerate(descriptor_rows, start=1)
+    ]
+
+
+def _segment_table(headers: list[Any], rows: list[list[Any]], row_colors: list[str]) -> go.Figure:
     return go.Figure(data=[go.Table(
         header=go.table.Header(
             values=headers,
@@ -151,6 +175,8 @@ def compute_and_save_segment_tables_plotly(
         filename_base: ファイル名のprefix
         segment_boundaries: セグメントの境界値一覧
         log: ロガー
+        color_by_corner_speed: コーナー通過速度で行を着色する
+        car_data_by_driver: 再利用済みの車両サンプル（キーは車番）
     """
     trace.get_current_span().set_attribute("segment.table_kind", Path(filename_base).name)
     if isinstance(segment_boundaries, MiniSegmentLayout):
@@ -179,11 +205,7 @@ def compute_and_save_segment_tables_plotly(
         return
     durations_by_driver = segment_durations(driver_times)
     descriptor_rows = _segment_descriptor_rows(segment_boundaries, circuit)
-    segment_rows = [
-        descriptor + [_rounded_driver_column(durations_by_driver, driver_number, i - 1)
-                      for driver_number in drivers]
-        for i, descriptor in enumerate(descriptor_rows, start=1)
-    ]
+    segment_rows = _driver_value_rows(descriptor_rows, drivers, durations_by_driver)
 
     abbreviations = [session.get_driver(d).Abbreviation for d in drivers]
     row_colors = [CORNER_SPEED_COLORS["unavailable"]] * len(segment_rows)
@@ -212,15 +234,13 @@ def compute_and_save_segment_tables_plotly(
         save_plotly_batch(table_figures, table_paths, log, width=1920, height=1080)
 
     ranks_by_driver = rank_segment_durations(durations_by_driver)
-    segment_rank_rows = []
-    for i, row in enumerate(segment_rows):
-        segment_rank_rows.append([
-            row[0], row[1],
-            *[
-                ranks[i] if (ranks := ranks_by_driver.get(driver_number)) is not None and i < len(ranks) else None
-                for driver_number in drivers
-            ],
-        ])
+    segment_rank_rows = [
+        # The ranks table omits the corners column: only name and distance
+        # carry over from the descriptor prefix.
+        descriptor[:2] + [_rank_driver_column(ranks_by_driver, driver_number, i - 1)
+                          for driver_number in drivers]
+        for i, descriptor in enumerate(descriptor_rows, start=1)
+    ]
 
     with tracer.start_as_current_span("segment_table.build_figure") as span:
         span.set_attribute("segment.output", "ranks")
@@ -240,11 +260,7 @@ def compute_and_save_segment_tables_plotly(
         save_tables()
         return
     deltas_by_driver = deltas_to_reference(durations_by_driver, best_driver_number)
-    gap_rows = [
-        descriptor + [_rounded_driver_column(deltas_by_driver, driver_number, i - 1)
-                      for driver_number in drivers]
-        for i, descriptor in enumerate(descriptor_rows, start=1)
-    ]
+    gap_rows = _driver_value_rows(descriptor_rows, drivers, deltas_by_driver)
     with tracer.start_as_current_span("segment_table.build_figure") as span:
         span.set_attribute("segment.output", "gaps_to_best")
         fig_gap = _segment_table(
@@ -297,7 +313,9 @@ def make_mini_segment_layout(
                 distance = float(item)
             except (TypeError, ValueError):
                 continue
-            if math.isfinite(distance):
+            # Same positive-distance policy as coerce_separator_boundary: a
+            # separator at or before the 0.0 start boundary is not a segment.
+            if math.isfinite(distance) and distance > 0:
                 separator_distances.append(distance)
             continue
         boundary = coerce_separator_boundary(item)
@@ -321,11 +339,11 @@ def plot_mini_segment_on_circuit(
         log: structlog.stdlib.BoundLogger,
         segment_boundaries: list[float] | MiniSegmentLayout,
         image_name: str,
-                                 *, output_dir: str | Path | None = None,
-                                 separator_boundaries: Sequence[Any] | None = None,
-                                 show_sector_boundaries: bool = False,
-                                 fastest_lap: Lap | None = None,
-                                 telemetry: Telemetry | None = None):
+        *, output_dir: str | Path | None = None,
+        separator_boundaries: Sequence[Any] | None = None,
+        show_sector_boundaries: bool = False,
+        fastest_lap: Lap | None = None,
+        telemetry: Telemetry | None = None):
     """ミニセグメントをプロットする
     Args:
         session: 分析対象のセッション

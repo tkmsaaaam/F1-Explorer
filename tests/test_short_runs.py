@@ -26,12 +26,11 @@ from f1_explorer.visualizations.segment_analysis import (
     plot_mini_segment_on_circuit,
 )
 from f1_explorer.visualizations.short_runs import (
-    plot_flat_out, plot_speed_on_track,
-)
-from f1_explorer.visualizations.short_runs import (
     _gear_colorscale,
     _save_interactive_driver_telemetry,
     _save_interactive_track_map,
+    plot_flat_out,
+    plot_speed_on_track,
 )
 
 
@@ -93,6 +92,29 @@ def test_structured_sector_markers_use_last_saved_mini_segment_boundary() -> Non
         SeparatorBoundary(500.0, 1, 2),
     ]
     assert _structured_sector_boundary_distances(boundaries) == [350.0, 500.0]
+
+
+def test_mini_segment_layout_drops_non_positive_separators() -> None:
+    # Structured and plain-float separators share the positive-distance
+    # policy of coerce_separator_boundary: at or before the 0.0 start
+    # boundary an entry cannot delimit a real segment.
+    telemetry = pd.DataFrame({
+        "Distance": [0.0, 200.0],
+        "X": [0.0, 200.0],
+        "Y": [0.0, 0.0],
+    })
+    telemetry.add_distance = lambda: telemetry
+    lap = SimpleNamespace(Driver="VER", get_telemetry=lambda: telemetry)
+    session = SimpleNamespace(
+        laps=SimpleNamespace(pick_fastest=lambda: lap),
+        get_circuit_info=lambda: None,
+    )
+    layout = make_mini_segment_layout(
+        session, MagicMock(), {},
+        [{"distance": 0.0, "sector": 0, "segment": 1}, -5.0, SeparatorBoundary(120.0, 0, 2)],
+    )
+    assert layout.distances == [0.0, 120.0, 200.0]
+    assert [boundary.distance for boundary in layout.separator_boundaries] == [120.0]
 
 
 def test_mini_segment_layout_projects_structured_boundaries_to_distances() -> None:

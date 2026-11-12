@@ -26,7 +26,7 @@ The repository is organized into the following components:
 * **[f1_explorer/visualizations/](f1_explorer/visualizations/)**: A directory containing core visualization methods. The analysis scripts above
   call functions from
   this directory to generate plots.
-* **[segment_analysis.py](f1_explorer/visualizations/segment_analysis.py)**: Segment layouts, maps, and tables. Numerical metrics remain in segment_metrics.py; short_runs.py re-exports the existing segment APIs for compatibility.
+* **[segment_analysis.py](f1_explorer/visualizations/segment_analysis.py)**: Segment layouts, maps, and tables. Numerical metrics remain in segment_metrics.py.
 * **[templates/template.html](templates/template.html)**: Shared HTML layout and browser behavior for session reports.
 
 ### Live tracking
@@ -451,7 +451,9 @@ sector's start/end distance, so a preceding sector's pace cannot move a later
 sector boundary.
 The stored separator values are distances in metres. Live Timing laps are accepted only
 when consecutive lap boundaries agree with the reported lap time (within 5%
-or 2 seconds) and mini-sector progress is monotonic.
+or 2 seconds) and mini-sector progress is monotonic. Separator entries must be
+positive, finite distances: zero or negative entries are ignored, both when
+stored as plain numbers and as structured boundary records.
 
 ## Implementation Details
 

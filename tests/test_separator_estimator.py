@@ -16,6 +16,7 @@ from f1_explorer.separator_estimator import (
     StaticArchiveClient,
     build_distance_lookup,
     build_live_timing_lap_windows,
+    coerce_separator_boundary,
     estimate_separator_distances,
     estimate_separator_boundaries,
     parse_json_stream,
@@ -523,6 +524,22 @@ def test_distance_lookup_rejects_non_iterable_samples(value):
 
     lookup = {("1", 1): {"SessionTime": value, "Distance": [0.0, 100.0]}}
     assert _lookup_distance(lookup, "1", 1, 5.0, {}) is None
+
+
+@pytest.mark.parametrize("value", [
+    float("nan"), float("inf"), 0.0, -5.0, None, 12.0, {}, {"sector": 1, "segment": 2},
+])
+def test_coerce_separator_boundary_rejects_non_positive_or_invalid_entries(value):
+    assert coerce_separator_boundary(value) is None
+
+
+def test_coerce_separator_boundary_accepts_instances_and_valid_mappings():
+    boundary = SeparatorBoundary(120.5, 0, 2)
+    assert coerce_separator_boundary(boundary) is boundary
+    parsed = coerce_separator_boundary({"Distance": 120.5, "Sector": 0, "Segment": 2})
+    assert parsed == boundary
+    assert coerce_separator_boundary(
+        {"distance": 3.0, "sector_index": 1, "segment_index": 4}) == SeparatorBoundary(3.0, 1, 4)
 
 
 def test_optional_session_metadata_and_track_status():
