@@ -27,12 +27,7 @@ from f1_explorer.visualizations.domain.lap import Lap
 from f1_explorer.visualizations.domain.tyre import Tyre
 from f1_explorer.visualizations.output import WarningLoggerLike, save_matplotlib, save_plotly
 from f1_explorer.visualizations.report import current_report
-from f1_explorer.visualizations.race_metrics import (
-    gap_to_ahead as calculate_gap_to_ahead,
-    gap_to_leader as calculate_gap_to_leader,
-    lap_times_by_position,
-    top_time_map,
-)
+from f1_explorer.visualizations.race_metrics import GapObservation, gap_observations_all
 from f1_explorer.visualizations.session_order import driver_order, driver_sort_key
 from f1_explorer.visualizations.style import driver_linestyle
 from f1_explorer.visualizations.race_start import start_samples
@@ -45,13 +40,11 @@ def execute(session: Session, log: WarningLoggerLike, images_path: str, logs_pat
             gap_top_range: int | None,
             gap_ahead_range: int | None):
     driver_laps_set = make_driver_laps_set(session.laps)
-    start_by_position_by_number = make_lap_start_by_position_by_number(session.laps)
     laptime(log, images_path, "laptime_graph", session, lap_time_range, driver_laps_set)
-    gap_to_ahead_table(log, f"{images_path}/gap_ahead_table.png", driver_laps_set, start_by_position_by_number,
+    gap_to_ahead_table(log, f"{images_path}/gap_ahead_table.png", driver_laps_set,
                        ranks=driver_order(session))
     gap_to_top_table(log, f"{images_path}/gap_top_table.png", driver_laps_set, session)
-    gap_to_ahead_graph(log, images_path, "gap_ahead_graph", session, gap_ahead_range, driver_laps_set,
-                       start_by_position_by_number)
+    gap_to_ahead_graph(log, images_path, "gap_ahead_graph", session, gap_ahead_range, driver_laps_set)
     gap_to_top_graph(log, images_path, "gap_top_graph", session, gap_top_range, driver_laps_set)
     positions(log, f"{images_path}/position.png", session, driver_laps_set)
     speed_first_10s(log, f"{images_path}/speed_first_10s.png", session)
@@ -99,10 +92,6 @@ def make_driver_laps_set(laps: Laps) -> list[DriverLaps]:
 def _is_invalid_position(position: float) -> bool:
     """Return whether a session position is missing or cannot be a rank."""
     return bool(pandas.isna(position)) or not isfinite(float(position)) or position <= 0
-
-
-def make_lap_start_by_position_by_number(laps: Laps) -> dict[int, dict[int, datetime.timedelta]]:
-    return lap_times_by_position(make_driver_laps_set(laps))
 
 
 @tracer.start_as_current_span("laptime")
@@ -163,11 +152,6 @@ def laptime(log: WarningLoggerLike, filepath: str, filename: str, session: Sessi
         plt.close(fig)
 
 
-
-def make_top_time_map(all_laps: Laps) -> dict[int, datetime.timedelta]:
-    return top_time_map(make_driver_laps_set(all_laps))
-
-
 def result_ranked(lap_logs: list[DriverLaps], ranks: dict[str, int]) -> list[DriverLaps]:
     """ラップ群を公式結果順位順（未順位は車番文字列順）に並べ替える。"""
     return sorted(
@@ -176,16 +160,25 @@ def result_ranked(lap_logs: list[DriverLaps], ranks: dict[str, int]) -> list[Dri
     )
 
 
+def _gap_evidence_meta(sorted_lap_logs: list[DriverLaps],
+                       observations_by_driver: dict[int, list[GapObservation]]) -> dict[str, list[dict[str, object]]]:
+    """Build the ``gapEvidence`` layout meta shared by the gap tables."""
+    return {"gapEvidence": [
+        {"driver": str(driver.get_driver().get_number()), "lap": item.lap_number,
+         "comparison": item.comparison_number, "reason": item.reason or "valid"}
+        for driver in sorted_lap_logs
+        for item in observations_by_driver[driver.get_driver().get_number()]
+    ]}
+
+
 @tracer.start_as_current_span("gap_to_ahead_table")
-def gap_to_ahead_table(log: WarningLoggerLike, filepath: str, lap_logs: list[DriverLaps],
-                       position_logs: dict[int, dict[int, datetime.timedelta]], *,
+def gap_to_ahead_table(log: WarningLoggerLike, filepath: str, lap_logs: list[DriverLaps], *,
                        ranks: dict[str, int] = {}):
     """ラップごとのギャップの一覧を作成する
     Args:
         log: ロガー
         filepath: 画像を保存する先のpathとファイル名
         lap_logs: ドライバーごとのラップ
-        position_logs: ラップごとのポジション
         ranks: 車番ごとの表示順位。空の場合は車番文字列順。
     """
     header = ["Lap"]
@@ -193,8 +186,10 @@ def gap_to_ahead_table(log: WarningLoggerLike, filepath: str, lap_logs: list[Dri
     fill_colors = []
     max_lap_number = max((max(dl.get_laps()) for dl in lap_logs if dl.get_laps()), default=0)
     sorted_lap_logs = result_ranked(lap_logs, ranks)
+    observations_by_driver = gap_observations_all(sorted_lap_logs, ahead=True)
     for driver_laps in sorted_lap_logs:
-        gap_by_lap = dict(calculate_gap_to_ahead(driver_laps, position_logs))
+        observations = observations_by_driver[driver_laps.get_driver().get_number()]
+        gap_by_lap = {item.lap_number: item.seconds for item in observations}
         gaps = []
         colors = []
         for i in range(1, max_lap_number + 1):
@@ -222,6 +217,7 @@ def gap_to_ahead_table(log: WarningLoggerLike, filepath: str, lap_logs: list[Dri
                 align='center'))],
         layout=go.Layout(autosize=True, margin=go.layout.Margin(autoexpand=True)))
 
+    fig.update_layout(meta=_gap_evidence_meta(sorted_lap_logs, observations_by_driver))
     save_plotly(fig, filepath, log, width=1920, height=1620)
 
 
@@ -238,11 +234,12 @@ def gap_to_top_table(log: WarningLoggerLike, filepath: str, lap_logs: list[Drive
     all_gaps = []
     fill_colors = []
     max_lap_number = max((max(dl.get_laps()) for dl in lap_logs if dl.get_laps()), default=0)
-    top_time_map = make_top_time_map(session.laps)
     ranks = driver_order(session)
     sorted_lap_logs = result_ranked(lap_logs, ranks)
+    observations_by_driver = gap_observations_all(sorted_lap_logs, ahead=False)
     for driver_laps in sorted_lap_logs:
-        gap_by_lap = dict(calculate_gap_to_leader(driver_laps, top_time_map))
+        observations = observations_by_driver[driver_laps.get_driver().get_number()]
+        gap_by_lap = {item.lap_number: item.seconds for item in observations}
         gaps = []
         colors = []
         for i in range(1, max_lap_number + 1):
@@ -274,13 +271,35 @@ def gap_to_top_table(log: WarningLoggerLike, filepath: str, lap_logs: list[Drive
                     color=[["#f0f0f0"] * max_lap_number] + fill_colors), align='center'))],
         layout=go.Layout(autosize=True, margin=go.layout.Margin(autoexpand=True)))
 
+    fig.update_layout(meta=_gap_evidence_meta(sorted_lap_logs, observations_by_driver))
     save_plotly(fig, filepath, log, width=1920, height=1620)
+
+
+def _gap_trace(fig: go.Figure, session: Session, driver_laps: DriverLaps,
+               observations: list[GapObservation]) -> list[float]:
+    """Add one driver's gap series and return its finite gap values."""
+    driver = driver_laps.get_driver()
+    line_style = driver_linestyle(session.event.year, driver.get_number())
+    fig.add_trace(go.Scatter(
+        x=[item.lap_number for item in observations],
+        y=[item.seconds for item in observations],
+        mode="lines",
+        name=driver.get_name(),
+        line={
+            "color": fastf1.plotting.get_team_color(driver.get_team_name(), session),
+            "dash": "dash" if line_style == "dashed" else "solid",
+            "width": 1.5,
+        },
+        customdata=[[item.comparison_number, item.reason or "valid"] for item in observations],
+        hovertemplate="Lap %{x}<br>Same-lap gap %{y:.3f} s<br>Comparison car: %{customdata[0]}<br>Status: %{customdata[1]}<extra>%{fullData.name}</extra>",
+    ))
+    return [item.seconds for item in observations
+            if item.seconds is not None and isfinite(item.seconds)]
 
 
 @tracer.start_as_current_span("gap_to_ahead")
 def gap_to_ahead_graph(log: WarningLoggerLike, filepath: str, filename: str, session: Session, r: int | None,
-                       lap_logs: list[DriverLaps],
-                       position_logs: dict[int, dict[int, datetime.timedelta]]):
+                       lap_logs: list[DriverLaps]):
     """x = ラップ番号, y = 前走とのギャップのドライバーごとの推移
     Args:
         log: ロガー
@@ -289,33 +308,17 @@ def gap_to_ahead_graph(log: WarningLoggerLike, filepath: str, filename: str, ses
         session: セッション
         r: y軸の幅
         lap_logs: ドライバーごとのラップ
-        position_logs: ラップごとのポジション
     """
     ranks = driver_order(session)
+    sorted_lap_logs = result_ranked(lap_logs, ranks)
+    observations_by_driver = gap_observations_all(sorted_lap_logs, ahead=True)
 
     def make_figure(y_max: int | None) -> go.Figure:
         fig = go.Figure()
         all_gaps: list[float] = []
-        sorted_lap_logs = result_ranked(lap_logs, ranks)
         for driver_laps in sorted_lap_logs:
-            gap_series = calculate_gap_to_ahead(driver_laps, position_logs)
-            for _, gap in gap_series:
-                if gap is not None and isfinite(gap):
-                    all_gaps.append(gap)
-            driver = driver_laps.get_driver()
-            line_style = driver_linestyle(session.event.year, driver.get_number())
-            fig.add_trace(go.Scatter(
-                x=[lap_number for lap_number, _ in gap_series],
-                y=[gap for _, gap in gap_series],
-                mode="lines",
-                name=driver.get_name(),
-                line={
-                    "color": fastf1.plotting.get_team_color(driver.get_team_name(), session),
-                    "dash": "dash" if line_style == "dashed" else "solid",
-                    "width": 1.5,
-                },
-                hovertemplate="Lap %{x}<br>Gap %{y:.3f} s<extra>%{fullData.name}</extra>",
-            ))
+            observations = observations_by_driver[driver_laps.get_driver().get_number()]
+            all_gaps.extend(_gap_trace(fig, session, driver_laps, observations))
         if y_max is None and all_gaps:
             # Match the full-data domain used by the report's Y-range sliders.
             low, high = min(all_gaps), max(all_gaps)
@@ -325,7 +328,7 @@ def gap_to_ahead_graph(log: WarningLoggerLike, filepath: str, filename: str, ses
         else:
             y_range = [30 if y_max is None else y_max, 0]
         fig.update_layout(
-            title="Gap Ahead",
+            title="同ラップ前順位通過との差",
             xaxis={"title": "Lap Number", "gridcolor": "#d9d9d9"},
             yaxis={"title": "Gap (s)", "range": y_range, "gridcolor": "#d9d9d9"},
             hovermode="x unified",
@@ -353,30 +356,17 @@ def gap_to_top_graph(log: WarningLoggerLike, filepath: str, filename: str, sessi
         r: y軸の幅
         lap_logs: ドライバーごとのラップ
     """
-    top_time_map = make_top_time_map(session.laps)
     ranks = driver_order(session)
+    sorted_lap_logs = result_ranked(lap_logs, ranks)
+    observations_by_driver = gap_observations_all(sorted_lap_logs, ahead=False)
 
     def make_figure(y_max: int) -> go.Figure:
         fig = go.Figure()
-        sorted_lap_logs = result_ranked(lap_logs, ranks)
         for lap_log in sorted_lap_logs:
-            driver = lap_log.get_driver()
-            gap_series = calculate_gap_to_leader(lap_log, top_time_map)
-            line_style = driver_linestyle(session.event.year, driver.get_number())
-            fig.add_trace(go.Scatter(
-                x=[lap_number for lap_number, _ in gap_series],
-                y=[gap for _, gap in gap_series],
-                mode="lines",
-                name=driver.get_name(),
-                line={
-                    "color": fastf1.plotting.get_team_color(driver.get_team_name(), session),
-                    "dash": "dash" if line_style == "dashed" else "solid",
-                    "width": 1.5,
-                },
-                hovertemplate="Lap %{x}<br>Gap %{y:.3f} s<extra>%{fullData.name}</extra>",
-            ))
+            observations = observations_by_driver[lap_log.get_driver().get_number()]
+            _gap_trace(fig, session, lap_log, observations)
         fig.update_layout(
-            title="Gap Top",
+            title="同ラップ首位通過との差",
             xaxis={"title": "Lap Number", "gridcolor": "#d9d9d9"},
             yaxis={"title": "Gap (s)", "range": [y_max, 0], "gridcolor": "#d9d9d9"},
             hovermode="x unified",

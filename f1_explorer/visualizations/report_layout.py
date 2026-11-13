@@ -122,10 +122,10 @@ RACE_SECTIONS = (
         ("laptime by lap number", "周回別のインタラクティブなラップタイム推移"),
     )),
     LayoutSection("gap-analysis", "2. ギャップ分析", _items(
-        ("gap top graph", "首位とのギャップ推移"),
-        ("gap top table", "首位とのギャップ一覧"),
-        ("gap ahead graph", "前走車とのギャップ推移"),
-        ("gap ahead table", "前走車とのギャップ一覧"),
+        ("gap top graph", "同ラップ首位通過との差の推移"),
+        ("gap top table", "同ラップ首位通過との差の一覧"),
+        ("gap ahead graph", "同ラップ前順位通過との差の推移"),
+        ("gap ahead table", "同ラップ前順位通過との差の一覧"),
     )),
     LayoutSection("lap-pit-analysis", "3. ラップ・ピット分析", _items(
         ("laptime graph", "周回別の静的なラップタイム推移"),

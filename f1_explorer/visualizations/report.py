@@ -58,6 +58,19 @@ def current_report() -> "SessionReport | None":
     return _CURRENT_REPORT.get()
 
 
+def _figure_meta(figure_json: str) -> dict[str, Any] | None:
+    """Return the figure's layout meta dict, or None on any shape drift.
+
+    A shape drift in one figure's meta must not abort the whole report
+    write; callers then simply skip the meta-driven details block.
+    """
+    try:
+        meta = json.loads(figure_json).get("layout", {}).get("meta", {})
+    except (KeyError, TypeError, ValueError):
+        return None
+    return meta if isinstance(meta, dict) else None
+
+
 def _slug(value: str) -> str:
     value = re.sub(r"[^a-zA-Z0-9]+", "-", value.lower()).strip("-")
     return value or "figure"
@@ -303,6 +316,23 @@ class SessionReport:
                 figure_json = item.figure_json
                 if figure_json is not None:
                     is_long_run_selection = '"f1ExplorerKind":"longRunSelection"' in figure_json
+                    if '"gapEvidence":' in figure_json:
+                        # A shape drift in the meta must not abort the report
+                        # write; render no evidence table when it is not a
+                        # list of record objects.
+                        meta = _figure_meta(figure_json)
+                        evidence = meta.get("gapEvidence") if meta is not None else None
+                        if isinstance(evidence, list):
+                            body.append('<details><summary>同ラップ通過差の比較車番・欠測理由</summary>'
+                                        '<p>路上の直前車ではありません。上流の通過欠落を検出できない場合があります。</p>'
+                                        '<table><tr><th>車番</th><th>実ラップ</th><th>比較車番</th><th>理由</th></tr>')
+                            for row in evidence:
+                                if not isinstance(row, dict):
+                                    continue
+                                body.append("<tr>" + "".join(
+                                    "<td>" + escape(str(row.get(key) if row.get(key) is not None else "不明")) + "</td>"
+                                    for key in ("driver", "lap", "comparison", "reason")) + "</tr>")
+                            body.append("</table></details>")
                     data_id = f"figure-data-{_slug(item.anchor)}"
                     safe_json = figure_json.replace("<", "\\u003c") if figure_json else "{}"
                     is_table = '"type":"table"' in figure_json
@@ -316,15 +346,10 @@ class SessionReport:
                     if is_speed_chart:
                         body.append('''<div class="speed-rules"><strong>速度ラベルの見方</strong><p>太字は、計測地点で前走車が0秒超〜2.000秒以内にいたことを示します。スリップストリームによる速度向上の可能性を示すもので、因果関係を確定するものではありません。<code>SpeedST</code>はFastF1のデータに正確な計測位置・時刻がないため、太字判定の対象外です。Q-02の「トウあり」は太字、「トウなし」は通常表示です。ギャップ不明時も通常表示です。</p></div>''')
                     if is_long_run_selection:
-                        # A shape drift in one figure's meta must not abort the
-                        # whole report write; skip the card's details instead.
-                        try:
-                            meta = json.loads(figure_json).get("layout", {}).get("meta", {})
-                            records = meta.get("longRunSelection") if isinstance(meta, dict) else None
-                            if isinstance(records, list):
-                                body.append(selection_details(records))
-                        except (KeyError, TypeError, ValueError):
-                            pass
+                        meta = _figure_meta(figure_json)
+                        records = meta.get("longRunSelection") if meta is not None else None
+                        if isinstance(records, list):
+                            body.append(selection_details(records))
                     body.append(
                         f'<div class="plotly-container{kind}" data-plotly-source="{escape(data_id)}" '
                         f'data-report-section="{escape(item.section)}"></div>'

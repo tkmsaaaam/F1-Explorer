@@ -23,18 +23,14 @@ from f1_explorer.visualizations.race import (
     gap_to_top_table,
     laptime,
     make_driver_laps_set,
-    make_lap_start_by_position_by_number,
-    make_top_time_map,
     positions,
     tyres,
     write_messages,
     write_track_status,
 )
 from f1_explorer.visualizations.race_metrics import (
-    gap_to_ahead,
-    gap_to_leader,
+    gap_observations,
     lap_times_by_position,
-    top_time_map,
 )
 
 
@@ -56,14 +52,9 @@ class Race(unittest.TestCase):
         late_start = self._driver_laps(6, "LATE", {3: (5, 250), 4: (5, 330)})
         empty = DriverLaps(Driver(5, "EMPTY", "Team EMPTY"), {})
         lap_logs = [leader, runner, dnf, hole, late_start, empty]
-        position_logs = lap_times_by_position(lap_logs)
         session = SimpleNamespace(laps=MagicMock())
-        top_times = top_time_map(lap_logs)
-        with (
-            patch("f1_explorer.visualizations.race.make_top_time_map", return_value=top_times),
-            patch("f1_explorer.visualizations.race.save_plotly") as save,
-        ):
-            gap_to_ahead_table(MagicMock(), "ahead.png", lap_logs, position_logs)
+        with patch("f1_explorer.visualizations.race.save_plotly") as save:
+            gap_to_ahead_table(MagicMock(), "ahead.png", lap_logs)
             ahead_fig = save.call_args.args[0]
             gap_to_top_table(MagicMock(), "top.png", lap_logs, session)
             top_fig = save.call_args.args[0]
@@ -92,6 +83,16 @@ class Race(unittest.TestCase):
         self.assertEqual("#ffffff", ahead_colors["RUNNER"][3])
         self.assertEqual("#e95464", top_colors["HOLE"][0])
 
+        # The report's evidence table consumes layout.meta.gapEvidence; pin
+        # the race.py → report.py contract on real table output.
+        ahead_evidence = ahead_fig.layout.meta["gapEvidence"]
+        self.assertIn({"driver": "1", "lap": 1, "comparison": None, "reason": "no_preceding_position"},
+                      ahead_evidence)
+        self.assertIn({"driver": "2", "lap": 1, "comparison": 1, "reason": "valid"},
+                      ahead_evidence)
+        top_evidence = top_fig.layout.meta["gapEvidence"]
+        self.assertIn({"driver": "1", "lap": 1, "comparison": 1, "reason": "valid"}, top_evidence)
+
         for fig in (ahead_fig, top_fig):
             for column in fig.data[0].cells.values:
                 self.assertEqual(4, len(column))
@@ -107,11 +108,10 @@ class Race(unittest.TestCase):
         session.event = SimpleNamespace(year=2026)
         nonempty = [driver for driver in lap_logs if driver.laps]
         with (
-            patch("f1_explorer.visualizations.race.make_top_time_map", return_value=top_times),
             patch("f1_explorer.visualizations.race.fastf1.plotting.get_team_color", return_value="#123456"),
             patch("f1_explorer.visualizations.race.save_plotly") as save,
         ):
-            gap_to_ahead_graph(MagicMock(), "output", "ahead", session, None, nonempty, position_logs)
+            gap_to_ahead_graph(MagicMock(), "output", "ahead", session, None, nonempty)
             ahead_graph = save.call_args.args[0]
             gap_to_top_graph(MagicMock(), "output", "top", session, None, nonempty)
             top_graph = save.call_args.args[0]
@@ -122,11 +122,8 @@ class Race(unittest.TestCase):
 
     def test_gap_tables_handle_only_empty_drivers(self):
         empty = DriverLaps(Driver(1, "EMPTY", "Team"), {})
-        with (
-            patch("f1_explorer.visualizations.race.make_top_time_map", return_value={}),
-            patch("f1_explorer.visualizations.race.save_plotly") as save,
-        ):
-            gap_to_ahead_table(MagicMock(), "ahead.png", [empty], {})
+        with patch("f1_explorer.visualizations.race.save_plotly") as save:
+            gap_to_ahead_table(MagicMock(), "ahead.png", [empty])
             ahead = save.call_args.args[0]
             gap_to_top_table(MagicMock(), "top.png", [empty], SimpleNamespace(laps=None))
             top = save.call_args.args[0]
@@ -136,7 +133,7 @@ class Race(unittest.TestCase):
 
     def test_gap_tables_handle_no_drivers(self):
         with patch("f1_explorer.visualizations.race.save_plotly") as save:
-            gap_to_ahead_table(MagicMock(), "ahead.png", [], {})
+            gap_to_ahead_table(MagicMock(), "ahead.png", [])
             ahead = save.call_args.args[0]
             gap_to_top_table(MagicMock(), "top.png", [], SimpleNamespace(laps=MagicMock()))
             top = save.call_args.args[0]
@@ -211,28 +208,6 @@ class Race(unittest.TestCase):
         self.assertEqual(True, result_sorted[0].get_laps()[1].get_tyre().get_new())
         self.assertEqual('Soft', result_sorted[0].get_laps()[1].get_tyre().get_compound())
 
-    def test_make_lap_start_by_position_by_number(self):
-        data = {
-            "DriverNumber": ["1", "1", "16", "16"],
-            "Driver": ["Max", "Max", "Lec", "Lec"],
-            "Stint": [1, 1, 1, 1],
-            "Team": ["Red Bull", "Red Bull", "Ferrari", "Ferrari"],
-            "LapNumber": [1, 2, 1, 2],
-            "Position": [1, 1, 2, 2],
-            "Compound": ["Soft", "Soft", "Soft", "Soft"],
-            "FreshTyre": [True, True, True, True],
-            "PitOutTime": pandas.to_datetime(["", "", "", ""]),
-            "Time": pandas.to_timedelta(["83s", "166s", "84s", "167s"]),
-            "LapTime": pandas.to_timedelta(["83.456s", "82.789s", "84.000s", "83.000s"]),
-        }
-        laps = Laps(pandas.DataFrame(data))
-        result = make_lap_start_by_position_by_number(laps)
-        self.assertEqual(2, len(result))
-        self.assertEqual(timedelta(seconds=83), result[1][1])
-        self.assertEqual(timedelta(seconds=84), result[1][2])
-        self.assertEqual(timedelta(seconds=166), result[2][1])
-        self.assertEqual(timedelta(seconds=167), result[2][2])
-
     def test_make_lap_log_marks_only_laps_with_pit_out_time(self):
         data = {
             "DriverNumber": ["1"], "Driver": ["Max"], "Stint": [2], "Team": ["Red Bull"],
@@ -292,8 +267,9 @@ class Race(unittest.TestCase):
 
         positions = lap_times_by_position(result)
         self.assertEqual({1: 83.0, 2: 84.0}, {p: t.total_seconds() for p, t in positions[1].items()})
-        self.assertEqual([(1, 1.0)], gap_to_ahead(result[1], positions))
-        self.assertEqual([(1, 1.0)], gap_to_leader(result[1], top_time_map(result)))
+        observation = gap_observations(result[1], result, ahead=True)[0]
+        self.assertEqual((1.0, 1, None),
+                         (observation.seconds, observation.comparison_number, observation.reason))
 
     def test_make_lap_log_keeps_lap_missing_session_time_only(self):
         """A lap missing only its session-elapsed time keeps its position."""
@@ -317,8 +293,8 @@ class Race(unittest.TestCase):
 
         # Without a session-elapsed time the lap provides no gap value,
         # and none is fabricated in its place.
-        self.assertEqual([(1, None)], gap_to_ahead(result[1], lap_times_by_position(result)))
-        self.assertEqual([(1, None)], gap_to_leader(result[1], top_time_map(result)))
+        self.assertEqual("missing_own_record",
+                         gap_observations(result[1], result, ahead=True)[0].reason)
 
     def test_make_lap_log_rejects_unrankable_positions(self):
         laps = Laps(pandas.DataFrame({
@@ -338,8 +314,8 @@ class Race(unittest.TestCase):
         self.assertIsNone(result[0].laps[1].get_position())
         self.assertEqual(1, result[0].laps[2].get_position())
         self.assertIsNone(result[0].laps[3].get_position())
-        self.assertEqual([(1, None), (2, None), (3, None)],
-                         gap_to_ahead(result[0], lap_times_by_position(result)))
+        reasons = [item.reason for item in gap_observations(result[0], result, ahead=True)]
+        self.assertEqual(["missing_own_record", "no_preceding_position", "missing_own_record"], reasons)
 
     def test_laptime_graph_keeps_original_complete_lap_target(self):
         """R-07 keeps plotting only fully recorded laps, even when the
@@ -457,11 +433,10 @@ class Race(unittest.TestCase):
         ]
         session = SimpleNamespace(event=SimpleNamespace(year=2026), laps=MagicMock())
         with (
-            patch("f1_explorer.visualizations.race.make_top_time_map", return_value={}),
             patch("f1_explorer.visualizations.race.fastf1.plotting.get_team_color", return_value="#123456"),
             patch("f1_explorer.visualizations.race.save_plotly") as save,
         ):
-            gap_to_ahead_graph(MagicMock(), "output", "ahead", session, None, lap_logs, {})
+            gap_to_ahead_graph(MagicMock(), "output", "ahead", session, None, lap_logs)
             ahead = save.call_args.args[0]
             gap_to_top_graph(MagicMock(), "output", "top", session, None, lap_logs)
             top = save.call_args.args[0]
@@ -470,26 +445,6 @@ class Race(unittest.TestCase):
         self.assertEqual([None, None], list(ahead.data[0].y))
         self.assertEqual(["FIRST"], [trace.name for trace in top.data])
         self.assertEqual([None, None], list(top.data[0].y))
-
-    def test_make_top_time_map(self):
-        data = {
-            "DriverNumber": ["1", "1", "16", "16"],
-            "Driver": ["Max", "Max", "Lec", "Lec"],
-            "Stint": [1, 1, 1, 1],
-            "Team": ["Red Bull", "Red Bull", "Ferrari", "Ferrari"],
-            "LapNumber": [1, 2, 1, 2],
-            "Position": [1, 1, 2, 2],
-            "Compound": ["Soft", "Soft", "Soft", "Soft"],
-            "FreshTyre": [True, True, True, True],
-            "PitOutTime": pandas.to_datetime(["", "", "", ""]),
-            "Time": pandas.to_timedelta(["83s", "166s", "84s", "167s"]),
-            "LapTime": pandas.to_timedelta(["83.456s", "82.789s", "84.000s", "83.000s"]),
-        }
-        laps = Laps(pandas.DataFrame(data))
-        result = make_top_time_map(laps)
-        self.assertEqual(2, len(result))
-        self.assertEqual(timedelta(seconds=83), result[1])
-        self.assertEqual(timedelta(seconds=166), result[2])
 
     def test_tyre_chart_marks_stint_changes_and_labels_age_and_condition(self):
         laps = Laps(pandas.DataFrame({
@@ -526,15 +481,15 @@ class Race(unittest.TestCase):
             results=pandas.DataFrame({"DriverNumber": ["1", "2"], "Position": [5, 1]}),
         )
 
+        observations = [SimpleNamespace(lap_number=n, seconds=v, comparison_number=1, reason=None)
+                        for n, v in [(1, None), (2, 1.25), (3, 3.25)]]
         with (
-            patch(
-                "f1_explorer.visualizations.race.calculate_gap_to_ahead",
-                return_value=[(1, None), (2, 1.25), (3, 3.25)],
-            ),
+            patch("f1_explorer.visualizations.race.gap_observations_all",
+                  return_value={1: observations, 2: observations}),
             patch("f1_explorer.visualizations.race.fastf1.plotting.get_team_color", return_value="#123456"),
             patch("f1_explorer.visualizations.race.save_plotly") as save,
         ):
-            gap_to_ahead_graph(MagicMock(), "output", "gap_ahead_graph", session, 15, lap_logs, {})
+            gap_to_ahead_graph(MagicMock(), "output", "gap_ahead_graph", session, 15, lap_logs)
 
         self.assertEqual(2, save.call_count)
         default_figure = save.call_args_list[0].args[0]
@@ -571,15 +526,12 @@ class Race(unittest.TestCase):
                             if not results.empty else
                             ["NORESULT", "TIE10", "DNF", "TIE3", "UNTIMED"])
                 with (
-                    patch("f1_explorer.visualizations.race.make_top_time_map", return_value=top_time_map(lap_logs)),
                     patch("f1_explorer.visualizations.race.fastf1.plotting.get_team_color", return_value="#123456"),
                     patch("f1_explorer.visualizations.race.save_plotly") as save,
                 ):
-                    positions = lap_times_by_position(lap_logs)
-                    gap_to_ahead_table(MagicMock(), "ahead.png", lap_logs, positions,
-                                       ranks=driver_order(session))
+                    gap_to_ahead_table(MagicMock(), "ahead.png", lap_logs, ranks=driver_order(session))
                     gap_to_top_table(MagicMock(), "top.png", lap_logs, session)
-                    gap_to_ahead_graph(MagicMock(), "output", "ahead", session, 15, lap_logs, positions)
+                    gap_to_ahead_graph(MagicMock(), "output", "ahead", session, 15, lap_logs)
                     gap_to_top_graph(MagicMock(), "output", "top", session, 30, lap_logs)
                 figures = [call.args[0] for call in save.call_args_list]
                 for figure in figures[:2]:
@@ -592,7 +544,7 @@ class Race(unittest.TestCase):
             laps=pandas.DataFrame(),
             results=pandas.DataFrame({"DriverNumber": ["2", "1"], "Position": [1, 5]}),
         )
-        functions = ("make_driver_laps_set", "make_lap_start_by_position_by_number", "laptime",
+        functions = ("make_driver_laps_set", "laptime",
                      "gap_to_ahead_table", "gap_to_top_table", "gap_to_ahead_graph", "gap_to_top_graph",
                      "positions", "speed_first_10s", "speed_until_turn1", "tyres",
                      "write_messages", "write_track_status")
@@ -606,18 +558,17 @@ class Race(unittest.TestCase):
         logs = [self._driver_laps(2, "SECOND", {1: (1, 80)}),
                 self._driver_laps(10, "TENTH", {1: (2, 82)})]
         with patch("f1_explorer.visualizations.race.save_plotly") as save:
-            gap_to_ahead_table(MagicMock(), "ahead.png", logs, lap_times_by_position(logs))
+            gap_to_ahead_table(MagicMock(), "ahead.png", logs)
         self.assertEqual(["Lap", "TENTH", "SECOND"], list(save.call_args.args[0].data[0].header.values))
 
     def test_gap_top_graph_is_plotly_and_keeps_zero_at_top(self):
-        leader_lap = MagicMock()
-        leader_lap.get_position.return_value = 1
-        lap_logs = [DriverLaps(Driver(1, "FIRST", "Team A"), {1: leader_lap})]
+        lap_logs = [DriverLaps(Driver(1, "FIRST", "Team A"), {1: MagicMock()})]
         session = SimpleNamespace(event=SimpleNamespace(year=2026), laps=MagicMock())
 
         with (
-            patch("f1_explorer.visualizations.race.make_top_time_map", return_value={}),
-            patch("f1_explorer.visualizations.race.calculate_gap_to_leader", return_value=[(1, 0.0)]),
+            patch("f1_explorer.visualizations.race.gap_observations_all",
+                  return_value={1: [SimpleNamespace(lap_number=1, seconds=0.0,
+                                                    comparison_number=1, reason=None)]}),
             patch("f1_explorer.visualizations.race.fastf1.plotting.get_team_color", return_value="#123456"),
             patch("f1_explorer.visualizations.race.save_plotly") as save,
         ):

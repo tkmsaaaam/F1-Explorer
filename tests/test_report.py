@@ -370,6 +370,21 @@ class SessionReportTest(unittest.TestCase):
         self.assertIn("燃料・路面進化の補正なし", html)
         self.assertIn("トラフィックはタイム差による推定", html)
 
+    def test_gap_evidence_is_escaped_and_stays_in_existing_table_card(self):
+        with TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            figure = go.Figure(go.Table(header={"values": ["Lap", "D"]},
+                                        cells={"values": [[1], ["---"]]}))
+            figure.update_layout(meta={"gapEvidence": [
+                {"driver": "<driver>", "lap": 1, "comparison": None, "reason": "ambiguous_comparison"}]})
+            with SessionReport(SimpleNamespace(name="Sprint"), root) as report:
+                report.register_plotly(figure, root / "gap_ahead_table.png")
+                html = report.write().read_text()
+        self.assertIn("同ラップ通過差の比較車番・欠測理由", html)
+        self.assertIn("&lt;driver&gt;", html)
+        self.assertNotIn("<driver>", html)
+        self.assertIn("ambiguous_comparison", html)
+
 
 if __name__ == "__main__":
     unittest.main()
