@@ -385,6 +385,16 @@ class SessionReportTest(unittest.TestCase):
         self.assertNotIn("<driver>", html)
         self.assertIn("ambiguous_comparison", html)
 
+    def test_segment_timing_note_is_visible_and_escaped(self):
+        with TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            figure = go.Figure(go.Table(header={"values": ["segment"]}, cells={"values": [[1]]}))
+            figure.update_layout(meta={"segmentTimingNote": "補間推定値 <精度保証なし>"})
+            with SessionReport(SimpleNamespace(name="Practice 1"), root) as report:
+                report.register_plotly(figure, root / "corners_durations.png")
+                html = report.write().read_text()
+        self.assertIn('<p class="segment-timing-note">補間推定値 &lt;精度保証なし&gt;</p>', html)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -2,17 +2,23 @@
 import json
 from unittest.mock import MagicMock, patch
 
+import numpy as np
 import pandas as pd
 import pytest
 
 from f1_explorer.visualizations import segment_analysis
+from f1_explorer.visualizations.segment_metrics import (
+    interpolate_boundary_times,
+    rank_segment_durations,
+    segment_durations,
+)
 
 
 def _session(*, no_reference=False):
     samples = pd.DataFrame({
-        # Duplicate distance and an exactly matching boundary test strict <.
-        'Distance': [0.0, 50.0, 50.0, 100.0, 150.0, float('nan')],
-        'Time': pd.to_timedelta([0, 1, 2, 3, 4, None], unit='s'),
+        # Ordered raw observations include exact matches and out-of-range boundaries.
+        'Distance': [0.0, 50.0, 100.0, 150.0],
+        'Time': pd.to_timedelta([0, 1, 2, 3], unit='s'),
     })
     empty = samples.iloc[0:0].copy()
     laps = {}
@@ -74,10 +80,10 @@ def test_shared_samples_match_standalone_tables_and_reduce_reads(no_reference):
     duration = shared[0][1]['data'][0]['cells']['values']
     # Column order comes from personal fastest laps, independent of mapping insertion order.
     assert shared[0][1]['data'][0]['header']['values'][3:] == ['D1', 'D2', 'D3']
-    assert duration[3] == [None, 2.0, 2.0]
+    assert duration[3] == [1.0, 1.0, None]
     assert duration[5] == [None, None, None]
     ranks = shared[1][1]['data'][0]['cells']['values']
-    assert ranks[2] == ranks[3] == [None, 1, 1]
+    assert ranks[2] == ranks[3] == [1, 1, None]
 
 
 def test_empty_mapping_does_not_fetch_missing_drivers():
@@ -98,11 +104,11 @@ def test_slow_driver_remains_in_all_three_tables_with_measured_values():
         table = figure['data'][0]
         assert table['header']['values'][-3:] == ['D1', 'D2', 'D3']
         if path == 'corners_durations.png':
-            assert table['cells']['values'][-1] == [None, 4., 4.]
+            assert table['cells']['values'][-1] == [2., 2., None]
         elif path == 'corners_ranks.png':
-            assert table['cells']['values'][-1] == [None, 3, 3]
+            assert table['cells']['values'][-1] == [3, 3, None]
         elif path == 'corners_gaps_to_best.png':
-            assert table['cells']['values'][-1] == [None, 2., 2.]
+            assert table['cells']['values'][-1] == [1., 1., None]
 
 
 def test_table_columns_break_equal_lap_time_ties_by_driver_number_text():
@@ -141,3 +147,96 @@ def test_no_valid_fastest_laps_produce_no_driver_columns():
     for _, figure in _tables(session):
         headers = figure['data'][0]['header']['values']
         assert headers in (['segment', 'distance', 'corners'], ['segment', 'distance'])
+
+
+def test_interpolation_recovers_known_speed_and_ranking():
+    durations = {}
+    for driver, speed, start, step in [('A', 50, 0, 60), ('B', 49.5, 3, 20)]:
+        distance = np.arange(start, 304, step, dtype=float)
+        data = pd.DataFrame({'Distance': distance, 'Time': pd.to_timedelta(distance / speed, unit='s')})
+        durations[driver] = segment_durations(segment_analysis.segment_boundary_times(data, [0, 100, 200, 300]))
+    assert durations['A'] == pytest.approx([2, 2, 2])
+    assert durations['B'][0] is None
+    assert durations['B'][1:] == pytest.approx([100 / 49.5] * 2)
+    assert rank_segment_durations(durations)['A'][1] == 1
+
+
+@pytest.mark.parametrize('model', ['constant', 'accelerating', 'decelerating'])
+@pytest.mark.parametrize('step', [5, 20, 60])
+@pytest.mark.parametrize('offset', [0, 3])
+def test_interpolation_matches_aud12_analytic_fixtures(model, step, offset):
+    functions = {
+        'constant': lambda x: x / 50,
+        'accelerating': lambda x: (np.sqrt(100 + 4 * x) - 10) / 2,
+        'decelerating': lambda x: 10 - np.sqrt(100 - x / 4),
+    }
+    distance = np.arange(offset, 301, step, dtype=float)
+    times = functions[model](distance)
+    boundaries = np.array([0, 100, 200, 300], dtype=float)
+    data = pd.DataFrame({'Distance': distance, 'Time': pd.to_timedelta(times, unit='s')})
+    original = data.copy(deep=True)
+    actual = segment_analysis.segment_boundary_times(data, boundaries)
+    # The analytic truth values are the only oracle; the interpolation
+    # residual grows with sample spacing, so the tolerance scales with it.
+    truth = functions[model](boundaries)
+    # The interpolation residual grows with sample spacing (measured AUD-12
+    # worst case: ~0.082 at the coarsest grid); the tolerance scales with it.
+    tolerance = 0.1 * 60 / step
+    for i, boundary in enumerate(boundaries):
+        if distance[0] <= boundary <= distance[-1]:
+            assert actual[i] == pytest.approx(truth[i], abs=tolerance)
+        else:
+            assert actual[i] is None
+    if offset == 0:
+        assert actual[0] == 0
+    pd.testing.assert_frame_equal(data, original)
+
+
+@pytest.mark.parametrize('distance,times', [
+    ([], []), ([0], [0]), ([0, 20, 10], [0, 1, 2]),
+    ([0, 20, 20], [0, 1, 2]), ([0, float('nan'), 20], [0, 1, 2]),
+    ([0, float('inf'), 20], [0, 1, 2]), ([0, 10, 20], [0, None, 2]),
+    ([0, 10, 20], [0, 2, 1]),
+])
+def test_invalid_series_is_missing_without_repair(distance, times):
+    data = pd.DataFrame({'Distance': distance, 'Time': pd.to_timedelta(times, unit='s')})
+    assert segment_analysis.segment_boundary_times(data, [0, 10, 20]) == [None] * 3
+    session, _ = _session()
+    for _, figure in _tables(session, car_data_by_driver={'1': data}):
+        assert all(v is None for v in figure['data'][0]['cells']['values'][
+            figure['data'][0]['header']['values'].index('D1')])
+
+
+def test_endpoint_matches_and_outside_boundaries_do_not_extrapolate():
+    data = pd.DataFrame({'Distance': [10, 20], 'Time': pd.to_timedelta([1, 2], unit='s')})
+    assert segment_analysis.segment_boundary_times(data, [0, 10, 15, 20, 30, float('nan')]) == [
+        None, 1, 1.5, 2, None, None]
+    # Equal timestamps are allowed; time must not decrease.
+    data['Time'] = pd.to_timedelta([1, 1], unit='s')
+    assert segment_analysis.segment_boundary_times(data, [10, 15, 20]) == [1, 1, 1]
+
+
+def test_table_ranks_and_deltas_use_unrounded_durations_and_include_note():
+    session, _ = _session()
+    samples = {number: pd.DataFrame({'Distance': [0, 50, 100, 200],
+                                   'Time': pd.to_timedelta([0, seconds, 2 * seconds, 4 * seconds], unit='s')})
+               for number, seconds in [('1', 1.0004), ('2', 1.0001)]}
+    tables = dict(_tables(session, car_data_by_driver=samples))
+    for figure in tables.values():
+        assert 'ミリ秒精度を保証しません' in figure['layout']['meta']['segmentTimingNote']
+    assert tables['corners_durations.png']['data'][0]['cells']['values'][3][:2] == [1, 1]
+    assert tables['corners_ranks.png']['data'][0]['cells']['values'][2][:2] == [2, 2]
+    assert tables['corners_ranks.png']['data'][0]['cells']['values'][3][:2] == [1, 1]
+    # Round after subtracting: round(1.0006 - 1.0004, 3) differs from subtracting rounded values.
+    samples['2']['Time'] = pd.to_timedelta([0, 1.0006, 2.0012, 4.0024], unit='s')
+    gaps = dict(_tables(session, car_data_by_driver=samples))['corners_gaps_to_best.png']
+    assert gaps['data'][0]['cells']['values'][4][0] == 0.0
+
+
+def test_interpolate_boundary_times_policy_holds_without_pandas():
+    assert interpolate_boundary_times([0, 10], [0, 2], [5, 10, 20, float('nan')]) == [1, 2, None, None]
+    assert interpolate_boundary_times([0, 10, 10], [0, 1, 2], [5]) == [None]  # duplicate distance
+    assert interpolate_boundary_times([0, 10], [2, 0], [5]) == [None]  # decreasing time
+    assert interpolate_boundary_times([0, 10], [0, 2], [5]) == [1]  # equal times stay valid
+    assert interpolate_boundary_times([0], [0], [5]) == [None]  # single sample
+    assert interpolate_boundary_times([0, 10], [0], [5]) == [None]  # mismatched lengths

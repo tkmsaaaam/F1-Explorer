@@ -4,7 +4,7 @@ The plotting code deals in cumulative timestamps (one value at each segment
 boundary), while a segment table needs one duration per pair of boundaries.
 The functions in this module intentionally know nothing about FastF1,
 pandas, or Plotly so they can be used and tested with ordinary mappings and
-sequences.
+sequences; numpy is the one allowed array helper.
 """
 
 from __future__ import annotations
@@ -12,6 +12,8 @@ from __future__ import annotations
 import math
 from collections.abc import Hashable, Mapping, Sequence
 from typing import TypeVar, overload
+
+import numpy as np
 
 
 Driver = TypeVar("Driver", bound=Hashable)
@@ -22,6 +24,7 @@ __all__ = [
     "segment_durations",
     "rank_segment_durations",
     "deltas_to_reference",
+    "interpolate_boundary_times",
     "derive_segment_durations",
     "compute_segment_durations",
     "delta_to_reference",
@@ -179,3 +182,32 @@ def deltas_to_reference(
 derive_segment_durations = segment_durations
 compute_segment_durations = segment_durations
 delta_to_reference = deltas_to_reference
+
+
+def interpolate_boundary_times(
+    distances: Sequence[float],
+    times: Sequence[float],
+    boundaries: Sequence[float],
+) -> list[float | None]:
+    """Interpolate elapsed seconds at boundaries inside ordered observations.
+
+    Reject the whole series on missing/nonfinite data, duplicate or
+    decreasing distance, or decreasing time. Do not sort, drop samples, or
+    extrapolate: boundaries outside ``[distances[0], distances[-1]]`` are
+    ``None``. At least two samples are needed, including for exact endpoint
+    matches. Equal times are allowed; equal distances are not.
+    """
+    missing = [None] * len(boundaries)
+    if len(distances) < 2 or len(distances) != len(times):
+        return missing
+    sample_distances = np.array(distances, dtype=float)
+    sample_times = np.array(times, dtype=float)
+    if (not np.all(np.isfinite(sample_distances)) or not np.all(np.isfinite(sample_times))
+            or np.any(np.diff(sample_distances) <= 0) or np.any(np.diff(sample_times) < 0)):
+        return missing
+    return [
+        float(np.interp(distance, sample_distances, sample_times))
+        if math.isfinite(distance) and sample_distances[0] <= distance <= sample_distances[-1]
+        else None
+        for distance in boundaries
+    ]

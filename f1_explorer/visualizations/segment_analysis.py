@@ -15,7 +15,12 @@ from opentelemetry import trace
 from f1_explorer.circuit import circuit_info_or_none
 from f1_explorer.scalars import as_float, as_seconds
 from f1_explorer.visualizations.output import resolve_output_dir, save_matplotlib, save_plotly_batch
-from f1_explorer.visualizations.segment_metrics import deltas_to_reference, rank_segment_durations, segment_durations
+from f1_explorer.visualizations.segment_metrics import (
+    deltas_to_reference,
+    interpolate_boundary_times,
+    rank_segment_durations,
+    segment_durations,
+)
 from f1_explorer.visualizations.lap_selection import fastest_laps_by_driver
 from f1_explorer.separator_estimator import SeparatorBoundary, coerce_separator_boundary
 from f1_explorer.telemetry import lap_telemetry_without_driver_ahead
@@ -100,6 +105,38 @@ def prepare_segment_car_data(session: Session) -> dict[str, Telemetry]:
     return samples
 
 
+_SEGMENT_TIMING_NOTE_LINES = (
+    "区間時間はテレメトリーの線形補間による推定値です。観測範囲外・異常系列は欠測とします。",
+    "時間・差の小数3桁は表示形式であり、ミリ秒精度を保証しません。順位・差は丸め前の値で計算します。",
+    "境界位置の推定誤差とサンプル補間の誤差は別です。",
+)
+# The HTML note and the in-figure annotation need different line breaks, so
+# both renderings are derived from one explicit list instead of substring
+# surgery on a single string.
+SEGMENT_TIMING_NOTE = "".join(_SEGMENT_TIMING_NOTE_LINES)
+SEGMENT_TIMING_NOTE_TEXT = "<br>".join(_SEGMENT_TIMING_NOTE_LINES)
+
+
+def segment_boundary_times(
+        car_data: Telemetry | pandas.DataFrame, boundaries: Sequence[float],
+) -> list[float | None]:
+    """Convert raw-car samples and interpolate elapsed seconds at boundaries.
+
+    Numeric validation and interpolation live in
+    :func:`segment_metrics.interpolate_boundary_times`; this adapter only
+    reads the columns and rejects unusable ones as all-missing.
+    """
+    missing = [None] * len(boundaries)
+    if len(car_data) < 2 or "Distance" not in car_data or "Time" not in car_data:
+        return missing
+    try:
+        distances = [as_float(value) for value in car_data["Distance"]]
+        times = [as_seconds(value) for value in car_data["Time"]]
+    except (TypeError, ValueError, OverflowError):
+        return missing
+    return interpolate_boundary_times(distances, times, boundaries)
+
+
 def _segment_descriptor_rows(segment_boundaries: list[float], circuit: CircuitInfo) -> list[list[Any]]:
     """Per-segment [name, distance, corner numbers] prefixes shared by the tables."""
     corners_df = circuit.corners
@@ -144,7 +181,7 @@ def _driver_value_rows(
 
 
 def _segment_table(headers: list[Any], rows: list[list[Any]], row_colors: list[str]) -> go.Figure:
-    return go.Figure(data=[go.Table(
+    figure = go.Figure(data=[go.Table(
         header=go.table.Header(
             values=headers,
             fill=go.table.header.Fill(color='lightgrey'),
@@ -157,6 +194,13 @@ def _segment_table(headers: list[Any], rows: list[list[Any]], row_colors: list[s
             align='center',
         ),
     )])
+    figure.update_layout(meta={"segmentTimingNote": SEGMENT_TIMING_NOTE}, margin={"b": 120})
+    figure.add_annotation(
+        text=SEGMENT_TIMING_NOTE_TEXT,
+        x=0, y=-0.04, xref="paper", yref="paper", xanchor="left", yanchor="top",
+        showarrow=False, align="left", font={"size": 13},
+    )
+    return figure
 
 
 @tracer.start_as_current_span("compute_and_save_segment_tables_plotly")
@@ -192,13 +236,13 @@ def compute_and_save_segment_tables_plotly(
             car_data_by_driver = prepare_segment_car_data(session)
         for driver_number in drivers:
             car_data = car_data_by_driver.get(driver_number)
-            if car_data is None:
+            if car_data is None or "Distance" not in car_data or "Time" not in car_data:
                 continue
-            if "Distance" not in car_data or "Time" not in car_data:
-                continue
-            driver_times[driver_number] = [
-                None if (last_point := car_data[car_data.Distance < dist]).empty else
-                last_point.iloc[-1].Time.total_seconds() for dist in segment_boundaries]
+            driver_times[driver_number] = segment_boundary_times(car_data, segment_boundaries)
+            if all(value is None for value in driver_times[driver_number]):
+                # Whole-series rejection or no boundary in range must not be
+                # indistinguishable from a silently dropped driver.
+                log.warning(f"Segment boundary times unavailable for driver {driver_number}.")
 
     circuit = circuit_info_or_none(session, log)
     if circuit is None:
@@ -255,7 +299,7 @@ def compute_and_save_segment_tables_plotly(
         return
     best_driver_number = str(best.DriverNumber)
     best_durations = durations_by_driver.get(best_driver_number)
-    if not best_durations:
+    if not best_durations or all(value is None for value in best_durations):
         log.warning("Fastest lap driver has insufficient segment data.")
         save_tables()
         return

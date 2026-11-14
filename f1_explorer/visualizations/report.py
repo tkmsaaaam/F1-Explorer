@@ -316,23 +316,24 @@ class SessionReport:
                 figure_json = item.figure_json
                 if figure_json is not None:
                     is_long_run_selection = '"f1ExplorerKind":"longRunSelection"' in figure_json
-                    if '"gapEvidence":' in figure_json:
-                        # A shape drift in the meta must not abort the report
-                        # write; render no evidence table when it is not a
-                        # list of record objects.
-                        meta = _figure_meta(figure_json)
-                        evidence = meta.get("gapEvidence") if meta is not None else None
-                        if isinstance(evidence, list):
-                            body.append('<details><summary>同ラップ通過差の比較車番・欠測理由</summary>'
-                                        '<p>路上の直前車ではありません。上流の通過欠落を検出できない場合があります。</p>'
-                                        '<table><tr><th>車番</th><th>実ラップ</th><th>比較車番</th><th>理由</th></tr>')
-                            for row in evidence:
-                                if not isinstance(row, dict):
-                                    continue
-                                body.append("<tr>" + "".join(
-                                    "<td>" + escape(str(row.get(key) if row.get(key) is not None else "不明")) + "</td>"
-                                    for key in ("driver", "lap", "comparison", "reason")) + "</tr>")
-                            body.append("</table></details>")
+                    # Parse the layout meta once for all meta-driven blocks;
+                    # a shape drift yields None and each block simply skips.
+                    meta = _figure_meta(figure_json)
+                    timing_note = meta.get("segmentTimingNote") if meta is not None else None
+                    if isinstance(timing_note, str):
+                        body.append(f'<p class="segment-timing-note">{escape(timing_note)}</p>')
+                    evidence = meta.get("gapEvidence") if meta is not None else None
+                    if isinstance(evidence, list):
+                        body.append('<details><summary>同ラップ通過差の比較車番・欠測理由</summary>'
+                                    '<p>路上の直前車ではありません。上流の通過欠落を検出できない場合があります。</p>'
+                                    '<table><tr><th>車番</th><th>実ラップ</th><th>比較車番</th><th>理由</th></tr>')
+                        for row in evidence:
+                            if not isinstance(row, dict):
+                                continue
+                            body.append("<tr>" + "".join(
+                                "<td>" + escape(str(row.get(key) if row.get(key) is not None else "不明")) + "</td>"
+                                for key in ("driver", "lap", "comparison", "reason")) + "</tr>")
+                        body.append("</table></details>")
                     data_id = f"figure-data-{_slug(item.anchor)}"
                     safe_json = figure_json.replace("<", "\\u003c") if figure_json else "{}"
                     is_table = '"type":"table"' in figure_json
@@ -346,7 +347,6 @@ class SessionReport:
                     if is_speed_chart:
                         body.append('''<div class="speed-rules"><strong>速度ラベルの見方</strong><p>太字は、計測地点で前走車が0秒超〜2.000秒以内にいたことを示します。スリップストリームによる速度向上の可能性を示すもので、因果関係を確定するものではありません。<code>SpeedST</code>はFastF1のデータに正確な計測位置・時刻がないため、太字判定の対象外です。Q-02の「トウあり」は太字、「トウなし」は通常表示です。ギャップ不明時も通常表示です。</p></div>''')
                     if is_long_run_selection:
-                        meta = _figure_meta(figure_json)
                         records = meta.get("longRunSelection") if meta is not None else None
                         if isinstance(records, list):
                             body.append(selection_details(records))
