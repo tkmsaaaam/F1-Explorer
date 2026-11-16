@@ -5,6 +5,7 @@ import logging
 import os
 from enum import Enum
 from logging import Logger
+from pathlib import Path
 from typing import Any, Mapping, Sequence, TYPE_CHECKING
 
 import fastf1
@@ -16,6 +17,10 @@ if TYPE_CHECKING:
     from f1_explorer.separator_estimator import SeparatorBoundary
 
 tracer = trace.get_tracer(__name__)
+
+# Single owner of the analysis-time config file location; every reader of
+# config.json should use this so the path cannot drift between call sites.
+CONFIG_PATH = Path("config.json")
 
 
 class SessionCategory(Enum):
@@ -96,7 +101,7 @@ def validate_config(config: dict[str, Any]):
 @tracer.start_as_current_span("load_config")
 def load_config() -> Config:
     config = None
-    with open('./config.json', 'r', encoding='utf-8') as file:
+    with open(CONFIG_PATH, 'r', encoding='utf-8') as file:
         config = json.load(file)
     if config is None:
         raise Exception("Config must be provided")

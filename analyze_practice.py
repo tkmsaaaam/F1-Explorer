@@ -9,17 +9,11 @@ from opentelemetry import trace
 from f1_explorer.circuit import circuit_info_or_none as _circuit_info_or_none
 from f1_explorer import config as config_module
 from f1_explorer.visualizations import run_volume, long_runs, segment_analysis, short_runs, weather, weekend
-from f1_explorer.visualizations.output import session_output_dir, session_report_dir
-from f1_explorer.visualizations.report import SessionReport
 from f1_explorer.visualizations.practice_comparison import make_practice_best, make_practice_speed
 from f1_explorer.visualizations.qualifying_telemetry import make_telemetry_comparison, make_track_map_comparison
 from f1_explorer.telemetry import last_valid_distance, lap_telemetry_without_driver_ahead
 from f1_explorer.visualizations.output import save_plotly
-from f1_explorer.analysis_state import (
-    build_fingerprint, invalidate_success_manifest, manifest_path, should_skip, write_success_manifest,
-    session_input_fingerprint, session_is_finished,
-)
-from f1_explorer.separator_estimator import persist_resolution, resolve_separators
+from f1_explorer.session_pipeline import run_session
 
 tracer = trace.get_tracer(__name__)
 
@@ -44,81 +38,14 @@ def start_at(session: fastf1.core.Session) -> None | datetime.datetime:
 
 @tracer.start_as_current_span("main")
 def main(*, force: bool = False, refresh_separators: bool = False) -> int:
-    log = config_module.log()
-    try:
-        config = config_module.load_config()
-    except Exception as exception:
-        log.warning('setup is failed', args=exception.args)
-        return 1
-
-    if config.get_session_category() != config_module.SessionCategory.FreePractice:
-        log.warning(f"{config.get_session()} is not FP. \"Session\" needs to be set to FP.")
-        return 1
-    config_module.fast_f1()
-    try:
-        session = fastf1.get_session(config.get_year(), config.get_round(), config.get_session())
-    except Exception as exception:
-        log.warning('setup is failed', args=exception.args)
-        return 1
-
-    start = start_at(session)
-    if start is None:
-        log.warning(f"{session.name} is not Practice 1 or Practice 2 or Practice 3.")
-        return 1
-    if datetime.datetime.now().astimezone() < start:
-        log.warning(
-            f"{session.event.year} Race {session.event.RoundNumber} {session.event.EventName} Practice is not started."
-        )
-        return 0
-
-    output_dir = session_output_dir(session)
-    report_dir = session_report_dir(session)
-    # Load before deciding whether an unchanged report can be skipped: an unsaved
-    # circuit separator is an input to this report and may need estimating.
-    with tracer.start_as_current_span("session.load"):
-        try:
-            session.load(messages=False)
-        except Exception:
-            invalidate_success_manifest(report_dir)
-            raise
-    session_input = session_input_fingerprint(session, include_messages=False)
-    complete = session_is_finished(session)
-    with tracer.start_as_current_span("resolve_separators"):
-        separator_resolution = resolve_separators(
-            session,
-            Path("config.json"),
-            refresh=refresh_separators,
-            log=log,
-        )
-    config.set_separator(separator_resolution.separators, separator_resolution.boundaries)
-    log.info("mini segment separator source", source=separator_resolution.source,
-             separators=separator_resolution.separators)
-    identity = {
-        "year": int(config.get_year()),
-        "round": int(config.get_round()),
-        "session": session.name,
-        "entrypoint": Path(__file__).name,
-    }
-    fingerprint = build_fingerprint(
-        Path(__file__), Path(__file__).resolve().parent, Path("config.json")
+    return run_session(
+        config_module.SessionCategory.FreePractice,
+        entrypoint=Path(__file__), start_at=start_at, figures=_figures,
+        force=force, refresh_separators=refresh_separators,
     )
-    if not separator_resolution.pending_save and should_skip(
-        manifest_path(report_dir), fingerprint, identity, force=force or refresh_separators,
-        session_input=session_input, complete=complete,
-    ):
-        log.info("Analysis skipped; loaded session inputs and analysis environment match the successful report")
-        return 0
-    invalidate_success_manifest(report_dir)
-    report = SessionReport(session, output_dir, report_dir=report_dir)
-    with report:
-        _analyze_session(session, config, log, report, output_dir, report_dir, identity,
-                         separator_resolution, refresh_separators, session_input, complete)
-    return 0
 
 
-def _analyze_session(session, config, log, report, output_dir, report_dir, identity,
-                     separator_resolution, refresh_separators, session_input, complete):
-    config.set_attribute_to_span()
+def _figures(session, config, log, output_dir) -> tuple[Path, ...]:
     log.info(
         f"{session.event.year} Race {session.event['RoundNumber']} {session.event.EventName} {config.get_session()}")
 
@@ -136,7 +63,7 @@ def _analyze_session(session, config, log, report, output_dir, report_dir, ident
         speed_figure = make_practice_speed(session)
     save_plotly(speed_figure, output_dir / 'SpeedFL.png', log, width=1920, height=1080)
 
-    base_path = f"./images/{session.event.year}/{session.event['RoundNumber']}_{session.event.Location}/{session.name.replace(' ', '')}"
+    base_path = str(output_dir)
     circuit = _circuit_info_or_none(session, log)
     fastest = session.laps.pick_fastest()
     if circuit is not None and fastest is not None:
@@ -194,24 +121,7 @@ def _analyze_session(session, config, log, report, output_dir, report_dir, ident
     weather.execute(session, log, base_path)
 
     weekend.plot_tyre(config.get_year(), config.get_round(), log, current_session=session)
-    report.write(scan_existing=False)
-    try:
-        persist_resolution(separator_resolution, Path("config.json"), session, refresh=refresh_separators)
-    except Exception as exception:
-        log.warning("automatic separators were not saved", error=str(exception))
-    fingerprint = build_fingerprint(
-        Path(__file__), Path(__file__).resolve().parent, Path("config.json")
-    )
-    if complete and session_input is not None:
-        write_success_manifest(
-            report_dir,
-            fingerprint,
-            identity,
-            extra_output_paths=report.written_output_paths(),
-            required_output_paths=(report.report_dir / "report.html", *report.required_png_paths()),
-            session_input=session_input,
-        )
-    return None
+    return ()
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:

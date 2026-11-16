@@ -460,6 +460,10 @@ stored as plain numbers and as structured boundary records.
 * **FastF1 Integration**: The project is primarily built on the **FastF1** library, which provides access to F1
   telemetry, lap timing, and session results.
 * **Analysis & Visualization**:
+    * `f1_explorer/session_pipeline.py` owns the shared load, reuse check, report
+      context, and manifest lifecycle. The Practice, Qualifying, and Race entrypoints
+      supply their CLI options, start-time selection, and figure recipes; batch
+      analysis invokes those same entrypoints.
     * Post-session scripts (`analyze_*.py`) utilize modular methods defined within
       the [f1_explorer/visualizations/](f1_explorer/visualizations/) directory to
       ensure consistent plotting logic across different session types.
