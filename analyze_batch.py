@@ -19,16 +19,9 @@ import tempfile
 from contextlib import nullcontext
 from typing import Any, Iterable, Mapping, Sequence
 
+from f1_explorer.sessions import SESSION_TABLE
 
-SESSION_ENTRYPOINTS = {
-    "FP1": "analyze_practice.py",
-    "FP2": "analyze_practice.py",
-    "FP3": "analyze_practice.py",
-    "Q": "analyze_qualifying.py",
-    "SQ": "analyze_qualifying.py",
-    "R": "analyze_race.py",
-    "S": "analyze_race.py",
-}
+SESSION_ENTRYPOINTS = {code: definition.entrypoint for code, definition in SESSION_TABLE.items()}
 
 
 @dataclass(frozen=True, slots=True)
@@ -151,7 +144,7 @@ def command_for(
     command = [python, SESSION_ENTRYPOINTS[job.session]]
     if force:
         command.append("--force")
-    if refresh_separators and job.session in {"FP1", "FP2", "FP3", "Q", "SQ"}:
+    if refresh_separators and SESSION_TABLE[job.session].uses_separators:
         command.append("--refresh-separators")
     return command
 

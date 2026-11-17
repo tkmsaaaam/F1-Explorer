@@ -2,6 +2,8 @@ from pathlib import Path
 from bisect import bisect_left
 from typing import cast, TypedDict
 
+from f1_explorer.sessions import is_race_session
+
 import fastf1.plotting
 import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
@@ -426,9 +428,7 @@ def plot_laptime_by_lap_number(session: Session, log: structlog.stdlib.BoundLogg
 def _is_race_session(session: Session) -> bool:
     """Return whether the session is a race, including a sprint race."""
 
-    return str(getattr(session, "name", "")).strip().lower() in {
-        "race", "sprint", "sprint race",
-    }
+    return is_race_session(getattr(session, "name", ""))
 
 
 def _interactive_race_laptime_range(session: Session) -> list[float] | None:

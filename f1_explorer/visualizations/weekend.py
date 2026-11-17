@@ -1,4 +1,6 @@
 from f1_explorer.scalars import require_present
+from f1_explorer.sessions import SESSION_TABLE, session_code
+
 import datetime
 import hashlib
 import json
@@ -254,16 +256,13 @@ def aggregate_tyres(year: int, race_number: int, log, current_session=None) -> T
     race_complete = False
     race_session = None
     session_signatures = {}
-    sessions: Final[list[str]] = ['FP1', 'FP2', 'FP3', 'SQ', 'S', 'Q', 'R']
+    sessions: Final[list[str]] = list(SESSION_TABLE)
     for session_name in sessions:
         try:
             session = (current_session if current_session is not None and
                        int(current_session.event.year) == int(year) and
                        int(current_session.event.RoundNumber) == int(race_number) and
-                       current_session.name == {
-                           'FP1': 'Practice 1', 'FP2': 'Practice 2', 'FP3': 'Practice 3',
-                           'SQ': 'Sprint Qualifying', 'S': 'Sprint', 'Q': 'Qualifying', 'R': 'Race'
-                       }[session_name] else fastf1.get_session(year, race_number, session_name))
+                       session_code(current_session.name) == session_name else fastf1.get_session(year, race_number, session_name))
         except ValueError:
             continue
         if session is None or datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None) < session.date:
@@ -319,10 +318,7 @@ def _batch_cached_aggregate(year: int, race_number: int, log, current_session=No
             aggregate = _read_cache(cache_path, fingerprint)
             reused = False
             if aggregate is not None:
-                current_name = next((name for name, label in {
-                    'FP1': 'Practice 1', 'FP2': 'Practice 2', 'FP3': 'Practice 3',
-                    'SQ': 'Sprint Qualifying', 'S': 'Sprint', 'Q': 'Qualifying', 'R': 'Race'
-                }.items() if current_session is not None and current_session.name == label), None)
+                current_name = session_code(current_session.name) if current_session is not None else None
                 current_matches = (current_session is None or current_name is not None and
                                    aggregate["session_signatures"].get(current_name) ==
                                    _loaded_session_signature(current_session) and

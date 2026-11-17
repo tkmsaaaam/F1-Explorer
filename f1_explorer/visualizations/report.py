@@ -7,6 +7,8 @@ not scan old outputs; an explicit rebuild can still import declared PNGs.
 
 from __future__ import annotations
 
+from f1_explorer.sessions import is_race_session
+
 import base64
 from contextvars import ContextVar, Token
 from dataclasses import dataclass
@@ -179,9 +181,7 @@ class SessionReport:
             return Path("__external__") / candidate.name
 
     def _is_race_session(self) -> bool:
-        return str(getattr(self.session, "name", "")).strip().lower() in {
-            "race", "sprint", "sprint race",
-        }
+        return is_race_session(getattr(self.session, "name", ""))
 
     def accepts_output(self, path: str | Path) -> bool:
         return is_spec_output(str(getattr(self.session, "name", "")), self._relative(path))

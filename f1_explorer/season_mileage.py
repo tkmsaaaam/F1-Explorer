@@ -8,12 +8,13 @@ from html import escape
 from typing import Any
 
 import pandas
+from f1_explorer.sessions import SESSION_TABLE, SessionCategory, session_code
 
 
 ATTACK_LAP_RATIO = 1.02
 PRACTICE_LONG_RUN_RATIO = 1.07
 PRACTICE_LONG_RUN_LAPS = 4
-SESSION_ROWS = ("FP1", "FP2", "FP3", "SQ", "S", "Q", "R")
+SESSION_ROWS = tuple(SESSION_TABLE)
 ATTACK_ROWS = ("FP1", "FP2", "FP3", "SQ1", "SQ2", "SQ3", "Q1", "Q2", "Q3")
 
 
@@ -47,25 +48,6 @@ class WeekendMetrics:
     round_number: int
     drivers: dict[str, DriverMetrics] = field(default_factory=dict)
     sessions: dict[str, str] = field(default_factory=dict)
-
-
-def session_code(name: str) -> str | None:
-    normalized = name.strip().lower()
-    if "practice 1" in normalized or normalized == "fp1":
-        return "FP1"
-    if "practice 2" in normalized or normalized == "fp2":
-        return "FP2"
-    if "practice 3" in normalized or normalized == "fp3":
-        return "FP3"
-    if "shootout" in normalized or "sprint qualifying" in normalized:
-        return "SQ"
-    if normalized == "sprint":
-        return "S"
-    if normalized == "qualifying":
-        return "Q"
-    if normalized == "race":
-        return "R"
-    return None
 
 
 def _is_true(value: Any) -> bool:
@@ -313,9 +295,9 @@ def analyze_session(
             laps={code: Metric(completed, "available", [f"欠番: {', '.join(missing)}"] if missing else [], provisional)},
         )
 
-    if code in {"FP1", "FP2", "FP3", "Q", "SQ"}:
+    if SESSION_TABLE[code].category != SessionCategory.Race:
         laps.attrs["session"] = session
-        qualifying = code in {"Q", "SQ"}
+        qualifying = SESSION_TABLE[code].category == SessionCategory.Qualifying
         attack_values = _attack_metrics(laps, code, qualifying)
         for compound_key, metric in attack_values.items():
             if ":" not in compound_key:

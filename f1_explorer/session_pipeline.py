@@ -14,6 +14,7 @@ from f1_explorer.analysis_state import (
     write_success_manifest, session_input_fingerprint, session_is_finished,
 )
 from f1_explorer.config import CONFIG_PATH
+from f1_explorer.sessions import SESSION_TABLE
 from f1_explorer.separator_estimator import persist_resolution, resolve_separators
 from f1_explorer.visualizations.output import session_output_dir, session_report_dir
 from f1_explorer.visualizations.report import SessionReport
@@ -39,11 +40,12 @@ def run_session(
     return value lists additional outputs that join the manifest's extra and
     required output paths.
     """
-    codes, names, label = {
-        config_module.SessionCategory.FreePractice: ("FP", "Practice 1 or Practice 2 or Practice 3", "Practice"),
-        config_module.SessionCategory.Qualifying: ("Q or SQ", "Sprint Qualifying or Qualifying", "Qualifying"),
-        config_module.SessionCategory.Race: ("R or S", "Sprint or Race", "Race"),
+    codes, label = {
+        config_module.SessionCategory.FreePractice: ("FP", "Practice"),
+        config_module.SessionCategory.Qualifying: ("Q or SQ", "Qualifying"),
+        config_module.SessionCategory.Race: ("R or S", "Race"),
     }[category]
+    names = " or ".join(item.fastf1_name for item in SESSION_TABLE.values() if item.category == category)
     is_race = category == config_module.SessionCategory.Race
     if is_race and refresh_separators:
         # The CLI cannot reach this, but the API must not pretend to refresh:
@@ -93,7 +95,7 @@ def run_session(
     session_input = session_input_fingerprint(session, include_messages=is_race)
     complete = session_is_finished(session)
     separator_resolution = None
-    if not is_race:
+    if SESSION_TABLE[config.get_session()].uses_separators:
         # Load first: resolve_separators needs loaded laps, and the unsaved
         # separator it estimates is an input to this report, so the reuse
         # check below must come after both.
@@ -113,7 +115,7 @@ def run_session(
         "session": session.name,
         "entrypoint": entrypoint.name,
     }
-    if not is_race:
+    if SESSION_TABLE[config.get_session()].uses_separators:
         fingerprint = build_fingerprint(entrypoint, entrypoint.resolve().parent, CONFIG_PATH)
     if (separator_resolution is None or not separator_resolution.pending_save) and should_skip(
         manifest_path(report_dir), fingerprint, identity, force=force or refresh_separators,

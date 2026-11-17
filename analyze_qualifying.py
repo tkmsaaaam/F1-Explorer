@@ -14,6 +14,7 @@ from f1_explorer.visualizations.output import save_plotly
 from f1_explorer.visualizations.qualifying_best import make_qualifying_best
 from f1_explorer.visualizations.qualifying_speed import make_qualifying_speed
 from f1_explorer.session_pipeline import run_session
+from f1_explorer.sessions import session_start_at
 from f1_explorer.telemetry import last_valid_distance, lap_telemetry_without_driver_ahead
 
 tracer = trace.get_tracer(__name__)
@@ -28,11 +29,7 @@ def _fastest_distance_or_none(telemetry, log):
 
 @tracer.start_as_current_span("start_at")
 def start_at(session: fastf1.core.Session) -> None | datetime.datetime:
-    if session.name == 'Sprint Qualifying':
-        return session.event.Session2Date
-    elif session.name == 'Qualifying':
-        return session.event.Session4Date
-    return None
+    return session_start_at(session, config_module.SessionCategory.Qualifying)
 
 @tracer.start_as_current_span("main")
 def main(*, force: bool = False, refresh_separators: bool = False) -> int:

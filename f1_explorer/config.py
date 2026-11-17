@@ -3,13 +3,13 @@ from __future__ import annotations
 import json
 import logging
 import os
-from enum import Enum
 from logging import Logger
 from pathlib import Path
 from typing import Any, Mapping, Sequence, TYPE_CHECKING
 
 import fastf1
 import structlog
+from f1_explorer.sessions import SessionCategory, SESSION_TABLE
 # noinspection PyPackageRequirements
 from opentelemetry import trace
 
@@ -23,12 +23,6 @@ tracer = trace.get_tracer(__name__)
 CONFIG_PATH = Path("config.json")
 
 
-class SessionCategory(Enum):
-    FreePractice = "FreePractice"
-    Qualifying = "Qualifying"
-    Race = "Race"
-
-
 class Config:
     def __init__(self, year: int, race_number: int, session: str, corners: dict[str, list[float]],
                  separator: list[float], comparison: list[list[dict[str, Any]]],
@@ -40,14 +34,9 @@ class Config:
         self.separator = separator
         self.separator_boundaries = list(separator_boundaries or [])
         self.comparison = comparison
-        if session in {'FP1', 'FP2', 'FP3'}:
-            self.session_category = SessionCategory.FreePractice
-        elif session in {'SQ', 'Q'}:
-            self.session_category = SessionCategory.Qualifying
-        elif session in {'S', 'R'}:
-            self.session_category = SessionCategory.Race
-        else:
+        if session not in SESSION_TABLE:
             raise Exception("Session is invalid")
+        self.session_category = SESSION_TABLE[session].category
 
     def get_year(self):
         return self.year

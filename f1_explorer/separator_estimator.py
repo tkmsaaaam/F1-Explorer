@@ -9,6 +9,8 @@ rendering which makes it possible to test with recorded/mocked streams.
 
 from __future__ import annotations
 
+from f1_explorer.sessions import session_definition
+
 from dataclasses import dataclass, field
 from datetime import timedelta
 import hashlib
@@ -42,18 +44,7 @@ class _LapRows(Protocol):
 DEFAULT_ARCHIVE_URL = "https://livetiming.formula1.com"
 ARCHIVE_TIMEOUT_SECONDS = 15
 _TIMING_DATA_NAME = "TimingData.jsonStream"
-_SESSION_NAMES = {
-    "FP1": "Practice 1",
-    "FP2": "Practice 2",
-    "FP3": "Practice 3",
-    "Q": "Qualifying",
-    "SQ": "Sprint Qualifying",
-    "Practice 1": "Practice 1",
-    "Practice 2": "Practice 2",
-    "Practice 3": "Practice 3",
-    "Qualifying": "Qualifying",
-    "Sprint Qualifying": "Sprint Qualifying",
-}
+
 
 
 class SeparatorEstimationError(RuntimeError):
@@ -105,7 +96,8 @@ class LiveTimingLapWindow:
 
 def _session_name(session: Any) -> str:
     name = getattr(session, "name", "")
-    return _SESSION_NAMES.get(str(name), str(name))
+    definition = session_definition(str(name))
+    return definition.fastf1_name if definition is not None else str(name)
 
 
 def _location(session: Any) -> str:

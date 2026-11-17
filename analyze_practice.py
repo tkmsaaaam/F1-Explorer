@@ -14,6 +14,7 @@ from f1_explorer.visualizations.qualifying_telemetry import make_telemetry_compa
 from f1_explorer.telemetry import last_valid_distance, lap_telemetry_without_driver_ahead
 from f1_explorer.visualizations.output import save_plotly
 from f1_explorer.session_pipeline import run_session
+from f1_explorer.sessions import session_start_at
 
 tracer = trace.get_tracer(__name__)
 
@@ -27,13 +28,7 @@ def _fastest_distance_or_none(telemetry, log):
 
 @tracer.start_as_current_span("start_at")
 def start_at(session: fastf1.core.Session) -> None | datetime.datetime:
-    if session.name == 'Practice 1':
-        return session.event.Session1Date
-    elif session.name == 'Practice 2':
-        return session.event.Session2Date
-    elif session.name == 'Practice 3':
-        return session.event.Session3Date
-    return None
+    return session_start_at(session, config_module.SessionCategory.FreePractice)
 
 
 @tracer.start_as_current_span("main")

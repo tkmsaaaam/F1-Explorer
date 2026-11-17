@@ -9,16 +9,13 @@ from opentelemetry import trace
 from f1_explorer import config as config_module
 from f1_explorer.visualizations import weekend, run_volume, weather, race
 from f1_explorer.session_pipeline import run_session
+from f1_explorer.sessions import session_start_at
 
 tracer = trace.get_tracer(__name__)
 
 @tracer.start_as_current_span("start_at")
 def start_at(session: fastf1.core.Session) -> None | datetime.datetime:
-    if session.name == 'Sprint':
-        return session.event.Session3Date
-    elif session.name == 'Race':
-        return session.event.Session5Date
-    return None
+    return session_start_at(session, config_module.SessionCategory.Race)
 
 
 @tracer.start_as_current_span("main")

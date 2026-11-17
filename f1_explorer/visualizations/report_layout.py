@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from html import escape
+from f1_explorer.sessions import session_definition, SessionCategory
+
 import re
 from pathlib import Path
 
@@ -150,14 +152,15 @@ RACE_SECTIONS = (
 
 
 def layout_for_session(session_name: str) -> tuple[str, tuple[LayoutSection, ...]] | None:
-    normalized = session_name.strip().lower()
-    if normalized in {"qualifying", "sprint qualifying", "sprint shootout"}:
-        return "Q", QUALIFYING_SECTIONS
-    if normalized in {"practice 1", "practice 2", "practice 3"}:
-        return "P", PRACTICE_SECTIONS
-    if normalized in {"race", "sprint", "sprint race"}:
-        return "R", RACE_SECTIONS
-    return None
+    definition = session_definition(session_name)
+    if definition is None:
+        return None
+    return {
+        SessionCategory.Qualifying: ("Q", QUALIFYING_SECTIONS),
+        SessionCategory.FreePractice: ("P", PRACTICE_SECTIONS),
+        SessionCategory.Race: ("R", RACE_SECTIONS),
+    }[definition.category]
+
 
 
 def _plain_title(title: str) -> str:
