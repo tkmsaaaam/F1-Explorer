@@ -1,7 +1,7 @@
 import json
-import os
-from logging import Logger
-from typing import Any
+from collections.abc import Callable, Sequence
+from operator import gt, lt
+from typing import Any, NamedTuple
 
 import fastf1
 import matplotlib.pyplot as plt
@@ -15,6 +15,7 @@ from pandas import DataFrame
 
 from f1_explorer import constants
 from f1_explorer import config as config_module
+from f1_explorer.visualizations.output import save_matplotlib, save_plotly
 
 tracer = trace.get_tracer(__name__)
 
@@ -71,330 +72,127 @@ class Comparison:
         return self.corners
 
 
-@tracer.start_as_current_span("plot_brake_distance")
-def plot_brake_distance(log: structlog.stdlib.BoundLogger, comparison: Comparison):
-    """brakeを比較
-    Args:
-        comparison: Comparison
-        log: ロガー
+def _plot_metric(log: structlog.stdlib.BoundLogger, comparison: Comparison, column: str, filename: str, *,
+                 pad: float, hlines: Callable[[float], Sequence[float]] | None = None) -> None:
+    """Plot one car-data column for both years with corner markers.
+
+    ``pad`` sets the y-axis headroom and also offsets the corner labels
+    below ``v_min`` by half the pad.  ``hlines`` receives ``v_max`` and
+    returns the horizontal grid line positions when wanted.
     """
     fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
     current_car_data = comparison.get_current().get_lap().get_car_data().add_distance()
-    ax.plot(current_car_data.Distance, current_car_data.Brake, linestyle='solid',
+    current_values = getattr(current_car_data, column)
+    ax.plot(current_car_data.Distance, current_values, linestyle='solid',
             label=f"{comparison.get_year()}: {comparison.get_current().get_lap().Driver}",
             color=constants.team_color[comparison.get_year()].get(
                 int(comparison.get_current().get_lap().DriverNumber), '#808080'))
     previous_car_data = comparison.get_previous().get_lap().get_car_data().add_distance()
-    ax.plot(previous_car_data.Distance, previous_car_data.Brake, color='black', linestyle='dashed',
+    previous_values = getattr(previous_car_data, column)
+    ax.plot(previous_car_data.Distance, previous_values, color='black', linestyle='dashed',
             label=f"{comparison.get_previous_year()}: {comparison.get_previous().get_lap().Driver}")
-    v_min = min(int(previous_car_data.Brake.min()), int(current_car_data.Brake.min()))
-    v_max = max(int(previous_car_data.Brake.max()), int(current_car_data.Brake.max()))
+    v_min = min(int(previous_values.min()), int(current_values.min()))
+    v_max = max(int(previous_values.max()), int(current_values.max()))
     ax.vlines(x=comparison.get_corners().values(), ymin=v_min, ymax=v_max, linestyles='dotted', colors='grey')
+    if hlines is not None:
+        ax.hlines(y=hlines(v_max), xmin=0, xmax=previous_car_data.Distance.max(), colors="lightgrey")
+    label_pad = pad / 2
     for number, distance in comparison.get_corners().items():
-        ax.text(distance, v_min - 0.05, f"{number}\n{"{:.0f}".format(distance)}", va='center_baseline', ha='center',
+        ax.text(distance, v_min - label_pad, f"{number}\n{"{:.0f}".format(distance)}", va='center_baseline', ha='center',
                 size='x-small')
 
-    ax.set_ylim(v_min - 0.1, v_max + 0.1)
+    ax.set_ylim(v_min - pad, v_max + pad)
     ax.legend(fontsize='small')
     ax.grid(True)
-    output_path = f"./images/comparison/{comparison.get_gp()}/{comparison.get_session()}/brake_distance.png"
-    os.makedirs(os.path.dirname(output_path), exist_ok=True)
-    fig.savefig(output_path, bbox_inches='tight')
-    log.info(f"Saved plot to {output_path}")
-    plt.close(fig)
+    save_matplotlib(fig, f"./images/comparison/{comparison.get_gp()}/{comparison.get_session()}/{filename}", log)
+
+
+@tracer.start_as_current_span("plot_brake_distance")
+def plot_brake_distance(log: structlog.stdlib.BoundLogger, comparison: Comparison):
+    _plot_metric(log, comparison, "Brake", "brake_distance.png", pad=0.1)
 
 
 @tracer.start_as_current_span("plot_n_gear_distance")
 def plot_n_gear_distance(log: structlog.stdlib.BoundLogger, comparison: Comparison):
-    """nGearを比較
-    Args:
-        comparison: Comparison
-        log: ロガー
-    """
-    fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
-    current_car_data = comparison.get_current().get_lap().get_car_data().add_distance()
-    ax.plot(current_car_data.Distance, current_car_data.nGear, linestyle='solid',
-            label=f"{comparison.get_year()}: {comparison.get_current().get_lap().Driver}",
-            color=constants.team_color[comparison.get_year()].get(
-                int(comparison.get_current().get_lap().DriverNumber), '#808080'))
-    previous_car_data = comparison.get_previous().get_lap().get_car_data().add_distance()
-    ax.plot(previous_car_data.Distance, previous_car_data.nGear, color='black', linestyle='dashed',
-            label=f"{comparison.get_previous_year()}: {comparison.get_previous().get_lap().Driver}")
-    v_min = min(int(previous_car_data.nGear.min()), int(current_car_data.nGear.min()))
-    v_max = max(int(previous_car_data.nGear.max()), int(current_car_data.nGear.max()))
-    ax.vlines(x=comparison.get_corners().values(), ymin=v_min, ymax=v_max, linestyles='dotted', colors='grey')
-    for number, distance in comparison.get_corners().items():
-        ax.text(distance, v_min - 0.25, f"{number}\n{"{:.0f}".format(distance)}", va='center_baseline', ha='center',
-                size='x-small')
-
-    ax.set_ylim(v_min - 0.5, v_max + 0.5)
-    ax.legend(fontsize='small')
-    ax.grid(True)
-    output_path = f"./images/comparison/{comparison.get_gp()}/{comparison.get_session()}/gear_distance.png"
-    os.makedirs(os.path.dirname(output_path), exist_ok=True)
-    fig.savefig(output_path, bbox_inches='tight')
-    log.info(f"Saved plot to {output_path}")
-    plt.close(fig)
+    _plot_metric(log, comparison, "nGear", "gear_distance.png", pad=0.5)
 
 
 @tracer.start_as_current_span("plot_rpm_distance")
 def plot_rpm_distance(log: structlog.stdlib.BoundLogger, comparison: Comparison):
-    """RPMを比較
-    Args:
-        comparison: Comparison
-        log: ロガー
-    """
-    fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
-    current_car_data = comparison.get_current().get_lap().get_car_data().add_distance()
-    ax.plot(current_car_data.Distance, current_car_data.RPM, linestyle='solid',
-            label=f"{comparison.get_year()}: {comparison.get_current().get_lap().Driver}",
-            color=constants.team_color[comparison.get_year()].get(
-                int(comparison.get_current().get_lap().DriverNumber), '#808080'))
-    previous_car_data = comparison.get_previous().get_lap().get_car_data().add_distance()
-    ax.plot(previous_car_data.Distance, previous_car_data.RPM, color='black', linestyle='dashed',
-            label=f"{comparison.get_previous_year()}: {comparison.get_previous().get_lap().Driver}")
-    v_min = min(int(previous_car_data.RPM.min()), int(current_car_data.RPM.min()))
-    v_max = max(int(previous_car_data.RPM.max()), int(current_car_data.RPM.max()))
-    ax.vlines(x=comparison.get_corners().values(), ymin=v_min, ymax=v_max, linestyles='dotted', colors='grey')
-    for number, distance in comparison.get_corners().items():
-        ax.text(distance, v_min - 250, f"{number}\n{"{:.0f}".format(distance)}", va='center_baseline', ha='center',
-                size='x-small')
-
-    ax.set_ylim(v_min - 500, v_max + 500)
-    ax.legend(fontsize='small')
-    ax.grid(True)
-    output_path = f"./images/comparison/{comparison.get_gp()}/{comparison.get_session()}/rpm_distance.png"
-    os.makedirs(os.path.dirname(output_path), exist_ok=True)
-    fig.savefig(output_path, bbox_inches='tight')
-    log.info(f"Saved plot to {output_path}")
-    plt.close(fig)
+    _plot_metric(log, comparison, "RPM", "rpm_distance.png", pad=500)
 
 
 @tracer.start_as_current_span("plot_speed_distance")
 def plot_speed_distance(log: structlog.stdlib.BoundLogger, comparison: Comparison):
-    """スピードを比較
-    Args:
-        comparison: Comparison
-        log: ロガー
-    """
-    fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
-    current_car_data = comparison.get_current().get_lap().get_car_data().add_distance()
-    ax.plot(current_car_data.Distance, current_car_data.Speed, linestyle='solid',
-            label=f"{comparison.get_year()}: {comparison.get_current().get_lap().Driver}",
-            color=constants.team_color[comparison.get_year()].get(
-                int(comparison.get_current().get_lap().DriverNumber), '#808080'))
-    previous_car_data = comparison.get_previous().get_lap().get_car_data().add_distance()
-    ax.plot(previous_car_data.Distance, previous_car_data.Speed, linestyle='dashed', color='black',
-            label=f"{comparison.get_previous_year()}: {comparison.get_previous().get_lap().Driver}")
-    v_min = min(int(previous_car_data.Speed.min()), int(current_car_data.Speed.min()))
-    v_max = max(int(previous_car_data.Speed.max()), int(current_car_data.Speed.max()))
-    ax.vlines(x=comparison.get_corners().values(), ymin=v_min, ymax=v_max, linestyles='dotted', colors='grey')
-    ax.hlines(y=list(range(0, int(v_max), 25)), xmin=0, xmax=previous_car_data.Distance.max(), colors='lightgrey')
-    for number, distance in comparison.get_corners().items():
-        ax.text(distance, v_min - 5, f"{number}\n{"{:.0f}".format(distance)}", va='center_baseline', ha='center',
-                size='x-small')
-    ax.set_ylim(v_min - 10, v_max + 10)
-    ax.legend(fontsize='small')
-    ax.grid(True)
-    output_path = f"./images/comparison/{comparison.get_gp()}/{comparison.get_session()}/speed_distance.png"
-    os.makedirs(os.path.dirname(output_path), exist_ok=True)
-    fig.savefig(output_path, bbox_inches='tight')
-    log.info(f"Saved plot to {output_path}")
-    plt.close(fig)
+    _plot_metric(log, comparison, "Speed", "speed_distance.png",
+                 pad=10, hlines=lambda maximum: list(range(0, int(maximum), 25)))
 
 
 @tracer.start_as_current_span("plot_throttle_distance")
 def plot_throttle_distance(log: structlog.stdlib.BoundLogger, comparison: Comparison):
-    """throttleを比較
-    Args:
-        comparison: Comparison
-        log: ロガー
+    _plot_metric(log, comparison, "Throttle", "throttle_distance.png",
+                 pad=5, hlines=lambda maximum: list(range(10, 100, 10)))
+
+
+class _SummaryMetric(NamedTuple):
+    """One row of the yearly summary table.
+
+    ``wins`` is evaluated as ``wins(current, previous)`` with the legacy
+    polarity untouched: for lap and sector times ``gt`` shades the current
+    cell green when its time is the greater one.  ``None`` keeps the row
+    white, and ``ratio`` rows also emit a ``(%)`` row under the same colors.
     """
-    fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
-    current_car_data = comparison.get_current().get_lap().get_car_data().add_distance()
-    ax.plot(current_car_data.Distance, current_car_data.Throttle, linestyle='solid',
-            label=f"{comparison.get_year()}: {comparison.get_current().get_lap().Driver}",
-            color=constants.team_color[comparison.get_year()].get(
-                int(comparison.get_current().get_lap().DriverNumber), '#808080'))
-    previous_car_data = comparison.get_previous().get_lap().get_car_data().add_distance()
-    ax.plot(previous_car_data.Distance, previous_car_data.Throttle, linestyle='dashed', color='black',
-            label=f"{comparison.get_previous_year()}: {comparison.get_previous().get_lap().Driver}")
-    v_min = min(int(previous_car_data.Throttle.min()), int(current_car_data.Throttle.min()))
-    v_max = max(int(previous_car_data.Throttle.max()), int(current_car_data.Throttle.max()))
-    ax.vlines(x=comparison.get_corners().values(), ymin=v_min, ymax=v_max, linestyles='dotted', colors='grey')
-    ax.hlines(y=[10, 20, 30, 40, 50, 60, 70, 80, 90], xmin=0, xmax=previous_car_data.Distance.max(), colors='lightgrey')
-    for number, distance in comparison.get_corners().items():
-        ax.text(distance, v_min - 2.5, f"{number}\n{"{:.0f}".format(distance)}", va='center_baseline', ha='center',
-                size='x-small')
-    ax.set_ylim(v_min - 5, v_max + 5)
-    ax.legend(fontsize='small')
-    ax.grid(True)
-    output_path = f"./images/comparison/{comparison.get_gp()}/{comparison.get_session()}/throttle_distance.png"
-    os.makedirs(os.path.dirname(output_path), exist_ok=True)
-    fig.savefig(output_path, bbox_inches='tight')
-    log.info(f"Saved plot to {output_path}")
-    plt.close(fig)
+    name: str
+    value: Callable[[SessionSummary], Any]
+    wins: Callable[[Any, Any], bool] | None
+    ratio: bool
+
+
+_SUMMARY_METRICS = (
+    _SummaryMetric("LapTime", lambda summary: summary.get_lap().LapTime, gt, True),
+    _SummaryMetric("Sector1Time", lambda summary: summary.get_lap().Sector1Time, gt, True),
+    _SummaryMetric("Sector2Time", lambda summary: summary.get_lap().Sector2Time, gt, True),
+    _SummaryMetric("Sector3Time", lambda summary: summary.get_lap().Sector3Time, gt, True),
+    _SummaryMetric("SpeedFL", lambda summary: summary.get_lap().SpeedFL, lt, False),
+    _SummaryMetric("SpeedI1", lambda summary: summary.get_lap().SpeedI1, lt, False),
+    _SummaryMetric("SpeedI2", lambda summary: summary.get_lap().SpeedI2, lt, False),
+    _SummaryMetric("SpeedST", lambda summary: summary.get_lap().SpeedST, lt, False),
+    _SummaryMetric("Max(Speed)", lambda summary: summary.get_lap().telemetry.Speed.max(), lt, False),
+    _SummaryMetric("Compound", lambda summary: summary.get_lap().Compound, None, False),
+    _SummaryMetric("TyreLife", lambda summary: summary.get_lap().TyreLife, None, False),
+    _SummaryMetric("Max(AirTemp)", lambda summary: summary.get_weather().AirTemp.max(), None, False),
+    _SummaryMetric("Min(AirTemp)", lambda summary: summary.get_weather().AirTemp.min(), None, False),
+    _SummaryMetric("Max(TrackTemp)", lambda summary: summary.get_weather().TrackTemp.max(), None, False),
+    _SummaryMetric("Min(TrackTemp)", lambda summary: summary.get_weather().TrackTemp.min(), None, False),
+)
 
 
 @tracer.start_as_current_span("summary")
 def summary(log: structlog.stdlib.BoundLogger, comparison: Comparison):
-    fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
-    current_car_data = comparison.get_current().get_lap().get_car_data().add_distance()
-    ax.plot(current_car_data.Distance, current_car_data.Throttle, linestyle='solid',
-            label=f"{comparison.get_year()}: {comparison.get_current().get_lap().Driver}",
-            color=constants.team_color[comparison.get_year()].get(
-                int(comparison.get_current().get_lap().DriverNumber), '#808080'))
-    titles = []
-    title_colors = []
-    c = []
-    c_colors = []
-    p = []
-    p_colors = []
-
-    titles.append("LapTime(s)")
-    c.append(comparison.get_current().get_lap().LapTime.total_seconds())
-    p.append(comparison.get_previous().get_lap().LapTime.total_seconds())
-    title_colors.append("lightgray")
-    c_win = comparison.get_current().get_lap().LapTime > comparison.get_previous().get_lap().LapTime
-    c_colors.append("#d4edda" if c_win else "white")
-    p_colors.append("#d4edda" if not c_win else "white")
-    titles.append("LapTime(%)")
-    c.append("{:.3f}".format(
-        comparison.get_current().get_lap().LapTime.total_seconds() / comparison.get_previous().get_lap().LapTime.total_seconds()))
-    p.append('-')
-    c_win = comparison.get_current().get_lap().LapTime > comparison.get_previous().get_lap().LapTime
-    c_colors.append("#d4edda" if c_win else "white")
-    p_colors.append("#d4edda" if not c_win else "white")
-
-    titles.append("Sector1Time(s)")
-    c.append(comparison.get_current().get_lap().Sector1Time.total_seconds())
-    p.append(comparison.get_previous().get_lap().Sector1Time.total_seconds())
-    title_colors.append("lightgray")
-    c_win = comparison.get_current().get_lap().Sector1Time > comparison.get_previous().get_lap().Sector1Time
-    c_colors.append("#d4edda" if c_win else "white")
-    p_colors.append("#d4edda" if not c_win else "white")
-    titles.append("Sector1Time(%)")
-    c.append("{:.3f}".format(
-        comparison.get_current().get_lap().Sector1Time.total_seconds() / comparison.get_previous().get_lap().Sector1Time.total_seconds()))
-    p.append('-')
-    c_win = comparison.get_current().get_lap().Sector1Time > comparison.get_previous().get_lap().Sector1Time
-    c_colors.append("#d4edda" if c_win else "white")
-    p_colors.append("#d4edda" if not c_win else "white")
-
-    titles.append("Sector2Time(s)")
-    c.append(comparison.get_current().get_lap().Sector2Time.total_seconds())
-    p.append(comparison.get_previous().get_lap().Sector2Time.total_seconds())
-    title_colors.append("lightgray")
-    c_win = comparison.get_current().get_lap().Sector2Time > comparison.get_previous().get_lap().Sector2Time
-    c_colors.append("#d4edda" if c_win else "white")
-    p_colors.append("#d4edda" if not c_win else "white")
-    titles.append("Sector2Time(%)")
-    c.append("{:.3f}".format(
-        comparison.get_current().get_lap().Sector2Time.total_seconds() / comparison.get_previous().get_lap().Sector2Time.total_seconds()))
-    p.append('-')
-    c_win = comparison.get_current().get_lap().Sector2Time > comparison.get_previous().get_lap().Sector2Time
-    c_colors.append("#d4edda" if c_win else "white")
-    p_colors.append("#d4edda" if not c_win else "white")
-
-    titles.append("Sector3Time(s)")
-    c.append(comparison.get_current().get_lap().Sector3Time.total_seconds())
-    p.append(comparison.get_previous().get_lap().Sector3Time.total_seconds())
-    title_colors.append("lightgray")
-    c_win = comparison.get_current().get_lap().Sector3Time > comparison.get_previous().get_lap().Sector3Time
-    c_colors.append("#d4edda" if c_win else "white")
-    p_colors.append("#d4edda" if not c_win else "white")
-    titles.append("Sector3Time(%)")
-    c.append("{:.3f}".format(
-        comparison.get_current().get_lap().Sector3Time.total_seconds() / comparison.get_previous().get_lap().Sector3Time.total_seconds()))
-    p.append('-')
-    c_win = comparison.get_current().get_lap().Sector3Time > comparison.get_previous().get_lap().Sector3Time
-    c_colors.append("#d4edda" if c_win else "white")
-    p_colors.append("#d4edda" if not c_win else "white")
-
-    titles.append("SpeedFL")
-    c.append(comparison.get_current().get_lap().SpeedFL)
-    p.append(comparison.get_previous().get_lap().SpeedFL)
-    title_colors.append("lightgray")
-    c_win = comparison.get_current().get_lap().SpeedFL < comparison.get_previous().get_lap().SpeedFL
-    c_colors.append("#d4edda" if c_win else "white")
-    p_colors.append("#d4edda" if not c_win else "white")
-
-    # noinspection SpellCheckingInspection
-    titles.append("SpeedI1")
-    c.append(comparison.get_current().get_lap().SpeedI1)
-    p.append(comparison.get_previous().get_lap().SpeedI1)
-    title_colors.append("lightgray")
-    c_win = comparison.get_current().get_lap().SpeedI1 < comparison.get_previous().get_lap().SpeedI1
-    c_colors.append("#d4edda" if c_win else "white")
-    p_colors.append("#d4edda" if not c_win else "white")
-
-    # noinspection SpellCheckingInspection
-    titles.append("SpeedI2")
-    c.append(comparison.get_current().get_lap().SpeedI2)
-    p.append(comparison.get_previous().get_lap().SpeedI2)
-    title_colors.append("lightgray")
-    c_win = comparison.get_current().get_lap().SpeedI2 < comparison.get_previous().get_lap().SpeedI2
-    c_colors.append("#d4edda" if c_win else "white")
-    p_colors.append("#d4edda" if not c_win else "white")
-
-    titles.append("SpeedST")
-    c.append(comparison.get_current().get_lap().SpeedST)
-    p.append(comparison.get_previous().get_lap().SpeedST)
-    title_colors.append("lightgray")
-    c_win = comparison.get_current().get_lap().SpeedST < comparison.get_previous().get_lap().SpeedST
-    c_colors.append("#d4edda" if c_win else "white")
-    p_colors.append("#d4edda" if not c_win else "white")
-
-    titles.append("Max(Speed)")
-    c.append(comparison.get_current().get_lap().telemetry.Speed.max())
-    p.append(comparison.get_previous().get_lap().telemetry.Speed.max())
-    title_colors.append("lightgray")
-    c_win = float(comparison.get_current().get_lap().telemetry.Speed.max()) < float(
-        comparison.get_previous().get_lap().telemetry.Speed.max())
-    c_colors.append("#d4edda" if c_win else "white")
-    p_colors.append("#d4edda" if not c_win else "white")
-
-    titles.append("Compound")
-    c.append(comparison.get_current().get_lap().Compound)
-    p.append(comparison.get_previous().get_lap().Compound)
-    title_colors.append("lightgray")
-    c_colors.append("white")
-    p_colors.append("white")
-
-    titles.append("TyreLife")
-    c.append(comparison.get_current().get_lap().TyreLife)
-    p.append(comparison.get_previous().get_lap().TyreLife)
-    title_colors.append("lightgray")
-    c_colors.append("white")
-    p_colors.append("white")
-
-    titles.append("Max(AirTemp)")
-    c.append(comparison.get_current().get_weather().AirTemp.max())
-    p.append(comparison.get_previous().get_weather().AirTemp.max())
-    title_colors.append("lightgray")
-    c_colors.append("white")
-    p_colors.append("white")
-
-    titles.append("Min(AirTemp)")
-    c.append(comparison.get_current().get_weather().AirTemp.min())
-    p.append(comparison.get_previous().get_weather().AirTemp.min())
-    title_colors.append("lightgray")
-    c_colors.append("white")
-    p_colors.append("white")
-
-    titles.append("Max(TrackTemp)")
-    c.append(comparison.get_current().get_weather().TrackTemp.max())
-    p.append(comparison.get_previous().get_weather().TrackTemp.max())
-    title_colors.append("lightgray")
-    c_colors.append("white")
-    p_colors.append("white")
-
-    titles.append("Min(TrackTemp)")
-    c.append(comparison.get_current().get_weather().TrackTemp.min())
-    p.append(comparison.get_previous().get_weather().TrackTemp.min())
-    title_colors.append("lightgray")
-    c_colors.append("white")
-    p_colors.append("white")
+    titles, title_colors = [], []
+    c, p, c_colors, p_colors = [], [], [], []
+    for metric in _SUMMARY_METRICS:
+        current = metric.value(comparison.get_current())
+        previous = metric.value(comparison.get_previous())
+        titles.append(f"{metric.name}(s)" if metric.ratio else metric.name)
+        c.append(current.total_seconds() if metric.ratio else current)
+        p.append(previous.total_seconds() if metric.ratio else previous)
+        title_colors.append("lightgray")
+        if metric.wins is None:
+            current_color = previous_color = "white"
+        else:
+            current_wins = metric.wins(current, previous)
+            current_color = "#d4edda" if current_wins else "white"
+            previous_color = "white" if current_wins else "#d4edda"
+        c_colors.append(current_color)
+        p_colors.append(previous_color)
+        if metric.ratio:
+            titles.append(f"{metric.name}(%)")
+            c.append("{:.3f}".format(current.total_seconds() / previous.total_seconds()))
+            p.append("-")
+            c_colors.append(current_color)
+            p_colors.append(previous_color)
+            title_colors.append("lightgray")
 
     fig = go.Figure(
         data=[go.Table(
@@ -409,10 +207,8 @@ def summary(log: structlog.stdlib.BoundLogger, comparison: Comparison):
         )]
     )
 
-    output_path = f"./images/comparison/{comparison.get_gp()}/{comparison.get_session()}/summary.png"
-    os.makedirs(os.path.dirname(output_path), exist_ok=True)
-    fig.write_image(output_path, width=1920, height=1080)
-    log.info(f"Saved plot to {output_path}")
+    save_plotly(fig, f"./images/comparison/{comparison.get_gp()}/{comparison.get_session()}/summary.png",
+                log, width=1920, height=1080)
 
 
 @tracer.start_as_current_span("main")
