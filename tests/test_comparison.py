@@ -42,7 +42,7 @@ def test_measurement_axis_label_is_not_overwritten_by_series_label():
     with (
         patch("f1_explorer.visualizations.comparison.plt.subplots", return_value=(fig, ax)),
         patch("f1_explorer.visualizations.comparison.plt.tight_layout"),
-        patch("f1_explorer.visualizations.comparison.fastf1.plotting.get_team_color", return_value="blue"),
+        patch("fastf1.plotting.get_team_color", return_value="blue"),
         patch("f1_explorer.visualizations.comparison.save_matplotlib") as save,
     ):
         _plot_driver_lap_telemetry(

@@ -30,7 +30,7 @@ def _figures(laps):
     result = []
     with patch.object(short_runs, 'save_plotly', side_effect=lambda figure, *args, **kwargs:
                       result.append(json.loads(figure.to_json()))), \
-         patch.object(short_runs.fastf1.plotting, 'get_team_color', return_value='blue'):
+         patch('fastf1.plotting.get_team_color', return_value='blue'):
         short_runs.plot_ideal_best(session, MagicMock(), output_dir='unused')
         short_runs.plot_ideal_best_diff(session, MagicMock(), output_dir='unused')
     return result

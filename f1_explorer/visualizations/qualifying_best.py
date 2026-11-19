@@ -3,15 +3,8 @@
 import pandas as pd
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
+from f1_explorer.visualizations.style import driver_team_colors
 from f1_explorer.visualizations.chart_ranges import bar_range
-
-
-def _team_colors(drivers, teams, session):
-    if not teams:
-        return ["gray"] * len(drivers)
-    import fastf1.plotting
-    return [fastf1.plotting.get_team_color(teams.get(driver, ""), session)
-            if teams.get(driver, "") else "gray" for driver in drivers]
 
 
 def _truthy(values):
@@ -49,7 +42,7 @@ def make_qualifying_best(session):
                     teams = fastest.set_index("Driver")["Team"].to_dict()
             drivers, times = best.index.tolist(), best.tolist()
             ratios = (best / best.min() * 100).tolist() if len(best) else []
-            colors = _team_colors(drivers, teams, session)
+            colors = driver_team_colors(drivers, teams, session)
             cells = [list(range(1, len(drivers) + 1)), drivers, [f"{t:.3f}" for t in times],
                      [f"{r:.3f}%" for r in ratios]]
             combinations.append((f"{scope} · {metric}", drivers, times, ratios, cells, colors))

@@ -276,7 +276,7 @@ def test_summary_scatter_values_and_interactive_report(tmp_path):
     report = SessionReport(session, tmp_path / "images", report_dir=tmp_path / "reports")
     with (
         report,
-        patch("f1_explorer.visualizations.short_runs.fastf1.plotting.get_team_color", return_value="blue"),
+        patch("fastf1.plotting.get_team_color", return_value="blue"),
         patch("plotly.graph_objects.Figure.write_image", autospec=True,
               side_effect=lambda figure, path, **kwargs: Path(path).touch()),
     ):
@@ -480,7 +480,7 @@ def test_interactive_driver_telemetry_is_ordered_by_fastest_session_lap() -> Non
     )
 
     with (
-        patch("f1_explorer.visualizations.short_runs.fastf1.plotting.get_team_color", return_value="blue"),
+        patch("fastf1.plotting.get_team_color", return_value="blue"),
         patch("f1_explorer.visualizations.short_runs.save_plotly") as save,
     ):
         _save_interactive_driver_telemetry(

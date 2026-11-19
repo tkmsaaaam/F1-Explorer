@@ -7,13 +7,10 @@ from typing import cast
 
 from f1_explorer.circuit import circuit_info_or_none
 
-import fastf1
-import fastf1.plotting
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import pandas
 import plotly.graph_objects as go
-import structlog
 from fastf1.core import Session, Laps
 # noinspection PyPackageRequirements
 from opentelemetry import trace
@@ -29,7 +26,7 @@ from f1_explorer.visualizations.output import WarningLoggerLike, save_matplotlib
 from f1_explorer.visualizations.report import current_report
 from f1_explorer.visualizations.race_metrics import GapObservation, gap_observations_all
 from f1_explorer.visualizations.session_order import driver_order, driver_sort_key
-from f1_explorer.visualizations.style import driver_linestyle
+from f1_explorer.visualizations.style import driver_linestyle, resolve_team_color, plotly_driver_dash
 from f1_explorer.visualizations.race_start import start_samples
 
 tracer = trace.get_tracer(__name__)
@@ -120,7 +117,7 @@ def laptime(log: WarningLoggerLike, filepath: str, filename: str, session: Sessi
                 continue
             lap_numbers = [number for number, _ in complete]
             lap_times = [lap.get_time() for _, lap in complete]
-            color = fastf1.plotting.get_team_color(lap_log.get_driver().get_team_name(), session)
+            color = resolve_team_color(lap_log.get_driver().get_team_name(), session)
             ax.plot(lap_numbers, lap_times, color=color, label=lap_log.get_driver().get_name(), linewidth=0.5,
                     linestyle=driver_linestyle(session.event.year, lap_log.get_driver().get_number()))
         minimum: datetime.timedelta = session.laps.sort_values(by='LapTime').LapTime.min()
@@ -279,15 +276,14 @@ def _gap_trace(fig: go.Figure, session: Session, driver_laps: DriverLaps,
                observations: list[GapObservation]) -> list[float]:
     """Add one driver's gap series and return its finite gap values."""
     driver = driver_laps.get_driver()
-    line_style = driver_linestyle(session.event.year, driver.get_number())
     fig.add_trace(go.Scatter(
         x=[item.lap_number for item in observations],
         y=[item.seconds for item in observations],
         mode="lines",
         name=driver.get_name(),
         line={
-            "color": fastf1.plotting.get_team_color(driver.get_team_name(), session),
-            "dash": "dash" if line_style == "dashed" else "solid",
+            "color": resolve_team_color(driver.get_team_name(), session),
+            "dash": plotly_driver_dash(session, driver.get_number()),
             "width": 1.5,
         },
         customdata=[[item.comparison_number, item.reason or "valid"] for item in observations],
@@ -393,7 +389,7 @@ def positions(log: WarningLoggerLike, filepath: str, session: Session, lap_logs:
     """
     fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
     for lap_log in lap_logs:
-        color = fastf1.plotting.get_team_color(lap_log.get_driver().get_team_name(), session)
+        color = resolve_team_color(lap_log.get_driver().get_team_name(), session)
         x = sorted(lap_log.get_laps().keys())
         # Missing positions are plotted as line gaps, not as zeros.
         y = [lap_log.get_laps()[i].get_position() for i in x]

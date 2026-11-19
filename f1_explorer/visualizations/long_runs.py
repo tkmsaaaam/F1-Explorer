@@ -21,7 +21,7 @@ from f1_explorer.visualizations.domain.long_run import (
 from f1_explorer.visualizations.output import resolve_output_dir, save_matplotlib
 from f1_explorer.visualizations.report import current_report
 from f1_explorer.visualizations.session_order import driver_order, driver_sort_key
-from f1_explorer.visualizations.style import driver_linestyle
+from f1_explorer.visualizations.style import driver_linestyle, resolve_team_color, plotly_driver_dash
 
 tracer = trace.get_tracer(__name__)
 
@@ -301,7 +301,7 @@ def plot_by_tyre_age_and_tyre(
             runs = list(selection.runs)
             for run in runs:
                 team = run.driver.team_name
-                color = fastf1.plotting.get_team_color(team, session) if team != '' else 'white'
+                color = resolve_team_color(team, session, empty_color="white")
                 displayed = _displayed_points(run)
                 line_style = driver_linestyle(session.event.year, run.driver.number)
                 ax.plot([point.tyre_age for point in displayed],
@@ -349,16 +349,8 @@ def _make_interactive_long_run_figure(
         name = _run_label(run)
         customdata = [[run.driver.name, run.driver.team_name, point.lap_number,
                        point.tyre_age] for point in run.points]
-        try:
-            color = (fastf1.plotting.get_team_color(run.driver.team_name, session)
-                     if run.driver.team_name else "gray")
-        except (AttributeError, KeyError, TypeError, ValueError):
-            color = "gray"
-        try:
-            line_style = driver_linestyle(session.event.year, run.driver.number)
-            dash = "dash" if line_style == "dashed" else "solid"
-        except (AttributeError, TypeError, ValueError):
-            dash = "solid"
+        color = resolve_team_color(run.driver.team_name, session)
+        dash = plotly_driver_dash(session, run.driver.number)
         fig.add_trace(go.Scatter(
             x=[point.tyre_age for point in run.points],
             y=[point.lap_time_seconds if point.tyre_age is not None else None

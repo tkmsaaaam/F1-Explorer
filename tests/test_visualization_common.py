@@ -20,7 +20,7 @@ from f1_explorer.visualizations.output import (
     session_output_dir,
     session_report_dir,
 )
-from f1_explorer.visualizations.style import driver_linestyle
+from f1_explorer.visualizations.style import driver_linestyle, plotly_driver_dash, resolve_team_color
 from f1_explorer.visualizations.report import SessionReport
 
 
@@ -285,6 +285,29 @@ class VisualizationCommon(unittest.TestCase):
                     save_plotly_batch([go.Figure()], [path], log, width=1920, height=1080)
             self.assertEqual(log.messages, [])
 
+
+    def test_team_palette_and_missing_colors(self):
+        session = Mock()
+        with patch("fastf1.plotting.get_team_color", return_value="#123456") as lookup:
+            self.assertEqual(resolve_team_color("Example", session), "#123456")
+            self.assertEqual(resolve_team_color("", session, empty_color="white"), "white")
+            # Non-string teams (None, NaN) stay gray even when empty_color is white.
+            self.assertEqual(resolve_team_color(None, session), "gray")
+            self.assertEqual(resolve_team_color(float("nan"), session, empty_color="white"), "gray")
+            lookup.assert_called_once_with("Example", session)
+            for error in (AttributeError, KeyError, TypeError, ValueError):
+                with self.subTest(error=error):
+                    lookup.side_effect = error
+                    self.assertEqual(resolve_team_color("Unknown", session), "gray")
+                    self.assertEqual(resolve_team_color("Unknown", session, empty_color="white"), "gray")
+
+    def test_plotly_driver_dash(self):
+        session = SimpleNamespace(event=SimpleNamespace(year=2025))
+        self.assertEqual(plotly_driver_dash(session, "22"), "dash")
+        self.assertEqual(plotly_driver_dash(session, "1"), "solid")
+        self.assertEqual(plotly_driver_dash(session, None), "solid")
+        # Session stubs without .event fall back to solid instead of raising.
+        self.assertEqual(plotly_driver_dash(SimpleNamespace(), "22"), "solid")
 
     def test_driver_linestyle_uses_camera_and_safe_defaults(self) -> None:
         self.assertEqual(driver_linestyle(2025, 1), "solid")

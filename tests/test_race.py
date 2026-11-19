@@ -108,7 +108,7 @@ class Race(unittest.TestCase):
         session.event = SimpleNamespace(year=2026)
         nonempty = [driver for driver in lap_logs if driver.laps]
         with (
-            patch("f1_explorer.visualizations.race.fastf1.plotting.get_team_color", return_value="#123456"),
+            patch("fastf1.plotting.get_team_color", return_value="#123456"),
             patch("f1_explorer.visualizations.race.save_plotly") as save,
         ):
             gap_to_ahead_graph(MagicMock(), "output", "ahead", session, None, nonempty)
@@ -343,7 +343,7 @@ class Race(unittest.TestCase):
         with (
             patch("f1_explorer.visualizations.race.save_matplotlib") as save,
             patch("f1_explorer.visualizations.race.current_report", return_value=MagicMock()),
-            patch("f1_explorer.visualizations.race.fastf1.plotting.get_team_color", return_value="#123456"),
+            patch("fastf1.plotting.get_team_color", return_value="#123456"),
         ):
             laptime(MagicMock(), "output", "laptime_graph", session, None, lap_logs)
 
@@ -362,7 +362,7 @@ class Race(unittest.TestCase):
         session = SimpleNamespace(event=SimpleNamespace(year=2026))
         with (
             patch("f1_explorer.visualizations.race.save_matplotlib") as save,
-            patch("f1_explorer.visualizations.race.fastf1.plotting.get_team_color", return_value="#123456"),
+            patch("fastf1.plotting.get_team_color", return_value="#123456"),
         ):
             positions(MagicMock(), "output", session, lap_logs)
 
@@ -383,7 +383,7 @@ class Race(unittest.TestCase):
         session = SimpleNamespace(event=SimpleNamespace(year=2026))
         with (
             patch("f1_explorer.visualizations.race.save_matplotlib") as save,
-            patch("f1_explorer.visualizations.race.fastf1.plotting.get_team_color", return_value="#123456"),
+            patch("fastf1.plotting.get_team_color", return_value="#123456"),
         ):
             positions(MagicMock(), "output", session, lap_logs)
 
@@ -433,7 +433,7 @@ class Race(unittest.TestCase):
         ]
         session = SimpleNamespace(event=SimpleNamespace(year=2026), laps=MagicMock())
         with (
-            patch("f1_explorer.visualizations.race.fastf1.plotting.get_team_color", return_value="#123456"),
+            patch("fastf1.plotting.get_team_color", return_value="#123456"),
             patch("f1_explorer.visualizations.race.save_plotly") as save,
         ):
             gap_to_ahead_graph(MagicMock(), "output", "ahead", session, None, lap_logs)
@@ -486,7 +486,7 @@ class Race(unittest.TestCase):
         with (
             patch("f1_explorer.visualizations.race.gap_observations_all",
                   return_value={1: observations, 2: observations}),
-            patch("f1_explorer.visualizations.race.fastf1.plotting.get_team_color", return_value="#123456"),
+            patch("fastf1.plotting.get_team_color", return_value="#123456"),
             patch("f1_explorer.visualizations.race.save_plotly") as save,
         ):
             gap_to_ahead_graph(MagicMock(), "output", "gap_ahead_graph", session, 15, lap_logs)
@@ -526,7 +526,7 @@ class Race(unittest.TestCase):
                             if not results.empty else
                             ["NORESULT", "TIE10", "DNF", "TIE3", "UNTIMED"])
                 with (
-                    patch("f1_explorer.visualizations.race.fastf1.plotting.get_team_color", return_value="#123456"),
+                    patch("fastf1.plotting.get_team_color", return_value="#123456"),
                     patch("f1_explorer.visualizations.race.save_plotly") as save,
                 ):
                     gap_to_ahead_table(MagicMock(), "ahead.png", lap_logs, ranks=driver_order(session))
@@ -569,7 +569,7 @@ class Race(unittest.TestCase):
             patch("f1_explorer.visualizations.race.gap_observations_all",
                   return_value={1: [SimpleNamespace(lap_number=1, seconds=0.0,
                                                     comparison_number=1, reason=None)]}),
-            patch("f1_explorer.visualizations.race.fastf1.plotting.get_team_color", return_value="#123456"),
+            patch("fastf1.plotting.get_team_color", return_value="#123456"),
             patch("f1_explorer.visualizations.race.save_plotly") as save,
         ):
             gap_to_top_graph(MagicMock(), "output", "gap_top_graph", session, None, lap_logs)

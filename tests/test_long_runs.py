@@ -301,7 +301,7 @@ class LongRuns(unittest.TestCase):
             laps=pandas.DataFrame(),
         )
 
-        with patch("f1_explorer.visualizations.long_runs.fastf1.plotting.get_team_color", return_value="#123456"):
+        with patch("fastf1.plotting.get_team_color", return_value="#123456"):
             figure = _make_interactive_long_run_figure(session, "SOFT", runs)
 
         self.assertEqual(["#123456"] * 3, [trace.line.color for trace in figure.data])
@@ -328,7 +328,7 @@ class LongRuns(unittest.TestCase):
         session = SimpleNamespace(event=SimpleNamespace(year=2026), laps=frame)
         with (
             patch("f1_explorer.visualizations.long_runs.fastf1.plotting.setup_mpl"),
-            patch("f1_explorer.visualizations.long_runs.fastf1.plotting.get_team_color", return_value="#123456"),
+            patch("fastf1.plotting.get_team_color", return_value="#123456"),
             patch("f1_explorer.visualizations.long_runs.driver_linestyle", return_value="solid"),
             patch("f1_explorer.visualizations.long_runs.save_matplotlib") as save,
         ):

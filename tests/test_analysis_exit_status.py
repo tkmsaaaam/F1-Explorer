@@ -302,7 +302,7 @@ def test_figure_construction_failure_closes_only_owned_figure(monkeypatch, tmp_p
     unrelated = plt.figure()
     before = set(plt.get_fignums())
     monkeypatch.setattr(run_volume, "driver_linestyle", lambda *args: "solid")
-    monkeypatch.setattr(run_volume.fastf1.plotting, "get_team_color", lambda *args: "red")
+    monkeypatch.setattr("fastf1.plotting.get_team_color", lambda *args: "red")
     monkeypatch.setattr(run_volume, "save_matplotlib", lambda *args, **kwargs: None)
     with pytest.raises(RuntimeError, match="plot failed"):
         with monkeypatch.context() as patcher:

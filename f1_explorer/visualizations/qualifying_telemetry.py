@@ -4,15 +4,14 @@ from __future__ import annotations
 
 from typing import Any
 
+from f1_explorer.visualizations.style import resolve_team_color, plotly_driver_dash
 from f1_explorer.circuit import circuit_info_or_none
 
 from fastf1.core import Telemetry
-import fastf1.plotting
 import numpy as np
 import plotly.graph_objects as go
 
 from f1_explorer.visualizations.lap_selection import fastest_laps_by_driver
-from f1_explorer.visualizations.short_runs import _plotly_driver_dash
 from f1_explorer.visualizations.short_runs import _gear_colorscale
 from f1_explorer.telemetry import lap_telemetry_without_driver_ahead
 
@@ -104,14 +103,8 @@ def make_telemetry_comparison(session: Any) -> go.Figure:
     values_by_tab: list[list[float]] = [[] for _ in tabs]
 
     for number, lap in laps.items():
-        try:
-            color = fastf1.plotting.get_team_color(lap.Team, session)
-        except (AttributeError, KeyError, ValueError):
-            color = "gray"
-        try:
-            dash = _plotly_driver_dash(session.event.year, int(number))
-        except (TypeError, ValueError):
-            dash = "solid"
+        color = resolve_team_color(getattr(lap, "Team", None), session)
+        dash = plotly_driver_dash(session, number)
 
         if len(common_distance) >= 2 and str(number) in time_data:
             distance, times = time_data[str(number)]
@@ -237,10 +230,7 @@ def make_track_map_comparison(session: Any) -> go.Figure:
     driver_labels: dict[str, str] = {}
     for number, lap, metric, x, y, values in entries:
         driver_labels[number] = str(lap.Driver)
-        try:
-            color = fastf1.plotting.get_team_color(lap.Team, session)
-        except (AttributeError, KeyError, ValueError):
-            color = "gray"
+        color = resolve_team_color(getattr(lap, "Team", None), session)
         is_speed = metric == "Speed"
         unit, hover_format = ("Speed [km/h]", ".1f") if is_speed else ("Gear", ".0f")
         figure.add_trace(go.Scattergl(

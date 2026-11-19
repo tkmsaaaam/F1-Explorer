@@ -3,8 +3,6 @@ from pathlib import Path
 
 from f1_explorer.circuit import circuit_info_or_none
 
-import fastf1
-import fastf1.plotting
 from matplotlib import colormaps
 from matplotlib.collections import LineCollection
 import matplotlib.pyplot as plt
@@ -19,7 +17,7 @@ from opentelemetry import trace
 
 from f1_explorer.telemetry import lap_telemetry_without_driver_ahead
 from f1_explorer.visualizations.output import resolve_output_dir, save_matplotlib, save_plotly
-from f1_explorer.visualizations.style import driver_linestyle
+from f1_explorer.visualizations.style import driver_linestyle, resolve_team_color, plotly_driver_dash
 
 tracer = trace.get_tracer(__name__)
 
@@ -62,7 +60,7 @@ def plot_best_laptime(session: Session, log: structlog.stdlib.BoundLogger, key: 
         if laps.empty:
             continue
         team = laps.Team.iloc[0]
-        color = 'white' if team == '' else fastf1.plotting.get_team_color(team, session)
+        color = resolve_team_color(team, session, empty_color="white")
         l = [laps.iloc[i][key].total_seconds() for i in range(0, len(laps))]
         data.append({'Acronym': laps.Driver.iloc[0], key: min(l), 'Color': color})
     if not data:
@@ -94,7 +92,7 @@ def plot_best_speed(session: Session, log: structlog.stdlib.BoundLogger, key: st
         if laps.empty:
             continue
         team = laps.Team.iloc[0]
-        color = 'white' if team == '' else fastf1.plotting.get_team_color(team, session)
+        color = resolve_team_color(team, session, empty_color="white")
         maximum = max([laps.iloc[i][key] for i in range(0, len(laps))])
         data.append({'Acronym': laps.Driver.iloc[0], key: maximum, 'Color': color})
     df = pandas.DataFrame(data).sort_values(key, ascending=False)
@@ -162,10 +160,7 @@ def plot_flat_out(session: Session, log: structlog.stdlib.BoundLogger, *, output
         if not math.isfinite(x) or not math.isfinite(y):
             log.warning("Skipping flat-out point with invalid calculated ratio", driver_number=driver_number)
             continue
-        try:
-            color = fastf1.plotting.get_team_color(lap.Team, session)
-        except AttributeError:
-            color = 'gray'
+        color = resolve_team_color(getattr(lap, "Team", None), session)
         _add_summary_point(fig, lap.Driver, x * 100, y * 100, color)
     _save_summary_scatter(fig, session, log, output_dir, "flat_out",
                           "Flat-out Distance / Lap Distance [%]",
@@ -213,10 +208,7 @@ def plot_ideal_best(session: Session, log: structlog.stdlib.BoundLogger, *, outp
             continue
         y = sec1 + sec2 + sec3
         acronym = laps.Driver.iloc[0]
-        try:
-            color = fastf1.plotting.get_team_color(laps.Team.iloc[0], session)
-        except AttributeError:
-            color = 'gray'
+        color = resolve_team_color(laps["Team"].iloc[0] if "Team" in laps else None, session)
         _add_summary_point(fig, acronym, x, y, color)
     _save_summary_scatter(fig, session, log, output_dir, "ideal_best",
                           "Best Lap Time [s]", "Ideal Lap Time (Sum of Best Sectors) [s]")
@@ -235,10 +227,7 @@ def plot_ideal_best_diff(session: Session, log: structlog.stdlib.BoundLogger, *,
         if laps.empty:
             continue
         acronym = laps.Driver.iloc[0]
-        try:
-            color = fastf1.plotting.get_team_color(laps.Team.iloc[0], session)
-        except AttributeError:
-            color = 'gray'
+        color = resolve_team_color(laps["Team"].iloc[0] if "Team" in laps else None, session)
         try:
             sec1, sec2, sec3 = _best_sector_seconds(laps)
         except (AttributeError, TypeError, ValueError) as error:
@@ -325,10 +314,7 @@ def plot_speed_and_laptime(session: Session, log: structlog.stdlib.BoundLogger, 
             continue
         max_speed: float = lap.get_car_data().Speed.max()
         y = lap.LapTime.total_seconds()
-        try:
-            color = fastf1.plotting.get_team_color(lap.Team, session)
-        except AttributeError:
-            color = 'gray'
+        color = resolve_team_color(getattr(lap, "Team", None), session)
         _add_summary_point(fig, lap.Driver, max_speed, y, color)
     _save_summary_scatter(fig, session, log, output_dir, "speed_and_laptime",
                           "Top Speed on Best Lap [km/h]", "Best Lap Time [s]")
@@ -351,10 +337,7 @@ def plot_speed_distance(session: Session, log: structlog.stdlib.BoundLogger, *, 
             continue
         fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
         try:
-            try:
-                team_color = fastf1.plotting.get_team_color(laps.Team, session)
-            except AttributeError:
-                team_color = 'gray'
+            team_color = resolve_team_color(getattr(laps, "Team", None), session)
             style = driver_linestyle(session.event.year, int(driver_number))
             car_data = laps.get_car_data().add_distance()
             ax.plot(car_data.Distance, car_data.Speed, color=team_color, label=laps.Driver, linestyle=style)
@@ -408,10 +391,7 @@ def plot_speed_distance_comparison(session: Session, log: structlog.stdlib.Bound
                 laps = session.laps.pick_drivers(driver_number).pick_fastest()
                 if laps is None:
                     continue
-                try:
-                    team_color = fastf1.plotting.get_team_color(laps.Team, session)
-                except AttributeError:
-                    team_color = 'gray'
+                team_color = resolve_team_color(getattr(laps, "Team", None), session)
                 style = driver_linestyle(session.event.year, int(driver_number))
                 car_data = laps.get_car_data().add_distance()
                 ax.plot(car_data.Distance, car_data.Speed, color=team_color, label=laps.Driver, linestyle=style,
@@ -541,10 +521,7 @@ def plot_time_distance_comparison(session: Session, log: structlog.stdlib.BoundL
                 tm = tm[np.sort(uniq_idx)]
                 interp_time = np.interp(common_distance, dist, tm)
                 delta = interp_time - ref_time
-                try:
-                    team_color = fastf1.plotting.get_team_color(lap.Team, session)
-                except AttributeError:
-                    team_color = 'gray'
+                team_color = resolve_team_color(getattr(lap, "Team", None), session)
                 label = lap.Driver
                 if driver_number == fastest_driver_number:
                     label += " (FASTEST)"
@@ -724,13 +701,6 @@ def _save_interactive_track_map(
     )
 
 
-def _plotly_driver_dash(year: int, driver_number: int) -> str:
-    """Translate the shared Matplotlib line style to Plotly's dash names."""
-
-    style = driver_linestyle(year, driver_number)
-    return "dash" if style == "dashed" else style
-
-
 def _save_interactive_driver_telemetry(
         session: Session,
         log: structlog.stdlib.BoundLogger,
@@ -761,14 +731,8 @@ def _save_interactive_driver_telemetry(
         valid = np.isfinite(x_data) & np.isfinite(y_data)
         if not valid.any():
             continue
-        try:
-            color = fastf1.plotting.get_team_color(lap.Team, session)
-        except (AttributeError, KeyError, ValueError):
-            color = "gray"
-        try:
-            line_dash = _plotly_driver_dash(session.event.year, int(driver_number))
-        except (TypeError, ValueError):
-            line_dash = "solid"
+        color = resolve_team_color(getattr(lap, "Team", None), session)
+        line_dash = plotly_driver_dash(session, driver_number)
         figure.add_trace(go.Scatter(
             x=x_data[valid],
             y=y_data[valid],
@@ -854,14 +818,8 @@ def _save_interactive_time_distance_delta(
             continue
         delta = np.interp(common_distance, distance, times) - reference_time
         minimum, maximum = min(minimum, float(delta.min())), max(maximum, float(delta.max()))
-        try:
-            color = fastf1.plotting.get_team_color(lap.Team, session)
-        except (AttributeError, KeyError, ValueError):
-            color = "gray"
-        try:
-            line_dash = _plotly_driver_dash(session.event.year, int(driver_number))
-        except (TypeError, ValueError):
-            line_dash = "solid"
+        color = resolve_team_color(getattr(lap, "Team", None), session)
+        line_dash = plotly_driver_dash(session, driver_number)
         label = f"{lap.Driver} (FASTEST)" if str(driver_number) == fastest_driver else str(lap.Driver)
         figure.add_trace(go.Scatter(
             x=common_distance,
@@ -929,10 +887,7 @@ def _plot_driver_telemetry(session: Session, log: structlog.stdlib.BoundLogger, 
 
                 car_data = laps.get_car_data().add_distance()
                 driver_name = laps.Driver
-                try:
-                    team_color = fastf1.plotting.get_team_color(laps.Team, session)
-                except AttributeError:
-                    team_color = 'gray'
+                team_color = resolve_team_color(getattr(laps, "Team", None), session)
                 line_style = driver_linestyle(session.event.year, int(driver_number))
 
                 y_data = value_func(car_data)
@@ -1062,7 +1017,7 @@ def plot_telemetry(session: Session, log: structlog.stdlib.BoundLogger,
 
             car_data = laps.get_car_data().add_distance()
             driver_name = laps.Driver
-            team_color = fastf1.plotting.get_team_color(laps.Team, session)
+            team_color = resolve_team_color(getattr(laps, "Team", None), session)
             line_style = driver_linestyle(session.event.year, int(driver_number))
 
             y_data = value_func(car_data)
@@ -1110,10 +1065,7 @@ def plot_tyre_age_and_laptime(session: Session, log: structlog.stdlib.BoundLogge
             continue
 
         tyre_life = lap.TyreLife
-        try:
-            color = fastf1.plotting.get_team_color(lap.Team, session)
-        except AttributeError:
-            color = 'gray'
+        color = resolve_team_color(getattr(lap, "Team", None), session)
         _add_summary_point(fig, lap.Driver, tyre_life, lap.LapTime.total_seconds(), color)
     _save_summary_scatter(fig, session, log, output_dir, "tyre_age_and_laptime",
                           "Tyre Age on Best Lap [laps]", "Best Lap Time [s]",

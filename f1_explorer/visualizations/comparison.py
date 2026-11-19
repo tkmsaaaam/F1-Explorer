@@ -1,17 +1,15 @@
 from pathlib import Path
 from typing import Any, Callable, NotRequired, TypedDict
 
+from f1_explorer.visualizations.style import driver_linestyle, resolve_team_color
 from f1_explorer.circuit import circuit_info_or_none
 
-import fastf1
-import fastf1.plotting
 import matplotlib.pyplot as plt
 import structlog
 from fastf1.core import Session
 # noinspection PyPackageRequirements
 from opentelemetry import trace
 
-from f1_explorer import constants
 from f1_explorer.visualizations.output import resolve_output_dir, save_matplotlib
 
 tracer = trace.get_tracer(__name__)
@@ -82,17 +80,13 @@ def _plot_driver_lap_telemetry(session: Session, log: structlog.stdlib.BoundLogg
                 continue
             car_data = lap.get_car_data().add_distance()
             series_label = f"{lap.Driver} {lap.LapNumber} {lap.LapTime.total_seconds()}"
-            try:
-                team_color = fastf1.plotting.get_team_color(lap.Team, session)
-            except AttributeError:
-                team_color = 'gray'
-            camera_color = constants.camera[session.event.year].get(int(lap.DriverNumber), 'black')
+            team_color = resolve_team_color(getattr(lap, "Team", None), session)
             if lap.DriverNumber in z and z[lap.DriverNumber] == 0:
                 line_style = 'dotted'
             elif lap.DriverNumber in z and z[lap.DriverNumber] == 1:
                 line_style = 'dashdot'
             else:
-                line_style = 'solid' if camera_color == 'black' else 'dashed'
+                line_style = driver_linestyle(session.event.year, int(lap.DriverNumber))
             if lap.DriverNumber not in z:
                 z[lap.DriverNumber] = 0
             else:

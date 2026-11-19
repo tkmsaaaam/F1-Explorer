@@ -220,7 +220,7 @@ def test_laptime_charts_use_team_color_and_camera_dash(name):
         event=SimpleNamespace(year=2025),
     )
 
-    with patch("f1_explorer.visualizations.run_volume.fastf1.plotting.get_team_color", return_value="#123456"):
+    with patch("fastf1.plotting.get_team_color", return_value="#123456"):
         figures = (
             _make_interactive_laptime_by_timing(session),
             _make_interactive_laptime_by_lap_number(session),

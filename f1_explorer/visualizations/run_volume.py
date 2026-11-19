@@ -4,7 +4,6 @@ from typing import cast, TypedDict
 
 from f1_explorer.sessions import is_race_session
 
-import fastf1.plotting
 import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
 import numpy
@@ -21,7 +20,7 @@ from f1_explorer import constants
 from f1_explorer.visualizations.output import resolve_output_dir, save_matplotlib, save_plotly
 from f1_explorer.visualizations.report import current_report
 from f1_explorer.visualizations.session_order import driver_order, driver_sort_key
-from f1_explorer.visualizations.style import driver_linestyle
+from f1_explorer.visualizations.style import driver_linestyle, resolve_team_color, plotly_driver_dash
 
 tracer = trace.get_tracer(__name__)
 
@@ -99,17 +98,8 @@ def _lap_quality(row) -> tuple[bool, list[str]]:
 
 def _interactive_driver_style(session: Session, driver_number, team) -> tuple[str, str]:
     """Return the team color and camera-based Plotly dash for a driver."""
-    color = "gray"
-    if pandas.notna(team) and str(team):
-        try:
-            color = fastf1.plotting.get_team_color(str(team), session)
-        except (AttributeError, KeyError, TypeError, ValueError):
-            pass
-    try:
-        style = driver_linestyle(session.event.year, int(driver_number))
-        dash = "dash" if style == "dashed" else "solid"
-    except (AttributeError, TypeError, ValueError):
-        dash = "solid"
+    color = resolve_team_color(team, session)
+    dash = plotly_driver_dash(session, driver_number)
     return color, dash
 
 
@@ -128,7 +118,7 @@ def plot_lap_number_by_timing(session: Session, log: structlog.stdlib.BoundLogge
             if stint_laps.empty:
                 continue
             team = stint_laps.Team.iloc[0]
-            color = 'white' if team == '' else fastf1.plotting.get_team_color(team, session)
+            color = resolve_team_color(team, session, empty_color="white")
             stint_laps = stint_laps.sort_values(by='LapNumber')
             lap_numbers = stint_laps.LapNumber
             lap_starts = stint_laps.LapStartDate
@@ -405,7 +395,7 @@ def plot_laptime_by_lap_number(session: Session, log: structlog.stdlib.BoundLogg
             if stint_laps.empty:
                 continue
             team = stint_laps.Team.iloc[0]
-            color = 'white' if team == '' else fastf1.plotting.get_team_color(team, session)
+            color = resolve_team_color(team, session, empty_color="white")
             stint_laps = stint_laps.sort_values(by='LapNumber')
             lap_times = stint_laps.LapTime.dt.total_seconds().tolist()
             lap_numbers = stint_laps.LapNumber
@@ -541,7 +531,7 @@ def plot_laptime_by_timing(
             if driver_laps.empty:
                 continue
             team = driver_laps.Team.iloc[0]
-            color = 'white' if team == '' else fastf1.plotting.get_team_color(team, session)
+            color = resolve_team_color(team, session, empty_color="white")
             driver_laps = driver_laps.sort_values(by='LapNumber').copy()
             driver_laps['_LapStartDate'] = _lap_start_dates(session, driver_laps)
             show_label = True

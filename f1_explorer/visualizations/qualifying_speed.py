@@ -4,6 +4,7 @@ import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 from opentelemetry import trace
+from f1_explorer.visualizations.style import driver_team_colors
 from f1_explorer.scalars import require_present
 
 tracer = trace.get_tracer(__name__)
@@ -24,14 +25,6 @@ def _speed_range(values: list[float]) -> list[float] | None:
     if not values:
         return None
     return [max(0, min(values) - 5), max(values) + 5]
-
-
-def _team_colors(drivers, teams, session):
-    if not teams:
-        return ["gray"] * len(drivers)
-    import fastf1.plotting
-    return [fastf1.plotting.get_team_color(teams.get(driver, ""), session)
-            if teams.get(driver, "") else "gray" for driver in drivers]
 
 
 def _truthy(values):
@@ -271,7 +264,7 @@ def make_qualifying_speed(session):
                 laps, key, telemetry_cache, session, tow_context=tow_context,
             )
             label = f"{scope_label} · {measurement_label}"
-            combinations.append((label, key, drivers, speeds, _team_colors(drivers, teams, session), tow))
+            combinations.append((label, key, drivers, speeds, driver_team_colors(drivers, teams, session), tow))
 
     fig = go.Figure()
     for index, (label, key, drivers, speeds, colors, tow) in enumerate(combinations):

@@ -5,14 +5,9 @@ from __future__ import annotations
 import pandas as pd
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
+from f1_explorer.visualizations.style import driver_team_colors
 from f1_explorer.visualizations.chart_ranges import bar_range
 from f1_explorer.visualizations.qualifying_speed import _TowContext, _measurement_values, _telemetry_cache
-
-
-def _colors(drivers, teams, session):
-    import fastf1.plotting
-    return [fastf1.plotting.get_team_color(teams.get(d, ""), session)
-            if teams.get(d, "") else "gray" for d in drivers]
 
 
 def _speed_range(values: list[float]) -> list[float] | None:
@@ -54,7 +49,7 @@ def make_practice_best(session):
         drivers, values, teams, ratios = _best(session, key)
         cells = [list(range(1, len(drivers) + 1)), drivers,
                  [f"{v:.3f}" for v in values], [f"{r:.3f}%" for r in ratios]]
-        combinations.append((label, drivers, values, ratios, cells, _colors(drivers, teams, session)))
+        combinations.append((label, drivers, values, ratios, cells, driver_team_colors(drivers, teams, session)))
     fig = make_subplots(rows=2, cols=1, specs=[[{"type": "xy"}], [{"type": "table"}]],
                         row_heights=[0.48, 0.52], vertical_spacing=0.04)
     first = combinations[0]
@@ -106,7 +101,7 @@ def make_practice_speed(session):
         drivers, speeds, teams, tow = _measurement_values(
             valid, key, telemetry_cache, session, tow_context=tow_context,
         )
-        choices.append((label, drivers, speeds, _colors(drivers, teams, session), tow, key))
+        choices.append((label, drivers, speeds, driver_team_colors(drivers, teams, session), tow, key))
     for index, (label, drivers, values, colors, tow, key) in enumerate(choices):
         text = [f"<b>{value:.1f}</b>" if tow.get(driver, False) and key != "SpeedST" else f"{value:.1f}"
                 for driver, value in zip(drivers, values)]
