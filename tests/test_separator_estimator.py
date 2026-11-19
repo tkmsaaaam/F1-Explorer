@@ -14,6 +14,8 @@ from f1_explorer.separator_estimator import (
     SeparatorBoundary,
     SeparatorResolution,
     StaticArchiveClient,
+    _find_session_path,
+    _session_key,
     build_distance_lookup,
     build_live_timing_lap_windows,
     coerce_separator_boundary,
@@ -448,14 +450,26 @@ def test_stream_parser_accepts_archive_lines() -> None:
     assert parsed[0][1]["Lines"]["1"]["LapNumber"] == 1
 
 
-def test_static_archive_resolves_indexes_and_caches() -> None:
+@pytest.mark.parametrize("reverse", [False, True])
+@pytest.mark.parametrize("event, available, expected", [
+    pytest.param({"EventName": "B GP"}, True, "B", id="event-name"),
+    pytest.param(SimpleNamespace(Location="B"), True, "B", id="location"),
+    pytest.param({"EventName": "B GP"}, False, "fallback", id="session-absent"),
+    pytest.param({}, True, "fallback", id="no-event-info"),
+    pytest.param({"Location": "A", "EventName": "B GP"}, True, "B", id="name-over-location"),
+])
+def test_static_archive_resolves_indexes_and_caches(reverse, event, available, expected) -> None:
+    meetings = [
+        {"Name": "A GP", "Location": "A", "Sessions": [{"Name": "Sprint Shootout", "Path": "A/"}]},
+        {"Name": "B GP", "Location": "B", "Sessions": [
+            {"Name": "Sprint Shootout" if available else "Practice 1", "Path": "B/"}
+        ]},
+    ]
+    base = "https://example.test/static/"
     payloads = {
-        "https://example.test/static/2025/Index.json": {"Meetings": [{
-            "Location": "Test Circuit", "Path": "2025/Test/",
-            "Sessions": [{"Name": "Practice 1", "Path": "2025/Test/Practice/"}],
-        }]},
-        "https://example.test/static/2025/Test/Practice/Index.json": {"Files": ["TimingData.jsonStream"]},
-        "https://example.test/static/2025/Test/Practice/TimingData.jsonStream": "00:00:01:000{}\r\n",
+        base + "2025/Index.json": {"Meetings": meetings[::-1] if reverse else meetings},
+        base + expected + "/Index.json": {"Files": ["TimingData.jsonStream"]},
+        base + expected + "/TimingData.jsonStream": "00:00:01:000{}\r\n",
     }
     calls = []
 
@@ -469,12 +483,117 @@ def test_static_archive_resolves_indexes_and_caches() -> None:
         calls.append((url, timeout))
         return Response(payloads[url])
 
-    session = SimpleNamespace(name="Practice 1", api_path="/static/fallback/",
-                              event=SimpleNamespace(year=2025, Location="Test Circuit"))
+    session = SimpleNamespace(name="SQ", api_path="/static/fallback/", event=event, year=2025)
     client = StaticArchiveClient(base_url="https://example.test", http_get=get)
     assert client.timing_data(session) == [["00:00:01:000", {}]]
     assert len(calls) == 3
     assert all(timeout == 15 for _, timeout in calls)
+    calls.clear()
+    assert client.timing_data(session) == [["00:00:01:000", {}]]
+    assert calls == []
+
+
+def test_static_archive_requires_a_session_path() -> None:
+    class Response:
+        status_code = 200
+        content = json.dumps({"Meetings": []}).encode()
+
+    session = SimpleNamespace(name="Practice 1", api_path=None,
+                              event={"Location": "X"}, year=2025)
+    client = StaticArchiveClient(
+        base_url="https://example.test",
+        http_get=lambda *_, **__: Response(),
+    )
+    with pytest.raises(SeparatorEstimationError, match="session path is missing"):
+        client.timing_data(session)
+
+
+def test_flat_archive_requires_unique_session() -> None:
+    session = SimpleNamespace(name="SQ")
+    row = {"SessionName": "Sprint_Shootout", "Path": "B/"}
+    assert _find_session_path([row], session) == "B/"
+    assert _find_session_path([row, dict(row, Path="A/")], session) is None
+
+
+@pytest.mark.parametrize("name, expected", [
+    (None, ""),
+    (float("nan"), ""),
+    ("Sprint_Shootout", "sprint qualifying"),
+    ("sprint shootout", "sprint qualifying"),
+    ("Unknown_Session", "unknown session"),
+])
+def test_session_key_normalises_archive_spellings(name, expected) -> None:
+    assert _session_key(name) == expected
+
+
+def test_grouped_archive_matches_official_event_names_and_lowercase_meetings() -> None:
+    meetings = [{
+        "Name": "Bahrain", "OfficialName": "Bahrain Grand Prix", "Location": "Sakhir",
+        "Sessions": [{"Name": "Practice 1", "Path": "bahrain/"}],
+    }]
+    event = pd.Series({"Location": "Sakhir", "EventName": "Bahrain",
+                       "OfficialEventName": "Bahrain Grand Prix"})
+    assert _find_session_path(
+        {"meetings": meetings}, SimpleNamespace(name="FP1", event=event)
+    ) == "bahrain/"
+    assert _find_session_path({"Meetings": meetings}, SimpleNamespace(
+        name="Practice 1", event=pd.Series({"OfficialEventName": "Bahrain Grand Prix"})
+    )) == "bahrain/"
+
+
+def test_session_path_accepts_nested_and_flat_index_shapes() -> None:
+    session = SimpleNamespace(name="Practice 1", event={"Location": "Sakhir"})
+    meeting = {"Name": "Bahrain", "Location": "Sakhir",
+               "Sessions": [{"Name": "Practice 1", "Path": "nested/"}]}
+    assert _find_session_path({"Season": {"Meetings": [meeting]}}, session) == "nested/"
+    # An unrelated empty ``Sessions`` key must not turn a flat index into meetings.
+    flat = [{"SessionName": "Practice 1", "Path": "flat/", "Sessions": []}]
+    assert _find_session_path(flat, session) == "flat/"
+    # A session without its own path must not yield the meeting-level path.
+    pathless = {"Name": "Bahrain", "Location": "Sakhir", "Path": "meeting/",
+                "Sessions": [{"Name": "Practice 1"}]}
+    assert _find_session_path({"Meetings": [pathless]}, session) is None
+    # A matched meeting without sessions, or a mapping instead of a list, is unusable.
+    assert _find_session_path({"Meetings": [{"Name": "Bahrain", "Location": "Sakhir"}]},
+                              session) is None
+    assert _find_session_path({"Meetings": {"A": meeting}}, session) is None
+
+
+def test_meeting_lookup_prefers_event_name_over_shared_location() -> None:
+    # The archive lists pre-season testing and the Bahrain GP at the same
+    # location; the event name must select the race meeting.
+    meetings = [
+        {"Name": "Pre-Season Testing", "Location": "Sakhir",
+         "Sessions": [{"Name": "Practice 1", "Path": "testing/"}]},
+        {"Name": "Bahrain", "OfficialName": "Bahrain Grand Prix", "Location": "Sakhir",
+         "Sessions": [{"Name": "Practice 1", "Path": "grand-prix/"}]},
+    ]
+    event = pd.Series({"Location": "Sakhir", "EventName": "Bahrain"})
+    session = SimpleNamespace(name="Practice 1", event=event)
+    assert _find_session_path({"Meetings": meetings}, session) == "grand-prix/"
+    # With no distinguishing name, a shared location stays ambiguous.
+    location_only = SimpleNamespace(name="Practice 1",
+                                    event=pd.Series({"Location": "Sakhir"}))
+    assert _find_session_path({"Meetings": meetings}, location_only) is None
+    # Duplicate event names are disambiguated by location when possible.
+    duplicate_names = meetings + [{"Name": "Bahrain", "Location": "Elsewhere",
+                                   "Sessions": [{"Name": "Practice 1", "Path": "other/"}]}]
+    assert _find_session_path({"Meetings": duplicate_names}, session) == "grand-prix/"
+
+
+def test_grouped_archive_without_event_requires_unique_session() -> None:
+    meetings = [
+        {"Name": "A", "Sessions": [{"Name": "Practice 1", "Path": "a/"}]},
+        {"Name": "B", "Sessions": [{"Name": "Qualifying", "Path": "b/"}]},
+    ]
+    session = SimpleNamespace(name="Qualifying", event=None)
+    assert _find_session_path({"Meetings": meetings}, session) == "b/"
+    assert _find_session_path({"Meetings": meetings + [
+        {"Name": "C", "Sessions": [{"Name": "Qualifying", "Path": "c/"}]},
+    ]}, session) is None
+    assert _find_session_path(
+        {"Meetings": meetings}, SimpleNamespace(name=None, event=None)
+    ) is None
 
 
 def test_resolution_prefers_saved_and_persists_estimates_atomically(tmp_path: Path) -> None:

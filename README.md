@@ -440,6 +440,14 @@ supported as legacy fallbacks. A saved year/location value is not changed by
 archive data leaves the configuration untouched and uses corner-based
 boundaries.
 
+Session lookup in the season index must be unambiguous: the FastF1 event name
+selects one meeting, falling back to the event location only when names are
+absent or ambiguous. The session name must then select one session with its
+own path. A flat index is matched on the session name alone, and without event
+metadata the session name must be unique across meetings. If the index is
+ambiguous, omits the session, or the matched session has no path, the archive
+client uses the session path FastF1 recorded instead.
+
 Live Timing and FastF1 clocks are not joined by their absolute timestamps.
 Each sector of a valid driver/lap is normalized independently to 0–100% of
 sector elapsed time; a Live Timing mini-sector completion percentage is

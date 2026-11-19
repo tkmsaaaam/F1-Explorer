@@ -2,9 +2,10 @@
 
 The F1 live timing archive is an intentionally small, defensive integration
 point.  The archive is not an API supported by FastF1 and has changed shape
-several times, so this module accepts both the current archive index shape and
-the older, flatter variants.  Estimation is kept independent from report
-rendering which makes it possible to test with recorded/mocked streams.
+several times, so this module accepts the current meeting-based season index
+and flat lists of sessions; unrecognised shapes fall back to FastF1's own
+session path.  Estimation is kept independent from report rendering which
+makes it possible to test with recorded/mocked streams.
 """
 
 from __future__ import annotations
@@ -94,10 +95,21 @@ class LiveTimingLapWindow:
         return (timestamp - self.start) / (self.end - self.start) * 100.0
 
 
-def _session_name(session: Any) -> str:
-    name = getattr(session, "name", "")
-    definition = session_definition(str(name))
-    return definition.fastf1_name if definition is not None else str(name)
+def _session_key(value: Any) -> str:
+    """Return a comparison key for a FastF1 or archive session name.
+
+    Keys are casefolded, so only compare them with other ``_session_key``
+    results.  Archive spellings such as ``Sprint_Shootout`` normalize to the
+    same key as FastF1's canonical name.  Missing names yield an empty string,
+    which the caller treats as "cannot identify this session".
+    """
+    if not isinstance(value, str):
+        return ""
+    text = " ".join(value.replace("_", " ").split())
+    if not text:
+        return ""
+    definition = session_definition(text)
+    return (definition.fastf1_name if definition is not None else text).casefold()
 
 
 def _location(session: Any) -> str:
@@ -161,38 +173,139 @@ def _path_value(item: Mapping[str, Any]) -> str | None:
     return None
 
 
-def _find_session_path(index: Any, session: Any) -> str | None:
-    wanted = _session_name(session).casefold()
-    event_name = str(getattr(getattr(session, "event", None), "EventName", "")).casefold()
-    location = _location(session).casefold()
-    # Some season indexes put the session names in a sibling list and the
-    # path on the meeting object.  Match the meeting before its session.
-    for meeting in _walk_dicts(index):
-        meeting_text = " ".join(
-            str(meeting.get(key, "")) for key in ("Name", "EventName", "Location")
-        ).casefold()
-        if (location and location not in meeting_text) and (not event_name or event_name not in meeting_text):
-            continue
-        sessions = meeting.get("Sessions", meeting.get("sessions"))
-        if not isinstance(sessions, list):
-            continue
-        for item in sessions:
-            if not isinstance(item, dict):
-                continue
-            name = str(item.get("Name", item.get("name", ""))).casefold()
-            if name == wanted or name.replace(" ", "_") == wanted:
-                return _path_value(item) or _path_value(meeting)
+def _event_identity(session: Any) -> tuple[str, set[str]]:
+    """Return the casefolded event location and names FastF1 exposes."""
+    event = getattr(session, "event", None)
+    if event is None:
+        return "", set()
 
-    # Fall back to a flat index, where each session itself has a name/path and
-    # there is no meeting context to disambiguate.
-    for item in _walk_dicts(index):
-        name = str(item.get("Name", item.get("name", item.get("SessionName", "")))).casefold()
-        if name not in {wanted, wanted.replace(" ", "_")}:
-            continue
-        path = _path_value(item)
-        if path:
-            return path
-    return None
+    def field(name: str) -> Any:
+        if isinstance(event, (Mapping, pd.Series)):
+            return event.get(name)
+        return getattr(event, name, None)
+
+    location = field("Location") or field("location")
+    location = location.strip().casefold() if isinstance(location, str) else ""
+    # FastF1's ``EventName`` and ``OfficialEventName`` mirror the archive's
+    # ``Name`` and ``OfficialName``; accept both spellings on either side.
+    names: set[str] = set()
+    for key in ("EventName", "OfficialEventName", "Name"):
+        value = field(key)
+        if isinstance(value, str) and value.strip():
+            names.add(value.strip().casefold())
+    return location, names
+
+
+def _meeting_location(meeting: Mapping[str, Any]) -> str:
+    value = _first(meeting, "Location", "location")
+    return value.strip().casefold() if isinstance(value, str) else ""
+
+
+def _sessions(meeting: Mapping[str, Any]) -> list[Mapping[str, Any]]:
+    value = _first(meeting, "Sessions", "sessions")
+    if not isinstance(value, list):
+        return []
+    return [row for row in value if isinstance(row, Mapping)]
+
+
+def _meeting_names(meeting: Mapping[str, Any]) -> set[str]:
+    names: set[str] = set()
+    for key in ("Name", "name", "EventName", "eventName", "OfficialName", "officialName"):
+        value = meeting.get(key)
+        if isinstance(value, str) and value.strip():
+            names.add(value.strip().casefold())
+    return names
+
+
+def _matching_meetings(
+    meetings: Sequence[Mapping[str, Any]], location: str, event_names: set[str]
+) -> list[Mapping[str, Any]]:
+    """Narrow meetings by event name first, then by location.
+
+    A season index can list pre-season testing and a race at the same circuit,
+    so a shared location is common; the event name is the stronger signal.
+    """
+    if event_names:
+        named = [meeting for meeting in meetings if _meeting_names(meeting) & event_names]
+        if len(named) == 1:
+            return named
+        if named:
+            # Duplicate names are only usable when the location disambiguates.
+            narrowed = [
+                meeting for meeting in named
+                if location and _meeting_location(meeting) == location
+            ]
+            return narrowed if len(narrowed) == 1 else []
+    if location:
+        located = [meeting for meeting in meetings if _meeting_location(meeting) == location]
+        return located if len(located) == 1 else []
+    return []
+
+
+def _index_entries(index: Any) -> tuple[list[Any], bool] | None:
+    """Split a season index into rows and whether they are meetings."""
+    nested: Any = None
+    if isinstance(index, Mapping):
+        nested = index.get("Meetings", index.get("meetings"))
+    if nested is None:
+        # Older variants wrap the meeting list one level deeper.
+        for candidate in _walk_dicts(index):
+            value = candidate.get("Meetings", candidate.get("meetings"))
+            if isinstance(value, list):
+                nested = value
+                break
+    if nested is not None:
+        return (nested, True) if isinstance(nested, list) else None
+    entries: list[Any] = index if isinstance(index, list) else [index]
+    return entries, any(
+        isinstance(row, Mapping) and bool(_sessions(row)) for row in entries
+    )
+
+
+def _find_session_path(index: Any, session: Any) -> str | None:
+    """Resolve one session's archive path, or ``None`` when it is ambiguous.
+
+    A meeting-based index is narrowed by the event name FastF1 recorded, then
+    by location when names are ambiguous or absent, then by session name; each
+    step must match exactly once.  A flat index is matched on session name
+    alone.  Ambiguous or missing matches, including a session without its own
+    path, return ``None`` so the caller can fall back to FastF1's own path.
+    """
+    wanted = _session_key(getattr(session, "name", None))
+    resolved = _index_entries(index)
+    if not wanted or resolved is None:
+        return None
+    entries, grouped = resolved
+
+    name_keys = ("Name", "name", "SessionName")
+    if not grouped:
+        # A flat index lists sessions directly, without meeting context.
+        matches = [
+            row for row in entries
+            if isinstance(row, Mapping) and _session_key(_first(row, *name_keys)) == wanted
+        ]
+        return _path_value(matches[0]) if len(matches) == 1 else None
+
+    meetings = [row for row in entries if isinstance(row, Mapping)]
+    location, event_names = _event_identity(session)
+    if location or event_names:
+        matches = _matching_meetings(meetings, location, event_names)
+        if len(matches) != 1:
+            return None
+        meetings = matches
+    # Without event metadata the session name alone must identify one session
+    # across every meeting; anything less specific stays unresolved.
+
+    matches = [
+        row for meeting in meetings
+        for row in _sessions(meeting)
+        if _session_key(_first(row, *name_keys)) == wanted
+    ]
+    if len(matches) != 1:
+        return None
+    # The path must belong to the session itself; a meeting path would fetch a
+    # meeting index instead of the session stream.
+    return _path_value(matches[0])
 
 
 def _find_timing_path(index: Any) -> str | None:
@@ -303,7 +416,9 @@ class StaticArchiveClient:
             # omit old meetings, while still using the static archive stream.
             session_path = getattr(session, "api_path", None)
         if not session_path:
-            raise SeparatorEstimationError("session path is missing from archive index")
+            raise SeparatorEstimationError(
+                "session path is missing from the archive index and FastF1 metadata"
+            )
         session_path = _normalise_path(session_path)
         session_index_url = _join_url(self.base_url, session_path + "Index.json")
         session_index = self._json(session_index_url)
