@@ -1,4 +1,5 @@
 import unittest
+import warnings
 from contextlib import ExitStack
 import math
 import tempfile
@@ -348,6 +349,7 @@ class Race(unittest.TestCase):
             laptime(MagicMock(), "output", "laptime_graph", session, None, lap_logs)
 
         figure = save.call_args.args[0]
+        self.assertEqual(["Max"], [text.get_text() for text in figure.axes[0].get_legend().get_texts()])
         lines = figure.axes[0].get_lines()
         self.assertEqual([[1, 2]], [list(line.get_xdata()) for line in lines])
         self.assertEqual([[83.0, 83.0]], [list(line.get_ydata()) for line in lines])
@@ -366,7 +368,9 @@ class Race(unittest.TestCase):
         ):
             positions(MagicMock(), "output", session, lap_logs)
 
-        line = save.call_args.args[0].axes[0].get_lines()[0]
+        axes = save.call_args.args[0].axes[0]
+        self.assertEqual(["MAX"], [text.get_text() for text in axes.get_legend().get_texts()])
+        line = axes.get_lines()[0]
         points = line.get_xydata()
         self.assertEqual([1, 2], [float(point[0]) for point in points])
         self.assertEqual(1.0, points[0][1])
@@ -385,9 +389,12 @@ class Race(unittest.TestCase):
             patch("f1_explorer.visualizations.race.save_matplotlib") as save,
             patch("fastf1.plotting.get_team_color", return_value="#123456"),
         ):
-            positions(MagicMock(), "output", session, lap_logs)
+            with warnings.catch_warnings():
+                warnings.filterwarnings("error", message="No artists with labels found", category=UserWarning)
+                positions(MagicMock(), "output", session, lap_logs)
 
         self.assertEqual([], list(save.call_args.args[0].axes[0].get_lines()))
+        self.assertIsNone(save.call_args.args[0].axes[0].get_legend())
 
     def test_laptime_graph_hides_driver_without_any_complete_lap(self):
         """A driver retained with only partial laps gets no ghost line or legend entry."""
@@ -415,9 +422,12 @@ class Race(unittest.TestCase):
             patch("f1_explorer.visualizations.race.save_matplotlib") as save,
             patch("f1_explorer.visualizations.race.current_report", return_value=MagicMock()),
         ):
-            laptime(MagicMock(), "output", "laptime_graph", session, None, lap_logs)
+            with warnings.catch_warnings():
+                warnings.filterwarnings("error", message="No artists with labels found", category=UserWarning)
+                laptime(MagicMock(), "output", "laptime_graph", session, None, lap_logs)
 
         self.assertEqual([], list(save.call_args.args[0].axes[0].get_lines()))
+        self.assertIsNone(save.call_args.args[0].axes[0].get_legend())
 
     def test_gap_graphs_keep_legend_for_driver_without_any_gaps(self):
         """Like empty drivers, a driver whose every lap misses position or

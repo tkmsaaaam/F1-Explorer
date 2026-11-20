@@ -126,7 +126,8 @@ def laptime(log: WarningLoggerLike, filepath: str, filename: str, session: Sessi
             & (session.laps.Deleted == False)
             & (session.laps.TrackStatus == '1')
         ].sort_values(by='LapTime', ascending=False).LapTime.max()
-        ax.legend(fontsize='small')
+        if ax.get_legend_handles_labels()[0]:
+            ax.legend(fontsize='small')
         ax.set_ylim(top=minimum.total_seconds() - 0.1, bottom=maximum.total_seconds() + 0.1)
         ax.set_xlabel("Lap Number [lap]")
         ax.set_ylabel("Lap Time [s]")
@@ -399,7 +400,8 @@ def positions(log: WarningLoggerLike, filepath: str, session: Session, lap_logs:
         line_style = driver_linestyle(session.event.year, lap_log.get_driver().get_number())
         ax.plot(x, y, linewidth=1, color=color, label=lap_log.get_driver().get_name(), linestyle=line_style)
 
-    ax.legend(fontsize='small')
+    if ax.get_legend_handles_labels()[0]:
+        ax.legend(fontsize='small')
     ax.invert_yaxis()
     ax.set_xlabel("Lap Number [lap]")
     ax.set_ylabel("Position [rank]")
