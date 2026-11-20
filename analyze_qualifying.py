@@ -13,6 +13,7 @@ from f1_explorer.visualizations.qualifying_telemetry import make_qualifying_tele
 from f1_explorer.visualizations.output import save_plotly
 from f1_explorer.visualizations.qualifying_best import make_qualifying_best
 from f1_explorer.visualizations.qualifying_speed import make_qualifying_speed
+from f1_explorer.qualifying_periods import qualifying_periods
 from f1_explorer.session_pipeline import run_session
 from f1_explorer.sessions import session_start_at
 from f1_explorer.telemetry import last_valid_distance, lap_telemetry_without_driver_ahead
@@ -44,15 +45,16 @@ def _figures(session, config, log, output_dir) -> tuple[Path, ...]:
     log.info(f"{config.get_year()} Race {config.get_round()} {session.event.EventName} {config.get_session()}")
 
     run_volume.plot_lap_number_by_timing(session, log)
-    run_volume.plot_laptime(session, log, split_qualifying=True)
-    run_volume.plot_laptime_by_timing(session, log, exclude_pit_laps=True)
+    periods = qualifying_periods(session, log=log)
+    run_volume.plot_laptime(session, log, periods=periods, exclude_pit_laps=True)
+    run_volume.plot_laptime_by_timing(session, log, periods=periods, exclude_pit_laps=True)
     run_volume.plot_laptime_by_lap_number(session, log)
 
     with tracer.start_as_current_span("make_qualifying_best"):
-        best_figure = make_qualifying_best(session)
+        best_figure = make_qualifying_best(session, periods=periods)
     save_plotly(best_figure, output_dir / 'LapTime.png', log, width=1920, height=1500)
     with tracer.start_as_current_span("make_qualifying_speed"):
-        speed_figure = make_qualifying_speed(session)
+        speed_figure = make_qualifying_speed(session, periods=periods)
     save_plotly(speed_figure, output_dir / 'SpeedFL.png', log, width=1920, height=1080)
 
     base_path = str(output_dir)

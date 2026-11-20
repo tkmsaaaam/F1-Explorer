@@ -4,12 +4,14 @@ import warnings
 
 import pandas as pd
 import pytest
+from fastf1.exceptions import DataNotLoadedError
 
 from f1_explorer.visualizations.qualifying_best import _valid_laps, make_qualifying_best
 
 
+@pytest.mark.parametrize("status_loaded", [True, False])
 @pytest.mark.parametrize("name,prefix", [("Qualifying", "Q"), ("Sprint Qualifying", "SQ")])
-def test_independent_bests_ratios_and_missing_sessions(name, prefix):
+def test_independent_bests_ratios_and_missing_sessions(name, prefix, status_loaded):
     laps = pd.DataFrame({
         "Driver": ["AAA", "AAA", "BBB", "BBB", "CCC"],
         "IsAccurate": [True, True, True, True, False],
@@ -20,7 +22,8 @@ def test_independent_bests_ratios_and_missing_sessions(name, prefix):
         "Sector3Time": pd.to_timedelta([40, 42, 44, 50, 42], unit="s"),
     })
     with patch.object(pd.DataFrame, "split_qualifying_sessions",
-                      return_value=[laps.iloc[[0, 2]], laps.iloc[[1]], None], create=True):
+                      side_effect=None if status_loaded else DataNotLoadedError("status"),
+                       return_value=[laps.iloc[[0, 2]], laps.iloc[[1]], None], create=True):
         fig = make_qualifying_best(SimpleNamespace(name=name, laps=laps))
     assert list(fig.data[0].y) == [100, 107]
     assert list(fig.data[1].y) == [100, 107]
@@ -28,7 +31,7 @@ def test_independent_bests_ratios_and_missing_sessions(name, prefix):
     assert len(combinations.buttons) == 16
     assert combinations.buttons[1].args[0]["y"][0] == [29, 31]
     assert combinations.buttons[4].label == f"{prefix}1 · ラップ"
-    assert combinations.buttons[8].args[0]["y"][0] == [102]
+    assert combinations.buttons[8].args[0]["y"][0] == ([102] if status_loaded else [])
     assert combinations.buttons[12].args[0]["y"][0] == []
     assert "有効なタイムなし" in combinations.buttons[12].args[1]["title.text"]
     assert combinations.buttons[1].args[0]["visible"] == [True, False, True]

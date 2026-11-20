@@ -4,6 +4,7 @@ import warnings
 
 import pandas as pd
 import pytest
+from fastf1.exceptions import DataNotLoadedError
 
 from f1_explorer.visualizations.qualifying_speed import (
     _TowContext, _indexed_laps, _lap_telemetry, _valid_laps,
@@ -71,8 +72,9 @@ def test_indexed_lap_lookup_keeps_first_duplicate_index():
     assert _indexed_laps(laps)[7]["Driver"] == "AAA"
 
 
+@pytest.mark.parametrize("status_loaded", [True, False])
 @pytest.mark.parametrize("name,prefix", [("Qualifying", "Q"), ("Sprint Qualifying", "SQ")])
-def test_lap_selections_and_measurements_are_selectable(name, prefix):
+def test_lap_selections_and_measurements_are_selectable(name, prefix, status_loaded):
     laps = pd.DataFrame({
         "Driver": ["AAA", "AAA", "BBB", "CCC"],
         "Team": ["A", "A", "B", "C"],
@@ -90,6 +92,7 @@ def test_lap_selections_and_measurements_are_selectable(name, prefix):
         2: ("BBB", _telemetry([9, 10, 11], [290, 310, 300])),
     }
     with (patch.object(pd.DataFrame, "split_qualifying_sessions",
+                       side_effect=None if status_loaded else DataNotLoadedError("status"),
                        return_value=[laps.iloc[[0, 2]], laps.iloc[[1]], None], create=True),
           patch("f1_explorer.visualizations.qualifying_speed._telemetry_cache", return_value=cache),
           patch("fastf1.plotting.get_team_color",
@@ -101,6 +104,7 @@ def test_lap_selections_and_measurements_are_selectable(name, prefix):
     assert list(figure.data[0].y) == [310.0, 305.0]
     assert [trace.visible for trace in figure.data].count(True) == 1
     buttons = figure.layout.updatemenus[0].buttons
+    assert list(figure.data[12].y) == ([305.0] if status_loaded else [])
     assert len(buttons) == 24
     assert buttons[0].label == "全有効ラップ · フィニッシュライン"
     assert buttons[4].label == "全有効ラップ · ラップ中の最高速（トウあり）"

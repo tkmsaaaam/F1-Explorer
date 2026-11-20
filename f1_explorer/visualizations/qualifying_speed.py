@@ -4,8 +4,8 @@ import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 from opentelemetry import trace
+from f1_explorer.qualifying_periods import QualifyingPeriods, qualifying_periods
 from f1_explorer.visualizations.style import driver_team_colors
-from f1_explorer.scalars import require_present
 
 tracer = trace.get_tracer(__name__)
 
@@ -240,22 +240,21 @@ def _measurement_values(laps, key, telemetry_cache, session=None, tow_context=No
             fastest.set_index("Driver")["Tow"].to_dict())
 
 
-def make_qualifying_speed(session):
+def make_qualifying_speed(session, *, periods: QualifyingPeriods | None = None):
     """Build the 4 lap selections × 6 speed measurements comparison."""
 
     valid = _valid_laps(session.laps)
     telemetry_cache = _telemetry_cache(valid)
     tow_context = _TowContext(valid, telemetry_cache, row_source=session.laps)
-    parts = session.laps.split_qualifying_sessions()
-    prefix = "SQ" if session.name.startswith("Sprint") else "Q"
+    if periods is None:
+        periods = qualifying_periods(session)
     scopes = [("全有効ラップ", valid)]
-    for index in range(3):
-        part: pd.DataFrame | None = parts[index] if len(parts) > index else None
+    for label, part in periods:
         if part is not None and not part.empty:
-            selected_part = _valid_laps(require_present(part))
+            selected_part = _valid_laps(part)
         else:
             selected_part = valid.iloc[0:0]
-        scopes.append((f"{prefix}{index + 1}ベストラップ", _best_laps(selected_part)))
+        scopes.append((f"{label}ベストラップ", _best_laps(selected_part)))
 
     combinations = []
     for scope_label, laps in scopes:

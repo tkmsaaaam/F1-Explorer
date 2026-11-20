@@ -121,18 +121,17 @@ def test_qualifying_laptime_table_has_one_section_per_qualifying_period():
     q1 = _laps(["1", "16"], [1, 1])
     q2 = _laps(["1", "16"], [2, 2])
     q3 = _laps(["1"], [3])
-    session_laps = MagicMock()
-    session_laps.split_qualifying_sessions.return_value = [q1, q2, q3]
     abbreviations = {"1": "VER", "16": "LEC"}
     session = SimpleNamespace(
         name="Qualifying",
         drivers=["1", "16"],
-        laps=session_laps,
+        laps=q1,
         get_driver=lambda driver: SimpleNamespace(Abbreviation=abbreviations[str(driver)]),
     )
 
     with patch("f1_explorer.visualizations.run_volume.save_plotly") as save:
-        plot_laptime(session, MagicMock(), split_qualifying=True, output_dir="test-output")
+        plot_laptime(session, MagicMock(), periods=[("Q1", q1), ("Q2", q2), ("Q3", q3)],
+                     exclude_pit_laps=True, output_dir="test-output")
 
     figure = save.call_args.args[0]
     assert len(figure.data) == 3
@@ -142,17 +141,16 @@ def test_qualifying_laptime_table_has_one_section_per_qualifying_period():
 
 def test_sprint_qualifying_uses_sq_section_labels():
     q1 = _laps(["1"], [1])
-    session_laps = MagicMock()
-    session_laps.split_qualifying_sessions.return_value = [q1, q1, q1]
     session = SimpleNamespace(
         name="Sprint Qualifying",
         drivers=["1"],
-        laps=session_laps,
+        laps=q1,
         get_driver=lambda _: SimpleNamespace(Abbreviation="VER"),
     )
 
     with patch("f1_explorer.visualizations.run_volume.save_plotly") as save:
-        plot_laptime(session, MagicMock(), split_qualifying=True, output_dir="test-output")
+        plot_laptime(session, MagicMock(), periods=[("SQ1", q1), ("SQ2", q1), ("SQ3", q1)],
+                     exclude_pit_laps=True, output_dir="test-output")
 
     assert [trace.header.values[0] for trace in save.call_args.args[0].data] == ["SQ1 Lap", "SQ2 Lap", "SQ3 Lap"]
 
@@ -165,18 +163,17 @@ def test_qualifying_laptime_table_excludes_pit_laps_and_packs_remaining_laps():
     q1.loc[q1.index[[0, 4, 6, 10]], "PitOutTime"] = pandas.to_timedelta([10, 20, 30, 40], unit="s")
     q1.loc[q1.index[[3, 9]], "PitInTime"] = pandas.to_timedelta([250, 260], unit="s")
     q1.loc[q1.index[[4, 5, 10, 11]], "Stint"] = 2
-    session_laps = MagicMock()
-    session_laps.split_qualifying_sessions.return_value = [q1]
     abbreviations = {"1": "VER", "16": "LEC"}
     session = SimpleNamespace(
         name="Qualifying",
         drivers=["1", "16"],
-        laps=session_laps,
+        laps=q1,
         get_driver=lambda driver: SimpleNamespace(Abbreviation=abbreviations[str(driver)]),
     )
 
     with patch("f1_explorer.visualizations.run_volume.save_plotly") as save:
-        plot_laptime(session, MagicMock(), split_qualifying=True, output_dir="test-output")
+        plot_laptime(session, MagicMock(), periods=[("Q1", q1)],
+                     exclude_pit_laps=True, output_dir="test-output")
 
     table = save.call_args.args[0].data[0]
     assert list(table.cells.values[0]) == ["1", "2", "3"]
@@ -356,3 +353,40 @@ def test_timing_minimum_ignores_pit_lap_when_excluded():
     create.assert_called_once()
     ax.set_ylim.assert_called_once_with(top=80.75, bottom=80.75 * 1.25)
     save.assert_called_once()
+
+
+@pytest.mark.parametrize("name,prefix", [("Qualifying", "Q"), ("Sprint Qualifying", "SQ")])
+@pytest.mark.parametrize("periods_available", [True, False])
+def test_qualifying_table_and_timing_share_period_laps(name, prefix, periods_available, tmp_path):
+    laps = _laps(["1"] * 5, [1, 2, 3, 4, 5])
+    laps["Team"] = ""
+    laps.loc[3, "PitInTime"] = pandas.to_timedelta(18, unit="s")
+    laps.loc[4, "Stint"] = 2
+    session = SimpleNamespace(
+        name=name, laps=laps, drivers=["1"], event=SimpleNamespace(year=2026),
+        get_driver=lambda _: SimpleNamespace(Abbreviation="VER"),
+    )
+    periods = (
+        [(f"{prefix}1", laps.iloc[[2, 3]]), (f"{prefix}2", None), (f"{prefix}3", laps.iloc[[4]])]
+        if periods_available else
+        [(f"{prefix}1", None), (f"{prefix}2", None), (f"{prefix}3", None)]
+    )
+    with (
+        patch.object(run_volume, "save_plotly") as table,
+        patch.object(run_volume, "save_matplotlib") as static,
+        patch.object(run_volume, "current_report") as report,
+    ):
+        plot_laptime(session, MagicMock(), periods=periods, exclude_pit_laps=True, output_dir=tmp_path)
+        run_volume.plot_laptime_by_timing(session, MagicMock(), periods=periods, exclude_pit_laps=True,
+                                          output_dir=tmp_path)
+
+    tables = table.call_args.args[0].data
+    expected = [82, 84] if periods_available else [80, 81, 82, 84]
+    assert [t.header.values[0] for t in tables] == (
+        [f"{prefix}1 Lap", f"{prefix}3 Lap"] if periods_available else ["Qualifying Lap"]
+    )
+    assert [float(cell.split("<")[0]) for t in tables for cell in t.cells.values[1]] == expected
+    lines = static.call_args.args[0].axes[0].lines
+    assert [list(line.get_ydata()) for line in lines] == [expected[:-1], expected[-1:]]
+    chart = report.return_value.register_plotly.call_args.args[0]
+    assert list(chart.data[0].y) == [*expected[:-1], None, expected[-1]]

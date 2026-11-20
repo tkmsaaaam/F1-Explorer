@@ -183,6 +183,12 @@ camera button while viewing the report offline. Existing PNG files are retained,
 are excluded from the new success manifest. Visualization calls outside an
 active session report continue to save their images.
 
+In Qualifying and Sprint Qualifying, the lap-time table and time-axis chart
+show laps from Q1-Q3 (SQ1-SQ3) and leave out pit-in and pit-out laps. If the
+periods cannot be determined, both charts use every non-pit lap in the session
+instead, and the per-period choices in the best-time and speed charts show no
+valid time.
+
 Practice, Qualifying, and Sprint Qualifying telemetry comparisons, track maps,
 and segment tables include every driver with a valid personal fastest lap,
 without a session-wide lap-time cutoff. Selection follows FastF1's default

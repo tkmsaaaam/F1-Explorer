@@ -17,6 +17,7 @@ from opentelemetry import trace
 
 from f1_explorer.scalars import as_int, as_seconds, require_present
 from f1_explorer import constants
+from f1_explorer.qualifying_periods import QualifyingPeriods, available_periods
 from f1_explorer.visualizations.output import resolve_output_dir, save_matplotlib, save_plotly
 from f1_explorer.visualizations.report import current_report
 from f1_explorer.visualizations.session_order import driver_order, driver_sort_key
@@ -143,33 +144,26 @@ def plot_laptime(
         log: structlog.stdlib.BoundLogger,
         *,
         output_dir: str | Path | None = None,
-        split_qualifying: bool = False,
+        exclude_pit_laps: bool = False,
+        periods: QualifyingPeriods | None = None,
 ):
     """ラップごとのタイムの一覧を作成する
     Args:
         session: セッション
         log: ロガー
+        exclude_pit_laps: ピットイン・ピットアウトを含むラップを除外する
+        periods: 予選区分。指定時は区分別の表を作り、区分がなければ予選全体の表にする
     """
-    if split_qualifying:
-        try:
-            qualifying_laps = session.laps.split_qualifying_sessions()
-        except ValueError as exception:
-            log.warning("Could not split qualifying sessions; using one table", reason=str(exception))
-        else:
-            prefix = "SQ" if session.name.startswith("Sprint") else "Q"
-            sections: list[tuple[str, Laps]] = []
-            for index, laps in enumerate(qualifying_laps, start=1):
-                if laps is not None and not laps.empty:
-                    sections.append((f"{prefix}{index}", laps))
-            if sections:
-                _save_laptime_sections(session, log, sections, output_dir)
-                return
+    sections = available_periods(periods) if periods is not None else []
+    if sections:
+        _save_laptime_sections(session, log, sections, output_dir, exclude_pit_laps=exclude_pit_laps)
+        return
 
     table, heights = _make_laptime_table(
         session,
         session.laps,
-        "Lap",
-        exclude_pit_laps=split_qualifying,
+        "Qualifying" if periods is not None else "Lap",
+        exclude_pit_laps=exclude_pit_laps,
     )
     fig = go.Figure(
         data=[table],
@@ -284,9 +278,9 @@ def _lap_start_dates(session: Session, laps: pandas.DataFrame) -> pandas.Series:
 
 
 def _save_laptime_sections(session: Session, log: structlog.stdlib.BoundLogger, sections: list[tuple[str, Laps]],
-                            output_dir: str | Path | None) -> None:
+                            output_dir: str | Path | None, *, exclude_pit_laps: bool) -> None:
     prepared = [
-        (label, *_make_laptime_table(session, laps, label, exclude_pit_laps=True))
+        (label, *_make_laptime_table(session, laps, label, exclude_pit_laps=exclude_pit_laps))
         for label, laps in sections
     ]
     row_heights = [max(320, sum(heights) + 100) for _, _, heights in prepared]
@@ -511,6 +505,7 @@ def plot_laptime_by_timing(
         *,
         output_dir: str | Path | None = None,
         exclude_pit_laps: bool = False,
+        periods: QualifyingPeriods | None = None,
 ):
     """
     y = ラップタイム
@@ -518,8 +513,17 @@ def plot_laptime_by_timing(
     Args:
         session: 分析対象のセッション
         log: ロガー
+        exclude_pit_laps: ピットイン・ピットアウトを含むラップを除外する
+        periods: 予選区分。指定時は取得できた区分の周回だけを表示する
     """
-    laps = _laps_without_pit_laps(session.laps) if exclude_pit_laps else session.laps
+    laps = session.laps
+    if periods is not None:
+        # Sections are slices of session.laps, so their row labels select the source rows.
+        indices = [index for _, part in available_periods(periods) for index in part.index]
+        if indices:
+            laps = laps.loc[indices]
+    if exclude_pit_laps:
+        laps = _laps_without_pit_laps(laps)
     minimum = _minimum_lap_seconds(laps)
     if minimum is None:
         log.info("Skipping plot_laptime_by_timing: no finite lap time")

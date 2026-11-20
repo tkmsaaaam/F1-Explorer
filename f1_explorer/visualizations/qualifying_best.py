@@ -3,6 +3,7 @@
 import pandas as pd
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
+from f1_explorer.qualifying_periods import QualifyingPeriods, qualifying_periods
 from f1_explorer.visualizations.style import driver_team_colors
 from f1_explorer.visualizations.chart_ranges import bar_range
 
@@ -19,13 +20,10 @@ def _valid_laps(laps):
     return valid
 
 
-def make_qualifying_best(session):
-    parts = session.laps.split_qualifying_sessions()
-    prefix = "SQ" if session.name.startswith("Sprint") else "Q"
-    scopes = [("予選全体", session.laps)] + [
-        (f"{prefix}{i}", parts[i - 1] if len(parts) >= i else None)
-        for i in range(1, 4)
-    ]
+def make_qualifying_best(session, *, periods: QualifyingPeriods | None = None):
+    if periods is None:
+        periods = qualifying_periods(session)
+    scopes = [("予選全体", session.laps)] + periods
     combinations = []
     for scope, laps in scopes:
         for key, metric in (("LapTime", "ラップ"), ("Sector1Time", "S1"),
