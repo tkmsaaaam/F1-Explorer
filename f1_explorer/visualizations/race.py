@@ -24,6 +24,7 @@ from f1_explorer.visualizations.domain.lap import Lap
 from f1_explorer.visualizations.domain.tyre import Tyre
 from f1_explorer.visualizations.output import WarningLoggerLike, save_matplotlib, save_plotly
 from f1_explorer.visualizations.report import current_report
+from f1_explorer.visualizations.race_laptime import race_lap_times
 from f1_explorer.visualizations.race_metrics import GapObservation, gap_observations_all
 from f1_explorer.visualizations.session_order import driver_order, driver_sort_key
 from f1_explorer.visualizations.style import driver_linestyle, resolve_team_color, plotly_driver_dash
@@ -102,6 +103,10 @@ def laptime(log: WarningLoggerLike, filepath: str, filename: str, session: Sessi
         r: y軸の幅
         lap_logs: ドライバーごとのラップ
     """
+    times = race_lap_times(session.laps)
+    if times is None:
+        log.info("Skipping laptime_graph: no recorded lap time")
+        return
     fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150, layout='tight')
     try:
         for lap_log in lap_logs:
@@ -120,15 +125,9 @@ def laptime(log: WarningLoggerLike, filepath: str, filename: str, session: Sessi
             color = resolve_team_color(lap_log.get_driver().get_team_name(), session)
             ax.plot(lap_numbers, lap_times, color=color, label=lap_log.get_driver().get_name(), linewidth=0.5,
                     linestyle=driver_linestyle(session.event.year, lap_log.get_driver().get_number()))
-        minimum: datetime.timedelta = session.laps.sort_values(by='LapTime').LapTime.min()
-        maximum: datetime.timedelta = session.laps[
-            session.laps.IsAccurate
-            & (session.laps.Deleted == False)
-            & (session.laps.TrackStatus == '1')
-        ].sort_values(by='LapTime', ascending=False).LapTime.max()
         if ax.get_legend_handles_labels()[0]:
             ax.legend(fontsize='small')
-        ax.set_ylim(top=minimum.total_seconds() - 0.1, bottom=maximum.total_seconds() + 0.1)
+        ax.set_ylim(*times.axis_range)
         ax.set_xlabel("Lap Number [lap]")
         ax.set_ylabel("Lap Time [s]")
         ax.grid(True)
@@ -140,7 +139,7 @@ def laptime(log: WarningLoggerLike, filepath: str, filename: str, session: Sessi
         fig.savefig(output_path, bbox_inches='tight')
         log.info(f"Saved plot to {output_path}")
         if r is not None:
-            ax.set_ylim(top=minimum.total_seconds(), bottom=minimum.total_seconds() + r)
+            ax.set_ylim(top=times.fastest, bottom=times.fastest + r)
             ax.grid(True)
             output_path = f"{filepath}/{filename}_{r}.png"
             os.makedirs(os.path.dirname(output_path), exist_ok=True)

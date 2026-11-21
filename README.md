@@ -151,6 +151,9 @@ only their lap time still appear in position and gap charts, and laps without
 a session-elapsed time or position provide no gap value (`---` in the tables,
 line gaps in the graphs).
 
+When every Race or Sprint lap time is missing, the report omits R-02 and R-07.
+Other charts and race logs continue, and the incomplete output is ineligible for reuse.
+
 Session analyses write independent offline reports to
 `reports/<year>/<round>_<location>/<session>/report.html`. Open
 `reports/index.html` to select a year, Grand Prix, and session. The index is

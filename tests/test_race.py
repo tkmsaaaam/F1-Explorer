@@ -354,6 +354,27 @@ class Race(unittest.TestCase):
         self.assertEqual([[1, 2]], [list(line.get_xdata()) for line in lines])
         self.assertEqual([[83.0, 83.0]], [list(line.get_ydata()) for line in lines])
 
+    def test_laptime_axis_and_missing_times(self):
+        for name in ("Race", "Sprint"):
+            for accurate, expected in ((True, (91.35, 80.65)), (False, (120.6, 80.65))):
+                with self.subTest(name=name, accurate=accurate):
+                    laps = Laps(pandas.DataFrame({
+                        "LapTime": pandas.to_timedelta([80.75, 91.25, 120.5], unit="s"),
+                        "IsAccurate": [False, accurate, False],
+                        "Deleted": [False] * 3,
+                        "TrackStatus": ["1", "1.0", "1"],
+                    }))
+                    session = SimpleNamespace(name=name, laps=laps)
+                    with (
+                        patch("f1_explorer.visualizations.race.current_report", return_value=MagicMock()),
+                        patch("f1_explorer.visualizations.race.save_matplotlib") as save,
+                    ):
+                        laptime(MagicMock(), "output", "laptime_graph", session, None, [])
+                        self.assertEqual(expected, save.call_args.args[0].axes[0].get_ylim())
+                        laps.loc[:, "LapTime"] = pandas.NaT
+                        laptime(MagicMock(), "output", "laptime_graph", session, None, [])
+                        save.assert_called_once()
+
     def test_positions_graph_keeps_missing_position_out_of_the_line(self):
         lap_logs = [
             DriverLaps(Driver(1, "MAX", "Red Bull"), {
@@ -549,12 +570,12 @@ class Race(unittest.TestCase):
                 for figure in figures[2:]:
                     self.assertEqual(expected, [trace.name for trace in figure.data])
 
-    def test_execute_passes_result_ranks_to_ahead_table(self):
+    def test_execute_continues_with_result_ranks_and_logs_without_lap_times(self):
         session = SimpleNamespace(
-            laps=pandas.DataFrame(),
+            laps=pandas.DataFrame({"LapTime": pandas.to_timedelta([None], unit="s")}),
             results=pandas.DataFrame({"DriverNumber": ["2", "1"], "Position": [1, 5]}),
         )
-        functions = ("make_driver_laps_set", "laptime",
+        functions = ("make_driver_laps_set",
                      "gap_to_ahead_table", "gap_to_top_table", "gap_to_ahead_graph", "gap_to_top_graph",
                      "positions", "speed_first_10s", "speed_until_turn1", "tyres",
                      "write_messages", "write_track_status")
@@ -562,6 +583,8 @@ class Race(unittest.TestCase):
             mocks = {name: stack.enter_context(patch(f"f1_explorer.visualizations.race.{name}"))
                      for name in functions}
             execute(session, MagicMock(), tmp, tmp, None, None, None)
+            mocks["write_messages"].assert_called_once()
+            mocks["write_track_status"].assert_called_once()
             self.assertEqual({"2": 1, "1": 5}, mocks["gap_to_ahead_table"].call_args.kwargs["ranks"])
 
     def test_ahead_table_without_ranks_uses_car_number_string_order(self):

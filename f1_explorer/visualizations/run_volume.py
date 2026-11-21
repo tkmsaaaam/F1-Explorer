@@ -19,6 +19,7 @@ from f1_explorer.scalars import as_int, as_seconds, require_present
 from f1_explorer import constants
 from f1_explorer.qualifying_periods import QualifyingPeriods, available_periods
 from f1_explorer.visualizations.output import resolve_output_dir, save_matplotlib, save_plotly
+from f1_explorer.visualizations.race_laptime import race_lap_times
 from f1_explorer.visualizations.report import current_report
 from f1_explorer.visualizations.session_order import driver_order, driver_sort_key
 from f1_explorer.visualizations.style import driver_linestyle, resolve_team_color, plotly_driver_dash
@@ -420,22 +421,13 @@ def _interactive_race_laptime_range(session: Session) -> list[float] | None:
 
     if not _is_race_session(session):
         return None
-    seconds = session.laps["LapTime"].dt.total_seconds().dropna()
-    if seconds.empty:
+    times = race_lap_times(session.laps)
+    if times is None:
         return None
-    fastest = float(seconds.min())
-    fixed_range = [fastest + 14.5, fastest - 0.5]
-
-    # Match race.laptime(), which produces laptime_graph.png.
-    # The Plotly graph retains every lap; these values only set its viewport.
-    graph_clean = session.laps[
-        session.laps["IsAccurate"].fillna(False).astype(bool)
-        & ~session.laps["Deleted"].fillna(False).astype(bool)
-        & session.laps["TrackStatus"].astype(str).isin({"1", "1.0"})
-    ]["LapTime"].dt.total_seconds().dropna()
-    graph_max = float(graph_clean.max()) if not graph_clean.empty else float(seconds.max())
-    graph_range = [graph_max + 0.1, fastest - 0.1]
-    return fixed_range if fixed_range[0] - fixed_range[1] <= graph_range[0] - graph_range[1] else graph_range
+    graph_range = list(times.axis_range)
+    if graph_range[0] - graph_range[1] >= 15:
+        return [times.fastest + 14.5, times.fastest - 0.5]
+    return graph_range
 
 
 def _make_interactive_laptime_by_lap_number(session: Session) -> go.Figure:

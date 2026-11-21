@@ -287,6 +287,21 @@ def test_race_interactive_laptime_range_can_use_laptime_graph_window():
     assert list(figure.layout.yaxis.range) == [90.1, 79.9]
 
 
+@pytest.mark.parametrize("name", ["Race", "Sprint"])
+def test_interactive_range_without_clean_or_timed_laps(name):
+    session = _race_session(name)
+    session.laps["IsAccurate"] = False
+    session.laps["LapTime"] = pandas.to_timedelta([80.75, 83, 91.25, 85, 87], unit="s")
+    figure = _make_interactive_laptime_by_lap_number(session)
+    assert list(figure.layout.yaxis.range) == [91.35, 80.65]
+    assert list(figure.data[0].y) == [80.75, 83, 91.25, 85, 87]
+
+    session.laps.loc[:, "LapTime"] = pandas.NaT
+    with patch("f1_explorer.visualizations.run_volume.current_report") as report:
+        run_volume.plot_laptime_by_lap_number(session, MagicMock())
+    report.return_value.register_plotly.assert_not_called()
+
+
 def test_non_race_interactive_laptime_range_keeps_full_autorange():
     figure = _make_interactive_laptime_by_lap_number(_race_session("Qualifying"))
 
