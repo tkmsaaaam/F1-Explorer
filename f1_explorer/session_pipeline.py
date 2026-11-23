@@ -14,7 +14,7 @@ from f1_explorer.analysis_state import (
     write_success_manifest, session_input_fingerprint, session_is_finished,
 )
 from f1_explorer.config import CONFIG_PATH
-from f1_explorer.sessions import SESSION_TABLE
+from f1_explorer.sessions import SESSION_TABLE, fastf1_identifier
 from f1_explorer.separator_estimator import persist_resolution, resolve_separators
 from f1_explorer.visualizations.output import session_output_dir, session_report_dir
 from f1_explorer.visualizations.report import SessionReport
@@ -64,7 +64,9 @@ def run_session(
         return 1
     config_module.fast_f1()
     try:
-        session = fastf1.get_session(config.get_year(), config.get_round(), config.get_session())
+        year = config.get_year()
+        code = config.get_session()
+        session = fastf1.get_session(year, config.get_round(), fastf1_identifier(year, code))
     except Exception as exception:
         log.warning('setup is failed', args=exception.args)
         return 1

@@ -240,9 +240,11 @@ Useful options are `--dry-run`, `--force`, `--refresh-separators`,
 
 The Practice, Qualifying (including SQ), and Race (including Sprint) commands
 exit with code 0 after successful analysis or a normal skip (a future session
-or an unchanged report). Future sessions are skipped before loading lap data.
-For an existing session, each command loads FastF1 data before checking whether
-the report can be reused. A report is reusable only when the final loaded
+or an unchanged report). Future sessions are skipped before loading lap data,
+using the selected session's scheduled UTC start. In 2023, `SQ` selects the
+session FastF1 calls Sprint Shootout. For an existing session, each command
+loads FastF1 data before checking whether the report can be reused.
+A report is reusable only when the final loaded
 session status is `Finished`, its normalized event/results/laps/weather/status/
 track-status/car/position inputs match the successful manifest, and every
 recorded output still exists. Reuse also requires matching analysis source,

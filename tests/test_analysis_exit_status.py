@@ -37,12 +37,10 @@ def analysis(request, monkeypatch, tmp_path):
     category, code, name = request.param
     module = importlib.import_module(f"analyze_{category}")
     config = Config(2026, 1, code, {}, [], [])
-    past = datetime.datetime(2000, 1, 1, tzinfo=datetime.timezone.utc)
     event = MagicMock(year=2026, RoundNumber=1, EventName="Test GP", Location="Test")
     event.__getitem__.side_effect = lambda key: getattr(event, key)
-    for index in range(1, 6):
-        setattr(event, f"Session{index}Date", past)
     session = MagicMock(name="session")
+    session.date = pd.Timestamp("2000-01-01")
     session.name = name
     session.event = event
     session.laps.pick_fastest.return_value = None
@@ -125,13 +123,60 @@ def test_unknown_session_name_is_failure(analysis):
 
 def test_future_session_skips_before_loading_even_with_force(analysis):
     future = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(days=1)
-    for index in range(1, 6):
-        setattr(analysis.session.event, f"Session{index}Date", future)
+    analysis.session.date = pd.Timestamp(future).tz_convert(None)
     assert analysis.module.main(force=True) == 0
     analysis.session.load.assert_not_called()
     session_pipeline.should_skip.assert_not_called()
     session_pipeline.SessionReport.assert_not_called()
     analysis.manifest.assert_not_called()
+
+
+def _scheduled_event(now, names, slot, offset, year):
+    """Build a real FastF1 Event so Session.date comes from its schedule."""
+    from fastf1.events import Event
+
+    fields = dict(EventName="Test GP", EventDate=now, RoundNumber=1, F1ApiSupport=True)
+    for index, name in enumerate(names, start=1):
+        utc = now + datetime.timedelta(days=index - slot, hours=offset)
+        fields[f"Session{index}"] = name
+        fields[f"Session{index}DateUtc"] = utc
+        fields[f"Session{index}Date"] = utc.tz_localize("UTC").tz_convert("Asia/Tokyo")
+    return Event(fields, year=year)
+
+
+@pytest.mark.parametrize("year,category,code,names,slot", [
+    (2025, "practice", "FP2", ["Practice 1", "Practice 2", "Practice 3", "Qualifying", "Race"], 2),
+    (2021, "practice", "FP2", ["Practice 1", "Qualifying", "Practice 2", "Sprint", "Race"], 3),
+    (2022, "race", "S", ["Practice 1", "Qualifying", "Practice 2", "Sprint", "Race"], 4),
+    (2023, "qualifying", "Q", ["Practice 1", "Qualifying", "Sprint Shootout", "Sprint", "Race"], 2),
+    (2023, "qualifying", "SQ", ["Practice 1", "Qualifying", "Sprint Shootout", "Sprint", "Race"], 3),
+    (2024, "qualifying", "SQ", ["Practice 1", "Sprint Qualifying", "Sprint", "Qualifying", "Race"], 2),
+])
+def test_entrypoint_loads_only_after_scheduled_start(monkeypatch, tmp_path, year, category, code, names, slot):
+    """Real FastF1 objects verify that the guard uses the configured session's slot."""
+    from fastf1.core import Session
+
+    module = importlib.import_module(f"analyze_{category}")
+    config = Config(year, 1, code, {}, [], [])
+    monkeypatch.setattr(module.config_module, "load_config", lambda: config)
+    monkeypatch.setattr(module.config_module, "fast_f1", lambda: None)
+    monkeypatch.setattr(session_pipeline, "session_output_dir", lambda session: tmp_path)
+    monkeypatch.setattr(session_pipeline, "session_report_dir", lambda session: tmp_path)
+    monkeypatch.setattr(session_pipeline, "build_fingerprint", MagicMock())
+    monkeypatch.setattr(session_pipeline, "session_input_fingerprint", MagicMock())
+    monkeypatch.setattr(session_pipeline, "session_is_finished", lambda session: True)
+    monkeypatch.setattr(session_pipeline, "should_skip", lambda *args, **kwargs: True)
+    monkeypatch.setattr(session_pipeline, "resolve_separators", MagicMock(return_value=SimpleNamespace(
+        separators=[], boundaries=[], pending_save=False, source="saved")))
+    loaded = []
+    monkeypatch.setattr(Session, "load", lambda session, **kwargs: loaded.append(session.name))
+    now = pd.Timestamp.now("UTC").tz_localize(None)
+    expected_name = names[slot - 1]
+    for offset in (1, -1):
+        event = _scheduled_event(now, names, slot, offset, year)
+        monkeypatch.setattr(module.fastf1.events, "get_event", lambda *args, **kwargs: event)
+        assert module.main() == 0
+        assert loaded == ([] if offset > 0 else [expected_name])
 
 
 def test_unchanged_session_is_normal_skip(analysis):
@@ -328,9 +373,7 @@ def test_report_context_does_not_leak_figures_to_next_session(analysis):
 def test_cli_exits_with_main_status(analysis, monkeypatch, future):
     # Execute the actual __main__ block with shared dependencies mocked.
     if future:
-        for index in range(1, 6):
-            setattr(analysis.session.event, f"Session{index}Date",
-                    datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(days=1))
+        analysis.session.date = pd.Timestamp.now("UTC").tz_localize(None) + datetime.timedelta(days=1)
     else:
         analysis.module.config_module.load_config.side_effect = ValueError("invalid config")
     monkeypatch.setattr("sys.argv", [analysis.module.__file__])

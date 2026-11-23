@@ -1,5 +1,6 @@
 """Session identities shared by configuration, entrypoints, and reports."""
 
+import datetime
 from dataclasses import dataclass
 from enum import Enum
 
@@ -13,7 +14,6 @@ class SessionCategory(Enum):
 @dataclass(frozen=True)
 class SessionDefinition:
     fastf1_name: str
-    date_slot: str
     category: SessionCategory
     entrypoint: str
     uses_separators: bool
@@ -21,15 +21,23 @@ class SessionDefinition:
 
 
 SESSION_TABLE = {
-    "FP1": SessionDefinition("Practice 1", "Session1Date", SessionCategory.FreePractice, "analyze_practice.py", True),
-    "FP2": SessionDefinition("Practice 2", "Session2Date", SessionCategory.FreePractice, "analyze_practice.py", True),
-    "FP3": SessionDefinition("Practice 3", "Session3Date", SessionCategory.FreePractice, "analyze_practice.py", True),
-    "SQ": SessionDefinition("Sprint Qualifying", "Session2Date", SessionCategory.Qualifying, "analyze_qualifying.py", True,
+    "FP1": SessionDefinition("Practice 1", SessionCategory.FreePractice, "analyze_practice.py", True),
+    "FP2": SessionDefinition("Practice 2", SessionCategory.FreePractice, "analyze_practice.py", True),
+    "FP3": SessionDefinition("Practice 3", SessionCategory.FreePractice, "analyze_practice.py", True),
+    "SQ": SessionDefinition("Sprint Qualifying", SessionCategory.Qualifying, "analyze_qualifying.py", True,
                             ("Sprint Shootout",)),
-    "S": SessionDefinition("Sprint", "Session3Date", SessionCategory.Race, "analyze_race.py", False, ("Sprint Race",)),
-    "Q": SessionDefinition("Qualifying", "Session4Date", SessionCategory.Qualifying, "analyze_qualifying.py", True),
-    "R": SessionDefinition("Race", "Session5Date", SessionCategory.Race, "analyze_race.py", False),
+    "S": SessionDefinition("Sprint", SessionCategory.Race, "analyze_race.py", False, ("Sprint Race",)),
+    "Q": SessionDefinition("Qualifying", SessionCategory.Qualifying, "analyze_qualifying.py", True),
+    "R": SessionDefinition("Race", SessionCategory.Race, "analyze_race.py", False),
 }
+
+# FastF1 calls the 2023 sprint qualifying session "Sprint Shootout" ("SS").
+_FASTF1_IDENTIFIER_OVERRIDES = {(2023, "SQ"): "SS"}
+
+
+def fastf1_identifier(year: int, code: str) -> str:
+    """Return the identifier FastF1 expects for a configured session code."""
+    return _FASTF1_IDENTIFIER_OVERRIDES.get((int(year), code), code)
 
 
 def session_code(name: str) -> str | None:
@@ -51,8 +59,14 @@ def is_race_session(name: str) -> bool:
     return definition is not None and definition.category == SessionCategory.Race
 
 
-def session_start_at(session, category: SessionCategory):
+def session_start_at(session, category: SessionCategory) -> datetime.datetime | None:
+    """Return the scheduled start as a timezone-aware UTC timestamp.
+
+    FastF1 exposes ``session.date`` as a timezone-naive UTC timestamp, so it
+    must not be interpreted as local time. Returns ``None`` when the session
+    does not belong to ``category``.
+    """
     definition = session_definition(session.name)
     if definition is None or definition.category != category:
         return None
-    return getattr(session.event, definition.date_slot)
+    return session.date.tz_localize("UTC")
