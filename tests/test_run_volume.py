@@ -405,3 +405,83 @@ def test_qualifying_table_and_timing_share_period_laps(name, prefix, periods_ava
     assert [list(line.get_ydata()) for line in lines] == [expected[:-1], expected[-1:]]
     chart = report.return_value.register_plotly.call_args.args[0]
     assert list(chart.data[0].y) == [*expected[:-1], None, expected[-1]]
+
+
+def _race_lap_cells(laps, name):
+    session = SimpleNamespace(
+        name=name, laps=laps, drivers=["1"],
+        get_driver=lambda _: SimpleNamespace(Abbreviation="D1"),
+    )
+    with patch.object(run_volume, "save_plotly") as save:
+        plot_laptime(session, MagicMock(), output_dir="test-output")
+    return list(save.call_args.args[0].data[0].cells.values[1])
+
+
+@pytest.mark.parametrize("name", ["Race", "Sprint"])
+def test_race_lap_cells_match_stop_observations(name):
+    laps = _pit_laps()
+    laps["Time"] = pandas.to_timedelta([88, 180], unit="s")
+    laps.loc[1, "LapTime"] = pandas.NaT
+    assert _race_lap_cells(laps, name) == [
+        "80.0<br>(5.000<br>85.000)", "—<br>(20.000<br>70.000)",
+    ]
+    assert _pit_figure(laps).data[0].cells.values[1][0].split("<br>")[1:4] == [
+        "25.000", "5.000", "20.000",
+    ]
+
+
+def test_race_lap_cells_preserve_partial_and_unmatched_pit_laps():
+    laps = _pit_laps()
+    laps.loc[1, "LapNumber"] = 3
+    laps["Time"] = pandas.to_timedelta([89, None], unit="s")
+    laps.loc[0, "LapStartTime"] = pandas.NaT
+    laps.loc[1, "PitInTime"] = pandas.to_timedelta(175, unit="s")
+    assert _race_lap_cells(laps, "Race") == [
+        "80.0<br>(4.000<br>—)", "81.0<br>(—<br>/20.000)",
+    ]
+    assert _pit_figure(laps).data[0].cells.values[-1][0] == "0<br>—<br>—<br>—"
+
+
+def test_race_lap_cells_mark_inverted_intervals_as_missing():
+    laps = _pit_laps()
+    laps["Time"] = pandas.to_timedelta([88, 88], unit="s")
+    laps.loc[0, "PitInTime"] = pandas.to_timedelta(95, unit="s")
+    assert _race_lap_cells(laps, "Race") == [
+        "80.0<br>(—<br>95.000)", "81.0<br>(20.000<br>—)",
+    ]
+
+
+def test_race_lap_cell_falls_back_to_time_when_next_start_is_missing():
+    laps = _pit_laps()
+    laps["Time"] = pandas.to_timedelta([88, 180], unit="s")
+    laps.loc[1, "LapStartTime"] = pandas.NaT
+    assert _race_lap_cells(laps, "Race") == [
+        "80.0<br>(3.000<br>85.000)", "81.0<br>(—<br>70.000)",
+    ]
+
+
+def test_race_lap_cell_with_next_lap_number_missing_uses_lap_time():
+    laps = _pit_laps()
+    laps["Time"] = pandas.to_timedelta([88, 180], unit="s")
+    laps.loc[1, "LapNumber"] = float("nan")
+    assert _race_lap_cells(laps, "Race") == [
+        "80.0<br>(3.000<br>85.000)", "81.0<br>(20.000<br>70.000)",
+    ]
+
+
+def test_race_lap_cell_with_both_stops_uses_observed_lap_end():
+    laps = _pit_laps()
+    laps["Time"] = pandas.to_timedelta([88, 180], unit="s")
+    laps.loc[1, "PitInTime"] = pandas.to_timedelta(175, unit="s")
+    assert _race_lap_cells(laps, "Race") == [
+        "80.0<br>(5.000<br>85.000)", "81.0<br>(5.000<br>/20.000)",
+    ]
+
+
+def test_qualifying_lap_cells_keep_derived_pit_intervals():
+    laps = _laps(["1", "1"], [1, 2])
+    laps.loc[0, "PitInTime"] = pandas.to_timedelta(75, unit="s")
+    laps.loc[1, "PitOutTime"] = pandas.to_timedelta(110, unit="s")
+    assert _race_lap_cells(laps, "Qualifying") == [
+        "80.0<br>(5.000<br>75.000)", "81.0<br>(20.000<br>61.000)",
+    ]

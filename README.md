@@ -20,6 +20,9 @@ The repository is organized into the following components:
   pace and consistency.
 * **[analyze_qualifying.py](analyze_qualifying.py)**: Script for analyzing Qualifying sessions, including flying lap
   comparisons.
+* **[analyze_race.py](analyze_race.py)**: Generates Race and Sprint reports. The lap table shows official lap times and
+  observed interval breakdowns around pit stops. See the [race report specification](specs/RACE.md) for timing and
+  missing-data rules.
 * **[analyze_season.py](analyze_season.py)**: Script for visualizing season-long trends, such as championship points
   transitions.
 * **[f1_explorer/](f1_explorer/)**: Shared configuration, analysis state, constants and separator logic.

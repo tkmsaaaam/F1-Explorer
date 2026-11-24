@@ -175,6 +175,37 @@ def plot_laptime(
                 width=1920, height=image_height)
 
 
+def _observed_interval(start, end) -> str:
+    if pandas.isna(start) or pandas.isna(end) or end < start:
+        return "—"
+    return f"{(end - start).total_seconds():.3f}"
+
+
+def _pit_lap_cell_text(official: str, first: str, second: str, suffix: str = "") -> str:
+    """Render the shared lap-time / two-interval HTML cell skeleton."""
+    return f"{official}<br>({first}<br>{second}){suffix}"
+
+
+def _race_pit_lap_cell(lap, next_lap) -> str:
+    end = lap.get("Time", pandas.NaT)
+    if (next_lap is not None and pandas.notna(lap.LapNumber)
+            and pandas.notna(next_lap.LapNumber) and next_lap.LapNumber == lap.LapNumber + 1
+            and pandas.notna(next_lap.LapStartTime)):
+        end = next_lap.LapStartTime
+
+    official = "—" if pandas.isna(lap.LapTime) else str(lap.LapTime.total_seconds())
+    if pandas.isna(lap.PitInTime):
+        first = _observed_interval(lap.LapStartTime, lap.PitOutTime)
+        second = _observed_interval(lap.PitOutTime, end)
+    elif pandas.isna(lap.PitOutTime):
+        first = _observed_interval(lap.PitInTime, end)
+        second = _observed_interval(lap.LapStartTime, lap.PitInTime)
+    else:
+        first = _observed_interval(lap.PitInTime, end)
+        second = "/" + _observed_interval(lap.LapStartTime, lap.PitOutTime)
+    return _pit_lap_cell_text(official, first, second)
+
+
 def _make_laptime_table(
         session: Session,
         laps: pandas.DataFrame,
@@ -185,6 +216,7 @@ def _make_laptime_table(
     if exclude_pit_laps:
         laps = _laps_without_pit_laps(laps)
 
+    race = _is_race_session(session)
     present_drivers = {str(driver_number) for driver_number in laps.DriverNumber.unique()}
     driver_numbers = [driver_number for driver_number in session.drivers if str(driver_number) in present_drivers]
     header = [f"{section_label} Lap"] + [
@@ -209,6 +241,10 @@ def _make_laptime_table(
             if exclude_pit_laps:
                 stint_number = int(lap.Stint) if pandas.notna(lap.Stint) else "?"
                 stint_label = f"<br>(S{stint_number})"
+            if race and (pandas.notna(lap.PitInTime) or pandas.notna(lap.PitOutTime)):
+                next_lap = driver_laps.iloc[row_index + 1] if row_index + 1 < len(driver_laps) else None
+                values.append(_race_pit_lap_cell(lap, next_lap))
+                continue
             if pandas.isna(lap.LapTime):
                 values.append("")
                 continue
@@ -216,20 +252,20 @@ def _make_laptime_table(
                 values.append(str(lap.LapTime.total_seconds()) + stint_label)
             elif pandas.isna(lap.PitOutTime):
                 pit_in = lap.LapStartTime.total_seconds() + lap.LapTime.total_seconds() - lap.PitInTime.total_seconds()
-                values.append(
-                    f"{lap.LapTime.total_seconds()}<br>({pit_in:.3f}<br>{lap.LapTime.total_seconds() - pit_in:.3f})"
-                    + stint_label)
+                values.append(_pit_lap_cell_text(
+                    str(lap.LapTime.total_seconds()), f"{pit_in:.3f}",
+                    f"{lap.LapTime.total_seconds() - pit_in:.3f}", stint_label))
             elif pandas.isna(lap.PitInTime):
                 pit_out = lap.PitOutTime.total_seconds() - lap.LapStartTime.total_seconds()
-                values.append(
-                    f"{lap.LapTime.total_seconds()}<br>({pit_out:.3f}<br>{lap.LapTime.total_seconds() - pit_out:.3f})"
-                    + stint_label)
+                values.append(_pit_lap_cell_text(
+                    str(lap.LapTime.total_seconds()), f"{pit_out:.3f}",
+                    f"{lap.LapTime.total_seconds() - pit_out:.3f}", stint_label))
             else:
                 pit_in = lap.LapStartTime.total_seconds() + lap.LapTime.total_seconds() - lap.PitInTime.total_seconds()
                 pit_out = lap.PitOutTime.total_seconds() - lap.LapStartTime.total_seconds()
-                values.append(
-                    f"{lap.LapTime.total_seconds()}<br>({pit_in:.3f}<br>/{pit_out:.3f})"
-                    + stint_label)
+                values.append(_pit_lap_cell_text(
+                    str(lap.LapTime.total_seconds()), f"{pit_in:.3f}",
+                    f"/{pit_out:.3f}", stint_label))
         cells.append(values)
         colors.append(lap_colors)
 
