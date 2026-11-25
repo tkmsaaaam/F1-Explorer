@@ -67,10 +67,10 @@ def _seconds(value: Any) -> float | None:
     return result if result > 0 else None
 
 
-def count_completed_laps(laps: pandas.DataFrame) -> tuple[int, list[str]]:
+def count_completed_laps(laps: pandas.DataFrame) -> tuple[int | None, list[str]]:
     """Count unique lap numbers with a recorded end, excluding generated rows."""
-    if laps.empty or "LapNumber" not in laps or "Time" not in laps:
-        return 0, []
+    if "LapNumber" not in laps or "Time" not in laps:
+        return None, []
     ended = laps[laps["Time"].notna()].copy()
     if "FastF1Generated" in ended:
         ended = ended[~ended["FastF1Generated"].fillna(False).astype(bool)]
@@ -119,7 +119,7 @@ def _valid_reference(row: Any) -> bool:
         return False
     if pandas.notna(getattr(row, "PitInTime", pandas.NaT)) or pandas.notna(getattr(row, "PitOutTime", pandas.NaT)):
         return False
-    if str(getattr(row, "TrackStatus", "1")) not in {"1", "1.0"}:
+    if str(getattr(row, "TrackStatus", "")) not in {"1", "1.0"}:
         return False
     return all(_seconds(getattr(row, column, None)) is not None
                for column in ("LapTime", "Sector1Time", "Sector2Time", "Sector3Time"))
@@ -133,10 +133,7 @@ def _attack_metrics(laps: pandas.DataFrame, code: str, qualifying: bool) -> dict
     sections: list[tuple[str, pandas.DataFrame]]
     if qualifying:
         try:
-            split = laps.attrs.get("session")
-            if split is None:
-                raise ValueError("session metadata unavailable")
-            split_laps = split.laps.split_qualifying_sessions()
+            split_laps = laps.split_qualifying_sessions()
             sections = [(f"{code}{index}", part) for index, part in enumerate(split_laps, 1)]
             if len(split_laps) < 3:
                 raise ValueError("qualifying split is incomplete")
@@ -157,8 +154,11 @@ def _attack_metrics(laps: pandas.DataFrame, code: str, qualifying: bool) -> dict
             group_key = group_key if isinstance(group_key, tuple) else (group_key,)
             driver_number = str(group_key[0])
             compound = group_key[1] if len(group_key) > 1 else None
-            if compound is None or pandas.isna(compound) or not str(compound).strip():
+            if pandas.isna(compound) or str(compound).strip().upper() in {"", "UNKNOWN", "TEST_UNKNOWN"}:
                 driver_metrics[driver_number].append(Metric(None, "unknown", ["コンパウンド不明"]))
+                continue
+            if "LapNumber" not in driver_laps:
+                driver_metrics[driver_number].append(Metric(None, "unknown", ["周回番号なし"]))
                 continue
             rows = list(driver_laps.sort_values("LapNumber", na_position="last").itertuples(index=False))
             reference_rows = [row for row in rows if _valid_reference(row)]
@@ -231,7 +231,7 @@ def analyze_session(
     identity_aliases: dict[str, str] | None = None,
 ) -> tuple[dict[str, Driver], dict[str, DriverMetrics]]:
     """Build per-driver session counts; caller handles data retrieval failures."""
-    laps = session.laps.copy()
+    laps = session.laps
     if laps.empty or "DriverNumber" not in laps:
         return {}, {}
     drivers: dict[str, Driver] = {}
@@ -240,10 +240,14 @@ def analyze_session(
         number = str(number)
         try:
             info = session.get_driver(number)
-        except (KeyError, ValueError, TypeError):
+        except (DataNotLoadedError, KeyError, ValueError, TypeError):
             info = {}
         driver_id = info.get("DriverId") if hasattr(info, "get") else None
-        abbreviation = str(info.get("Abbreviation", number)) if hasattr(info, "get") else number
+        abbreviation = info.get("Abbreviation") if hasattr(info, "get") else None
+        if not _identity_text(abbreviation):
+            labels = driver_laps.get("Driver", ())
+            abbreviation = next((label for label in labels if _identity_text(label)), number)
+        abbreviation = str(abbreviation)
         name = str(info.get("FullName", abbreviation)) if hasattr(info, "get") else abbreviation
         team = str(info.get("TeamName", "")) if hasattr(info, "get") else ""
         has_driver_id = driver_id is not None and not pandas.isna(driver_id) and bool(str(driver_id).strip())
@@ -287,11 +291,11 @@ def analyze_session(
                 history[matching_index] = driver
         completed, missing = count_completed_laps(driver_laps)
         metrics[key] = DriverMetrics(
-            laps={code: Metric(completed, "available", [f"欠番: {', '.join(missing)}"] if missing else [], provisional)},
+            laps={code: Metric(completed, "unknown" if completed is None else "available",
+                               [f"欠番: {', '.join(missing)}"] if missing else [], provisional)},
         )
 
     if SESSION_TABLE[code].category != SessionCategory.Race:
-        laps.attrs["session"] = session
         qualifying = SESSION_TABLE[code].category == SessionCategory.Qualifying
         attack_values = _attack_metrics(laps, code, qualifying)
         for compound_key, metric in attack_values.items():
@@ -372,6 +376,16 @@ def _table(title: str, rows: tuple[str, ...], drivers: list[Driver], metrics: di
             f"<tbody>{''.join(body)}</tbody></table></div>")
 
 
+def _missing_metric(weekend: WeekendMetrics, row: str) -> Metric:
+    session = row.rstrip("123") if row.startswith(("Q", "SQ")) else row
+    state = weekend.sessions.get(row, weekend.sessions.get(session, "not-held"))
+    if state in {"available", "provisional"}:
+        state = "not-participant"
+    elif state == "planned":
+        state = "not-held"
+    return Metric(None, state)
+
+
 def render_report_section(drivers: dict[str, Driver], weekends: list[WeekendMetrics],
                           *, driver_order: list[str] | None = None) -> str:
     """Render self-contained season totals and GP-selectable detail tables."""
@@ -387,13 +401,7 @@ def render_report_section(drivers: dict[str, Driver], weekends: list[WeekendMetr
                 for weekend in weekends:
                     metric = getattr(weekend.drivers.get(key, DriverMetrics()), target_name).get(row)
                     if metric is None:
-                        lookup = row if row in SESSION_ROWS or row in ATTACK_ROWS else row[:2]
-                        state = weekend.sessions.get(lookup, "not-held")
-                        if state in {"available", "provisional"}:
-                            state = "not-participant"
-                        elif state == "planned":
-                            state = "not-held"
-                        metric = Metric(None, state)
+                        metric = _missing_metric(weekend, row)
                     records.append((weekend.name, metric))
                 getattr(totals[key], target_name)[row] = _aggregate_metrics(records)
         total_row = "合計"
@@ -401,7 +409,7 @@ def render_report_section(drivers: dict[str, Driver], weekends: list[WeekendMetr
             records = []
             for row in rows:
                 records.append((row, getattr(totals[key], target_name)[row]))
-            getattr(totals[key], target_name)[total_row] = _aggregate_metrics(records, row_total=True)
+            getattr(totals[key], target_name)[total_row] = _aggregate_metrics(records)
 
     total_laps = _table("終了周回数（記録ベース）— シーズン取得分合計", SESSION_ROWS + ("合計",), ordered, totals, "laps")
     total_attacks = _table("推定アタック試行数 — シーズン取得分合計", ATTACK_ROWS + ("合計",), ordered, totals, "attacks")
@@ -413,24 +421,12 @@ def render_report_section(drivers: dict[str, Driver], weekends: list[WeekendMetr
         for driver in ordered:
             source = weekend.drivers.get(driver.key, DriverMetrics())
             target = DriverMetrics(dict(source.laps), dict(source.attacks))
-            for code in SESSION_ROWS:
-                state = weekend.sessions.get(code, "not-held")
-                if state in {"available", "provisional"}:
-                    state = "not-participant"
-                elif state == "planned":
-                    state = "not-held"
-                target.laps.setdefault(code, Metric(None, state))
-            for code in ATTACK_ROWS:
-                session_code_value = code[:2] if code.startswith(("Q", "SQ")) else code
-                state = weekend.sessions.get(code, weekend.sessions.get(session_code_value, "not-held"))
-                if state in {"available", "provisional"}:
-                    state = "not-participant"
-                elif state == "planned":
-                    state = "not-held"
-                target.attacks.setdefault(code, Metric(None, state))
             for target_name, rows in (("laps", SESSION_ROWS), ("attacks", ATTACK_ROWS)):
-                records = [(row, getattr(target, target_name)[row]) for row in rows]
-                getattr(target, target_name)["合計"] = _aggregate_metrics(records, row_total=True)
+                metrics = getattr(target, target_name)
+                for row in rows:
+                    metrics.setdefault(row, _missing_metric(weekend, row))
+                records = [(row, metrics[row]) for row in rows]
+                metrics["合計"] = _aggregate_metrics(records)
             lap_rows[driver.key] = target
         detail_sections.append(
             f"<div class='gp-tables' data-gp='{index}' {'hidden' if index else ''}>"
@@ -446,7 +442,7 @@ def render_report_section(drivers: dict[str, Driver], weekends: list[WeekendMetr
             + "".join(detail_sections) + script + "</section>")
 
 
-def _aggregate_metrics(records: list[tuple[str, Metric]], *, row_total: bool = False) -> Metric:
+def _aggregate_metrics(records: list[tuple[str, Metric]]) -> Metric:
     values = [metric.value for _, metric in records if metric.value is not None]
     incomplete = any(metric.status in {"failed", "unknown"} or metric.incomplete for _, metric in records)
     provisional = any(metric.provisional for _, metric in records)
@@ -459,8 +455,9 @@ def _aggregate_metrics(records: list[tuple[str, Metric]], *, row_total: bool = F
     if values:
         status = "available"
     elif incomplete:
-        status = "unknown"
-    elif records and all(metric.status == "not-participant" for _, metric in records):
+        statuses = {metric.status for _, metric in records if metric.status in {"failed", "unknown"}}
+        status = "failed" if statuses == {"failed"} else "unknown"
+    elif any(metric.status == "not-participant" for _, metric in records):
         status = "not-participant"
     else:
         status = "not-held"

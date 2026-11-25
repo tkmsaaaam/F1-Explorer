@@ -32,7 +32,7 @@ TURBULENCE_GAP_SECONDS = 2.0
 
 class LapStartContext(TypedDict):
     ahead_driver_number: str
-    gap_seconds: float
+    gap: pandas.Timedelta
     within_threshold: bool
 
 def _lap_start_context(laps: Laps, threshold: float = TURBULENCE_GAP_SECONDS) -> dict[tuple[str, int], LapStartContext]:
@@ -42,6 +42,7 @@ def _lap_start_context(laps: Laps, threshold: float = TURBULENCE_GAP_SECONDS) ->
     position, so lapped cars and cars that have changed position are handled
     in on-track order.
     """
+    threshold_delta = pandas.to_timedelta(threshold, unit="s")
     events = []
     for row in laps.itertuples():
         if pandas.isna(getattr(row, "Time", pandas.NaT)) or pandas.isna(getattr(row, "DriverNumber", pandas.NA)):
@@ -60,15 +61,12 @@ def _lap_start_context(laps: Laps, threshold: float = TURBULENCE_GAP_SECONDS) ->
         crossing_time, ahead_number, _ = events[prior_index]
         if ahead_number == key[0]:
             continue
-        # FastF1 lap timestamps are timedelta scalars; retain nanoseconds.
         lap_start_time: pandas.Timedelta = getattr(row, "LapStartTime")
-        gap = (lap_start_time - crossing_time).total_seconds()
-        if gap < 0:
-            continue
+        gap = lap_start_time - crossing_time
         result[key] = {
             "ahead_driver_number": ahead_number,
-            "gap_seconds": gap,
-            "within_threshold": gap <= threshold,
+            "gap": gap,
+            "within_threshold": gap <= threshold_delta,
         }
     return result
 
@@ -487,7 +485,7 @@ def _make_interactive_laptime_by_lap_number(session: Session) -> go.Figure:
             marker_colors.append("white" if close else color)
             marker_line_colors.append(color if clean else "black")
             marker_line_widths.append(1.5 if clean else 1.0)
-            gap_text = "unknown" if context is None else f'{float(context["gap_seconds"]):.3f}s'
+            gap_text = "unknown" if context is None else f'{context["gap"].total_seconds():.3f}s'
             ahead_text = "unknown" if context is None else str(context["ahead_driver_number"])
             quality_text = "clean" if clean else "non-clean: " + ", ".join(reasons)
             customdata.append([str(row.Compound), row.TyreLife, row.Stint, ahead_text, gap_text, quality_text])

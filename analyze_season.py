@@ -11,6 +11,7 @@ import pandas
 import structlog.stdlib
 from fastf1.core import DriverResult
 from fastf1.events import EventSchedule
+from fastf1.exceptions import DataNotLoadedError
 from fastf1.ergast import Ergast
 # noinspection PyPackageRequirements
 from opentelemetry import trace
@@ -235,7 +236,7 @@ def __main():
         session_names = [getattr(event, f"Session{index}", "") for index in range(1, 6)]
         session_dates = [getattr(event, f"Session{index}Date", None) for index in range(1, 6)]
         any_started = False
-        session_objects = {}
+        result_tables = {}
         for session_name, session_date in zip(session_names, session_dates):
             code = session_code(str(session_name)) if session_name else None
             if code is None:
@@ -257,7 +258,11 @@ def __main():
             try:
                 session = fastf1.get_session(config.get_year(), str(event.EventName), str(session_name))
                 session.load(laps=True, telemetry=False, weather=False, messages=True)
-                session_objects[code] = session
+                if code in {"R", "S"}:
+                    try:
+                        result_tables[code] = session.results
+                    except DataNotLoadedError:
+                        log.warning("Session results unavailable", event_name=str(event.EventName), session=code)
                 terminal = False
                 status_data = getattr(session, "session_status", None)
                 if status_data is not None and not status_data.empty:
@@ -286,7 +291,7 @@ def __main():
                     for index in range(1, 4):
                         event_metrics.sessions[f"{code}{index}"] = state
             except Exception as exception:
-                log.warning("Could not load season session", event=str(event.EventName), session=str(session_name), reason=str(exception))
+                log.warning("Could not load season session", event_name=str(event.EventName), session=str(session_name), reason=str(exception))
                 if code in SESSION_ROWS:
                     event_metrics.sessions[code] = "failed"
                 if code in {"Q", "SQ"}:
@@ -297,21 +302,22 @@ def __main():
             mileage_weekends.append(event_metrics)
 
         gp = Weekend(cast(str, event.EventName))
-        race = session_objects.get("R")
-        if race is not None and hasattr(race, "results") and race.results is not None:
-            for driver_row in race.results.itertuples(index=False):
+        race_results = result_tables.get("R")
+        if race_results is not None:
+            for _, driver_row in race_results.iterrows():
                 abbreviation: str = cast(str, driver_row.Abbreviation)
                 gp.set_grid_position(abbreviation, int(driver_row.GridPosition) if pandas.notna(driver_row.GridPosition) else 0)
                 gp.set_position(abbreviation, int(driver_row.Position) if pandas.notna(driver_row.Position) else 0)
                 gp.set_point(abbreviation, int(driver_row.Points) if pandas.notna(driver_row.Points) else 0)
-                if driver_row.DriverNumber not in drivers:
-                    drivers[int(cast(str, driver_row.DriverNumber))] = race.get_driver(abbreviation)
+                number = int(cast(str, driver_row.DriverNumber))
+                drivers[number] = driver_row
             results[round_number] = gp
-        sprint = session_objects.get("S")
-        if sprint is not None and hasattr(sprint, "results") and sprint.results is not None:
-            for driver_row in sprint.results.itertuples(index=False):
+        sprint_results = result_tables.get("S")
+        if sprint_results is not None:
+            for _, driver_row in sprint_results.iterrows():
                 gp.set_sprint_point(cast(str, driver_row.Abbreviation),
                                     int(driver_row.Points) if pandas.notna(driver_row.Points) else 0)
+                drivers.setdefault(int(driver_row.DriverNumber), driver_row)
             results.setdefault(round_number, gp)
 
     base_dir: Final = f"./images/{config.get_year()}"

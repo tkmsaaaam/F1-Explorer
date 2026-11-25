@@ -268,6 +268,32 @@ def _race_session(name: str) -> SimpleNamespace:
     )
 
 
+@pytest.mark.parametrize("gap_ns,own_crossing,close,ahead", [
+    (1_999_999_999, False, True, "16"),
+    (2_000_000_000, False, True, "16"),
+    (2_000_000_001, False, False, "16"),
+    (2_000_000_000, True, False, "unknown"),
+    (None, False, False, "unknown"),
+])
+def test_lap_start_proximity_marker(gap_ns, own_crossing, close, ahead):
+    laps = _laps(["16", "1", "1"], [1, 1, 2])
+    laps["IsAccurate"] = True
+    laps["Deleted"] = False
+    laps["TrackStatus"] = "1"
+    crossing = pandas.to_timedelta(80, unit="s")
+    laps["Time"] = pandas.to_timedelta([80, 81 if own_crossing else None, 164], unit="s")
+    start = crossing + pandas.to_timedelta(gap_ns, unit="ns") if gap_ns is not None else pandas.NaT
+    zero = pandas.to_timedelta(0, unit="s")
+    laps["LapStartTime"] = [zero, zero, start]
+    session = _race_session("Race")
+    session.laps = laps
+
+    figure = _make_interactive_laptime_by_lap_number(session)
+    driver = next(trace for trace in figure.data if trace.name == "1")
+    assert driver.marker.color[1] == ("white" if close else driver.line.color)
+    assert list(driver.customdata[1][3:5]) == [ahead, "unknown" if ahead == "unknown" else "2.000s"]
+
+
 def test_race_and_sprint_interactive_laptime_range_uses_narrower_window():
     for name in ("Race", "Sprint"):
         figure = _make_interactive_laptime_by_lap_number(_race_session(name))

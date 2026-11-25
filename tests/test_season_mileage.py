@@ -40,6 +40,36 @@ def _laps(numbers, times, *, compounds=None, s1=None, pit_out=None, pit_in=None,
 
 
 class SeasonMileageTests(unittest.TestCase):
+    def test_season_report_keeps_laps_when_race_and_sprint_results_are_unavailable(self):
+        class Session:
+            laps = _laps([1], ["90s"]).assign(Driver="AAA")
+
+            @property
+            def results(self):
+                raise DataNotLoadedError()
+
+            def get_driver(self, number):
+                raise DataNotLoadedError()
+
+            def load(self, **kwargs):
+                pass
+
+        schedule = pandas.DataFrame([{"RoundNumber": 1, "EventName": "Example GP",
+                                      "Session1": "Practice 1", "Session2": "Sprint", "Session3": "Race"}])
+        with (patch.object(analyze_season.config_module, "load_config") as config,
+              patch.object(analyze_season.config_module, "fast_f1"),
+              patch.object(analyze_season.fastf1, "get_event_schedule", return_value=schedule),
+              patch.object(analyze_season.fastf1, "get_session", side_effect=[ValueError("unavailable"), Session(), Session()]),
+              patch.object(analyze_season, "__season_driver_order", return_value=[]),
+              patch.object(analyze_season, "__save_season_report") as save):
+            config.return_value.get_year.return_value = 2025
+            getattr(analyze_season, "__main")()
+        html = save.call_args.args[-1]
+        self.assertIn("<th>AAA</th>", html)
+        self.assertIn("<th>FP1</th><td>取得失敗", html)
+        self.assertIn("<th>R</th><td>1</td>", html)
+        self.assertIn("<th>S</th><td>1</td>", html)
+
     def test_sprint_points_use_loaded_venues_in_calendar_order(self):
         shanghai = analyze_season.Weekend("Chinese Grand Prix")
         shanghai.set_sprint_point("AAA", 8)
@@ -53,6 +83,33 @@ class SeasonMileageTests(unittest.TestCase):
         rows = analyze_season._sprint_point_rows(results, schedule)
         self.assertEqual([(2, "Shanghai"), (6, "Miami")], rows)
         self.assertEqual([8, 0], [results[number].get_sprint_point("AAA") for number, _ in rows])
+
+    def test_loaded_results_produce_standings_and_points(self):
+        for session_name, code, score in [("Race", "R", 25), ("Sprint", "S", 8)]:
+            with self.subTest(session=session_name):
+                self._check_loaded_results(session_name, code, score)
+
+    def _check_loaded_results(self, session_name, code, score):
+        results = pandas.DataFrame([{"DriverNumber": "1", "Abbreviation": "AAA", "Points": score,
+                                     "Position": 1, "GridPosition": 2, "TeamColor": "112233"}])
+        session = SimpleNamespace(load=MagicMock(), results=results, laps=_laps([1], ["90s"]),
+                                  get_driver=lambda number: results.iloc[0])
+        schedule = pandas.DataFrame([{"RoundNumber": 1, "EventName": "Example GP", "Session1": session_name,
+                                      "Location": "Example"}])
+        with (patch.object(analyze_season.config_module, "load_config") as config,
+              patch.object(analyze_season.config_module, "fast_f1"),
+              patch.object(analyze_season.fastf1, "get_event_schedule", return_value=schedule),
+              patch.object(analyze_season.fastf1, "get_session", return_value=session),
+              patch.object(analyze_season, "__season_driver_order", return_value=["number:1"]),
+              patch.object(analyze_season.go.Figure, "to_image", return_value=b"png"),
+              patch.object(analyze_season, "__save_season_report") as save):
+            config.return_value.get_year.return_value = 2025
+            getattr(analyze_season, "__main")()
+        charts, points, _, html = save.call_args.args[-4:]
+        standings = dict(charts)["Championship standings"].data[0]
+        self.assertEqual(("AAA", [score]), (standings.name, list(standings.y)))
+        self.assertEqual(b"png", points)
+        self.assertIn(f"<th>{code}</th><td>1</td>", html)
 
     def test_published_championship_order_applies_to_every_table(self):
         drivers = {"a": Driver("a", "A Driver", "AAA", "1"),
@@ -96,6 +153,29 @@ class SeasonMileageTests(unittest.TestCase):
         self.assertTrue(result.incomplete)
         self.assertIn("FP用途判定不明", result.details[0])
 
+    def test_fastf1_unknown_compounds_leave_the_known_count_incomplete(self):
+        laps = _laps([1, 2, 3], ["90s"] * 3, compounds=["SOFT", "UNKNOWN", "TEST_UNKNOWN"])
+        result = _attack_metrics(laps, "FP1", qualifying=False)["FP1:1"]
+        self.assertEqual(1, result.value)
+        self.assertTrue(result.incomplete)
+
+    def test_missing_columns_affect_only_dependent_metrics(self):
+        for column, completed, attacks in [
+            ("LapNumber", None, None), ("Time", None, 1), ("TrackStatus", 1, None),
+        ]:
+            with self.subTest(column=column):
+                laps = _laps([1], ["90s"]).drop(columns=column)
+                laps["Driver"] = "AAA"
+                session = SimpleNamespace(laps=laps, get_driver=MagicMock(side_effect=DataNotLoadedError()))
+                drivers, metrics = analyze_session(session, "FP1")
+                self.assertEqual("AAA", drivers["number:1"].abbreviation)
+                lap_metric = metrics["number:1"].laps["FP1"]
+                attack_metric = metrics["number:1"].attacks["FP1"]
+                self.assertEqual((completed, "unknown" if completed is None else "available"),
+                                 (lap_metric.value, lap_metric.status))
+                self.assertEqual((attacks, "unknown" if attacks is None else "available"),
+                                 (attack_metric.value, attack_metric.status))
+
     def test_four_consecutive_laps_after_a_gap_form_a_new_run(self):
         laps = _laps([1, 3, 4, 5, 6], ["90s"] * 5)
         result = _attack_metrics(laps, "FP1", qualifying=False)["FP1:1"]
@@ -132,9 +212,8 @@ class SeasonMileageTests(unittest.TestCase):
         laps = _laps([1], ["90s"])
         for error in (ValueError("missing status"), IndexError(), DataNotLoadedError()):
             with self.subTest(error=type(error).__name__):
-                laps.attrs["session"] = SimpleNamespace(laps=SimpleNamespace(
-                    split_qualifying_sessions=MagicMock(side_effect=error)))
-                result = _attack_metrics(laps, "Q", qualifying=True)
+                with patch.object(type(laps), "split_qualifying_sessions", create=True, side_effect=error):
+                    result = _attack_metrics(laps, "Q", qualifying=True)
                 self.assertEqual({"Q1", "Q2", "Q3"}, set(result))
                 self.assertTrue(all(metric.value is None and metric.status == "unknown"
                                     for metric in result.values()))
@@ -351,6 +430,15 @@ class SeasonMileageTests(unittest.TestCase):
         self.assertIn("3", html)
         self.assertIn("GPを選択", html)
         self.assertIn("取得失敗", html)
+
+    def test_season_totals_keep_failure_and_nonparticipation_across_unheld_rounds(self):
+        driver = Driver("one", "A Driver", "AAA", "1")
+        weekends = [WeekendMetrics("First", 1, sessions={"Q": "available", "SQ": "failed"}),
+                    WeekendMetrics("Second", 2)]
+        html = render_report_section({"one": driver}, weekends)
+        season_tables = html.split("<label>GP", 1)[0]
+        self.assertIn("<th>Q1</th><td>未参加</td>", season_tables)
+        self.assertIn("<th>SQ1</th><td>取得失敗", season_tables)
 
 
 if __name__ == "__main__":

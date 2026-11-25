@@ -125,7 +125,8 @@ Season analysis is written as a self-contained offline report at
 `reports/<year>/season.html`. Interactive charts and the points/events table
 images are embedded in that single HTML file.
 The points table retains the sprint points total and lists points for each venue
-below it in sprint calendar order. The championship total includes both race and sprint points.
+below it in sprint calendar order. The championship total includes both race and sprint points,
+including sprint points for drivers whose race results are unavailable.
 
 The season report also includes recorded completed-lap counts for FP1–FP3,
 SQ, S, Q and R, plus estimated qualifying-attack attempts for each practice
@@ -136,7 +137,10 @@ marked as purpose-uncertain to avoid counting a long run as repeated attacks.
 Deleted laps and partial laps can count when their timing supports an attempt.
 These estimates do not identify every aborted lap; their thresholds are
 documented in [specs/SEASON.md](specs/SEASON.md). The report distinguishes
-missing data, non-participation, and provisional totals.
+missing data, non-participation, and provisional totals. If a driver has both
+known and unknown tyre compounds, the attack count shows the estimate from
+usable compounds with an asterisk. A missing lap-number or end-time column
+makes the completed-lap count unavailable.
 
 Race and Sprint gap tables use actual lap numbers from 1 through the last
 recorded lap across all drivers. Missing laps or comparison cars display `---`;
@@ -448,11 +452,16 @@ from the same structured boundary set. Sector markers use the final stored
 boundary in sector 0 or 1; only legacy arrays use the FastF1 telemetry
 position fallback.
 
-Existing `separator`/`Separator` and `corners`/`Corners` settings remain
-supported as legacy fallbacks. A saved year/location value is not changed by
-`--force`; only `--refresh-separators` can replace it. Failed or insufficient
-archive data leaves the configuration untouched and uses corner-based
-boundaries.
+FP and qualifying first use saved boundaries for the target year and location.
+A singular `separator` or `Separator` object is also read as a year/location
+map. If estimation fails (including during `--refresh-separators`), the report
+uses saved boundaries for that circuit, then a legacy distance array, then
+configured corners. If both singular keys contain arrays, lowercase
+`separator` takes priority. Saving an estimate writes to `separators` and
+retains the old keys so other circuits can still use them during migration.
+Only `--refresh-separators` can replace saved boundaries. The report summary
+identifies the fallback used when estimation fails. Configured corner offsets
+apply only when no usable separator distances are available.
 
 Session lookup in the season index must be unambiguous: the FastF1 event name
 selects one meeting, falling back to the event location only when names are
