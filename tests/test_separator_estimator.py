@@ -674,3 +674,66 @@ def test_optional_session_metadata_and_track_status():
     session.track_status = pd.DataFrame({"Time": pd.to_timedelta([20, 0, 10], unit="s"),
                                          "Status": ["1", "1", "4"]})
     assert affected_intervals_from_session(session) == [(10.0, 20.0)]
+
+
+@pytest.mark.parametrize(("settings", "expected"), [
+    ({"separator": [100], "Separator": {"2025": {"Elsewhere": [300]}}}, [100]),
+    ({"Separator": [100], "separator": {"2025": {"Elsewhere": [300]}}}, [100]),
+    ({"separator": [120], "Separator": [100]}, [120]),
+    ({"Separator": [100]}, [100]),
+    ({"separator": [120]}, [120]),
+    ({"Separator": {"2025": {"Elsewhere": [300]}}}, []),
+])
+def test_offline_separator_fallback(tmp_path, settings, expected):
+    path = tmp_path / "config.json"
+    path.write_text(json.dumps(settings))
+    session = SimpleNamespace(event=SimpleNamespace(year=2025, Location="Test"))
+    client = Mock(spec=StaticArchiveClient)
+    client.timing_data.side_effect = OSError("offline")
+    selected = resolve_separators(session, path, client=client)
+    assert selected.source == ("configured_fallback" if expected else "fallback_corners")
+    assert selected.separators == expected
+
+
+@pytest.mark.parametrize("map_key, array_key", [("Separator", "separator"), ("separator", "Separator")])
+def test_refresh_preserves_singular_settings(tmp_path, map_key, array_key):
+    path = tmp_path / "config.json"
+    original = {map_key: {"2025": {"Test": [200]}}, array_key: [100], "other": 42}
+    path.write_text(json.dumps(original))
+    session = SimpleNamespace(event=SimpleNamespace(year=2025, Location="Test"))
+    client = Mock(spec=StaticArchiveClient)
+    client.timing_data.side_effect = OSError("offline")
+    for refresh in (False, True):
+        selected = resolve_separators(session, path, refresh=refresh, client=client)
+        assert (selected.source, selected.separators) == ("saved_auto", [200])
+    client.timing_data.assert_called_once_with(session)
+    assert json.loads(path.read_text()) == original
+    persist_resolution(SeparatorResolution([250], "estimated", pending_save=True), path, session, refresh=True)
+    assert json.loads(path.read_text()) == {**original, "separators": {"2025": {"Test": [250]}}}
+    assert resolve_separators(session, path, client=client).separators == [250]
+
+
+def test_unusable_scoped_distances_do_not_mask_fallbacks(tmp_path):
+    path = tmp_path / "config.json"
+    settings = {"separators": {"2025": {"Test": [0, -5, "Infinity"]}}, "Separator": [220]}
+    session = SimpleNamespace(event=SimpleNamespace(year=2025, Location="Test"))
+    client = Mock(spec=StaticArchiveClient)
+    client.timing_data.side_effect = OSError("offline")
+    path.write_text(json.dumps(settings))
+    selected = resolve_separators(session, path, client=client)
+    assert (selected.source, selected.separators) == ("configured_fallback", [220])
+    client.timing_data.assert_called_once_with(session)
+
+    settings["separator"] = {"2025": {"Test": [0, "125.5"]}}
+    path.write_text(json.dumps(settings))
+    selected = resolve_separators(session, path, client=client)
+    assert (selected.source, selected.separators) == ("saved_auto", [125.5])
+    client.timing_data.assert_called_once_with(session)
+
+
+def test_refresh_updates_existing_location_regardless_of_case(tmp_path):
+    path = tmp_path / "config.json"
+    path.write_text(json.dumps({"separators": {"2025": {"TEST": [120], "Elsewhere": [80]}}}))
+    session = SimpleNamespace(event=SimpleNamespace(year=2025, Location="Test"))
+    persist_resolution(SeparatorResolution([250], "estimated", pending_save=True), path, session, refresh=True)
+    assert json.loads(path.read_text())["separators"]["2025"] == {"TEST": [250], "Elsewhere": [80]}

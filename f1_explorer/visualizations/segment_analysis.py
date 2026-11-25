@@ -333,22 +333,6 @@ def make_mini_segment_layout(
         return MiniSegmentLayout([], [])
 
     segment_boundaries = [0.0, float(car_data.iloc[-1].Distance)]
-    circuit_info = circuit_info_or_none(session, log)
-    if circuit_info is not None:
-        corners_df = circuit_info.corners
-        for c in range(0, len(corners_df)):
-            corner = corners_df.iloc[c]
-            if corner is None:
-                continue
-            i = str(corner.Number)
-            if i not in corner_map:
-                continue
-            for offset in corner_map[i]:
-                try:
-                    segment_boundaries.append(float(corner.Distance) + float(offset))
-                except (TypeError, ValueError):
-                    continue
-
     separator_boundaries: list[SeparatorBoundary] = []
     separator_distances: list[float] = []
     for item in separators:
@@ -367,13 +351,20 @@ def make_mini_segment_layout(
             separator_boundaries.append(boundary)
             separator_distances.append(float(boundary.distance))
 
-    segment_boundaries.extend(separator_distances)
+    if separator_distances:
+        segment_boundaries.extend(separator_distances)
+    elif corner_map:
+        circuit_info = circuit_info_or_none(session, log)
+        if circuit_info is not None:
+            for corner in circuit_info.corners.itertuples(index=False):
+                for offset in corner_map.get(str(corner.Number), []):
+                    try:
+                        segment_boundaries.append(float(corner.Distance) + float(offset))
+                    except (OverflowError, TypeError, ValueError):
+                        continue
+
     distances = sorted({round(distance, 6) for distance in segment_boundaries if math.isfinite(distance)})
-    log.info(
-        f"{corner_map} {separator_distances} corners_list: "
-        f"{list(getattr(circuit_info, 'corners', pandas.DataFrame()).Distance) if circuit_info is not None else []}, "
-        f"segment_list: {distances}"
-    )
+    log.info("mini segment layout", distances=distances)
     return MiniSegmentLayout(distances, separator_boundaries)
 
 

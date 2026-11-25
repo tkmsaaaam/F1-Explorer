@@ -471,3 +471,22 @@ def test_cli_options_remain_category_specific(analysis):
     else:
         assert analysis.module.parse_args([]).refresh_separators is False
         assert analysis.module.parse_args(["--refresh-separators"]).refresh_separators is True
+
+
+@pytest.mark.parametrize("analysis", [SESSIONS[0]], indirect=True)
+@pytest.mark.parametrize("source,refresh,expected", [
+    ("configured_fallback", False, "旧形式の距離配列"),
+    ("fallback_corners", False, "コーナー設定"),
+    ("saved_auto", True, "この開催の保存値"),
+    ("saved_auto", False, None),
+])
+def test_report_explains_separator_fallback(analysis, source, refresh, expected):
+    session_pipeline.resolve_separators.return_value.source = source
+    # Use the real writer to verify that the note survives report organization.
+    analysis.report.write = report_module.SessionReport.write.__get__(analysis.report)
+    assert analysis.module.main(refresh_separators=refresh) == 0
+    html = (analysis.report_dir / "report.html").read_text()
+    if expected is None:
+        assert "推定できなかったため" not in html
+    else:
+        assert expected in html.split("</header>")[0]

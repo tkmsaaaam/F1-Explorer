@@ -3,6 +3,7 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import pandas
+from fastf1.exceptions import DataNotLoadedError
 import analyze_season
 
 from f1_explorer.season_mileage import (
@@ -95,6 +96,12 @@ class SeasonMileageTests(unittest.TestCase):
         self.assertTrue(result.incomplete)
         self.assertIn("FP用途判定不明", result.details[0])
 
+    def test_four_consecutive_laps_after_a_gap_form_a_new_run(self):
+        laps = _laps([1, 3, 4, 5, 6], ["90s"] * 5)
+        result = _attack_metrics(laps, "FP1", qualifying=False)["FP1:1"]
+        self.assertEqual(1, result.value)
+        self.assertIn("コンパウンド単位: FP用途判定不明: 3, 4, 5, 6", result.details)
+
     def test_fast_sector_abort_and_deleted_lap_are_counted(self):
         laps = _laps(
             [1, 2, 3], [None, "90s", "90s"],
@@ -123,12 +130,14 @@ class SeasonMileageTests(unittest.TestCase):
 
     def test_qualifying_split_failure_does_not_assign_attempts_to_q1(self):
         laps = _laps([1], ["90s"])
-        fake_session = SimpleNamespace(laps=SimpleNamespace(
-            split_qualifying_sessions=lambda: (_ for _ in ()).throw(ValueError("missing status"))))
-        laps.attrs["session"] = fake_session
-        result = _attack_metrics(laps, "Q", qualifying=True)
-        self.assertEqual({"Q1", "Q2", "Q3"}, set(result))
-        self.assertTrue(all(metric.value is None and metric.status == "unknown" for metric in result.values()))
+        for error in (ValueError("missing status"), IndexError(), DataNotLoadedError()):
+            with self.subTest(error=type(error).__name__):
+                laps.attrs["session"] = SimpleNamespace(laps=SimpleNamespace(
+                    split_qualifying_sessions=MagicMock(side_effect=error)))
+                result = _attack_metrics(laps, "Q", qualifying=True)
+                self.assertEqual({"Q1", "Q2", "Q3"}, set(result))
+                self.assertTrue(all(metric.value is None and metric.status == "unknown"
+                                    for metric in result.values()))
 
     def test_qualifying_nonparticipant_and_cancelled_segment_are_distinct(self):
         class QualifyingLaps(pandas.DataFrame):

@@ -27,6 +27,7 @@ from typing import Any, Callable, Iterable, Mapping, Sequence, TypedDict, NotReq
 import numpy as np
 import pandas as pd
 
+from f1_explorer.config import legacy_separator, separator_distances
 from f1_explorer.scalars import as_float, as_int, call_dynamic
 from f1_explorer.telemetry import lap_telemetry_without_driver_ahead
 
@@ -1296,22 +1297,10 @@ def _separator_maps(config: Mapping[str, Any]) -> list[Mapping[str | int, Any]]:
     return maps
 
 
-def _scoped_separator_value(config: Mapping[str, Any], year: int, location: str) -> Any:
-    locations = (location, location.casefold())
-    for separator_map in _separator_maps(config):
-        if str(year) in separator_map:
-            year_map = separator_map[str(year)]
-        else:
-            year_map = separator_map.get(year)
-        if not isinstance(year_map, Mapping):
-            continue
-        for key in locations:
-            if key in year_map:
-                return year_map[key]
-        for key, value in year_map.items():
-            if str(key).casefold() == location.casefold():
-                return value
-    return None
+def _location_key(year_map: Mapping, location: str) -> str:
+    if location in year_map:
+        return location
+    return next((key for key in year_map if str(key).casefold() == location.casefold()), location)
 
 
 def coerce_separator_boundary(value: Any) -> SeparatorBoundary | None:
@@ -1324,7 +1313,7 @@ def coerce_separator_boundary(value: Any) -> SeparatorBoundary | None:
         segment = value.get("segment", value.get("segment_index", value.get("Segment")))
         try:
             candidate = SeparatorBoundary(as_float(distance), as_int(sector), as_int(segment))
-        except (TypeError, ValueError):
+        except (OverflowError, TypeError, ValueError):
             return None
     else:
         return None
@@ -1346,31 +1335,17 @@ def _structured_separator_boundaries(value: Any) -> list[SeparatorBoundary]:
     return result
 
 
-def _scoped_boundaries(config: Mapping[str, Any], year: int, location: str) -> list[SeparatorBoundary]:
-    return _structured_separator_boundaries(_scoped_separator_value(config, year, location))
-
-
-def _scoped_separator(config: Mapping[str, Any], year: int, location: str) -> list[float] | None:
-    value = _scoped_separator_value(config, year, location)
-    structured = _structured_separator_boundaries(value)
-    if structured:
-        return [boundary.distance for boundary in structured]
-    if isinstance(value, Sequence) and not isinstance(value, (str, bytes, bytearray)):
-        try:
-            return [float(item) for item in value]
-        except (TypeError, ValueError):
-            return None
+def _saved_resolution(config: Mapping[str, Any], year: int, location: str) -> SeparatorResolution | None:
+    for separator_map in _separator_maps(config):
+        year_map = separator_map.get(str(year), separator_map.get(year))
+        if not isinstance(year_map, Mapping):
+            continue
+        value = year_map.get(_location_key(year_map, location))
+        boundaries = _structured_separator_boundaries(value)
+        distances = [item.distance for item in boundaries] if boundaries else separator_distances(value)
+        if distances:
+            return SeparatorResolution(distances, "saved_auto", boundaries=boundaries)
     return None
-
-
-def _legacy_separator(config: Mapping[str, Any]) -> list[float]:
-    value = config.get("separator", config.get("Separator", []))
-    if not isinstance(value, Sequence) or isinstance(value, (str, bytes, bytearray)):
-        return []
-    try:
-        return [float(item) for item in value]
-    except (TypeError, ValueError):
-        return []
 
 
 def save_scoped_separator(
@@ -1394,18 +1369,19 @@ def save_scoped_separator(
     if not isinstance(year_map, dict):
         year_map = {}
         maps[str(int(year))] = year_map
+    location_key = _location_key(year_map, location)
     structured = []
     for item in (boundaries or _structured_separator_boundaries(separators)):
         boundary = coerce_separator_boundary(item)
         if boundary is not None:
             structured.append(boundary)
     if structured:
-        year_map[str(location)] = {
+        year_map[location_key] = {
             "schema_version": SEPARATOR_SCHEMA_VERSION,
             "boundaries": [boundary.to_dict() for boundary in structured],
         }
     else:
-        year_map[str(location)] = [round(float(value), 1) for value in separators]
+        year_map[location_key] = [round(float(value), 1) for value in separators]
     temporary: Path | None = None
     try:
         with tempfile.NamedTemporaryFile("w", encoding="utf-8", dir=path.parent, prefix=f".{path.name}.", suffix=".tmp", delete=False) as file:
@@ -1437,11 +1413,9 @@ def resolve_separators(
     except (OSError, UnicodeError, json.JSONDecodeError):
         config = {}
     year, location = _year(session), _location(session)
-    saved = _scoped_separator(config, year, location)
-    saved_boundaries = _scoped_boundaries(config, year, location)
-    legacy = _legacy_separator(config)
+    saved = _saved_resolution(config, year, location)
     if saved and not refresh:
-        return SeparatorResolution(saved, "saved_auto", boundaries=saved_boundaries)
+        return saved
 
     try:
         archive = client or StaticArchiveClient(cache_dir=Path("cache") / "livetiming")
@@ -1468,7 +1442,8 @@ def resolve_separators(
             except TypeError:
                 log.warning(f"automatic separator estimation failed; using fallback: {error}")
         if saved:
-            return SeparatorResolution(saved, "saved_auto", boundaries=saved_boundaries)
+            return saved
+        legacy = legacy_separator(config)
         return SeparatorResolution(legacy, "fallback_corners" if not legacy else "configured_fallback")
 
     return SeparatorResolution(separators, "estimated", pending_save=True, boundaries=boundaries)

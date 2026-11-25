@@ -140,6 +140,7 @@ class SessionReport:
         report_dir: str | Path | None = None,
     ):
         self.session = session
+        self.separator_note = ""
         self.output_dir = Path(output_dir)
         self.report_dir = Path(report_dir) if report_dir is not None else self.output_dir
         self._items: dict[str, ReportItem] = {}
@@ -365,6 +366,7 @@ class SessionReport:
             event_name=event_name,
             session_name=session_name,
             generated=generated,
+            separator_note=f"<p>{escape(self.separator_note)}</p>" if self.separator_note else "",
             nav="".join(nav),
             body="".join(body),
             plotly_js=plotly_js,

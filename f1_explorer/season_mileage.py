@@ -8,6 +8,7 @@ from html import escape
 from typing import Any
 
 import pandas
+from fastf1.exceptions import DataNotLoadedError
 from f1_explorer.sessions import SESSION_TABLE, SessionCategory, session_code
 
 
@@ -114,11 +115,7 @@ def _same_driver(first: Driver, second: Driver) -> bool:
 def _valid_reference(row: Any) -> bool:
     if _is_true(getattr(row, "FastF1Generated", False)):
         return False
-    if _is_true(getattr(row, "Deleted", False)):
-        # Deleted timed laps are still eligible as reference values only when
-        # the timing data says their lap and sectors are accurate.
-        pass
-    if getattr(row, "IsAccurate", False) is not True and not _is_true(getattr(row, "IsAccurate", False)):
+    if not _is_true(getattr(row, "IsAccurate", False)):
         return False
     if pandas.notna(getattr(row, "PitInTime", pandas.NaT)) or pandas.notna(getattr(row, "PitOutTime", pandas.NaT)):
         return False
@@ -143,7 +140,7 @@ def _attack_metrics(laps: pandas.DataFrame, code: str, qualifying: bool) -> dict
             sections = [(f"{code}{index}", part) for index, part in enumerate(split_laps, 1)]
             if len(split_laps) < 3:
                 raise ValueError("qualifying split is incomplete")
-        except (ValueError, AttributeError, KeyError):
+        except (DataNotLoadedError, ValueError, AttributeError, KeyError, IndexError):
             for index in range(1, 4):
                 output[f"{code}{index}"] = Metric(None, "unknown", ["区分データなし"])
             return output
@@ -182,7 +179,6 @@ def _attack_metrics(laps: pandas.DataFrame, code: str, qualifying: bool) -> dict
                     candidates.append((row_index, row, "S1"))
 
             excluded: set[int] = set()
-            unknown_laps: list[int] = []
             if not qualifying:
                 run: list[int] = []
                 previous_number: int | None = None
@@ -192,15 +188,14 @@ def _attack_metrics(laps: pandas.DataFrame, code: str, qualifying: bool) -> dict
                     lap_time = _seconds(getattr(row, "LapTime", None))
                     in_run = (number is not None and lap_time is not None
                               and lap_time <= best_lap * PRACTICE_LONG_RUN_RATIO
-                              and not pandas.notna(getattr(row, "PitInTime", pandas.NaT))
-                              and not pandas.notna(getattr(row, "PitOutTime", pandas.NaT))
-                              and (previous_number is None or number == previous_number + 1))
-                    if in_run:
-                        run.append(index)
-                    else:
+                              and pandas.isna(getattr(row, "PitInTime", pandas.NaT))
+                              and pandas.isna(getattr(row, "PitOutTime", pandas.NaT)))
+                    if not in_run or (previous_number is not None and number != previous_number + 1):
                         if len(run) >= PRACTICE_LONG_RUN_LAPS:
                             excluded.update(run)
                         run = []
+                    if in_run:
+                        run.append(index)
                     previous_number = number if in_run else None
                 if len(run) >= PRACTICE_LONG_RUN_LAPS:
                     excluded.update(run)

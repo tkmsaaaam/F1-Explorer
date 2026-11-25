@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
+import math
 import os
 from logging import Logger
 from pathlib import Path
@@ -83,8 +84,36 @@ def validate_config(config: dict[str, Any]):
         raise Exception("Round must be provided")
     if 'Session' not in config:
         raise Exception("Session must be provided")
-    if config['Session'] not in {'FP1', 'FP2', 'FP3', 'SQ', 'S', 'Q', 'R'}:
+    if config['Session'] not in SESSION_TABLE:
         raise Exception("Session is invalid")
+
+
+def separator_distances(value: object) -> list[float]:
+    """Keep usable metre values from a flat JSON separator array."""
+    if not isinstance(value, list):
+        return []
+    distances = []
+    for item in value:
+        if isinstance(item, bool):
+            continue
+        try:
+            distance = float(item)
+        except (OverflowError, TypeError, ValueError):
+            continue
+        if math.isfinite(distance) and distance > 0:
+            distances.append(distance)
+    return distances
+
+
+def legacy_separator(config: Mapping[str, Any]) -> list[float]:
+    """Read the legacy distance array, skipping keys used as scoped maps."""
+    for key in ("separator", "Separator"):
+        value = config.get(key)
+        if isinstance(value, list):
+            distances = separator_distances(value)
+            if distances or not value:
+                return distances
+    return []
 
 
 @tracer.start_as_current_span("load_config")
@@ -98,13 +127,9 @@ def load_config() -> Config:
     # Older sample files use lower-case keys while the original loader only
     # accepted the title-cased spelling.  Accept both spellings so a config
     # can be migrated incrementally without losing user settings.
-    separator = config.get('Separator', config.get('separator', []))
+    separator = legacy_separator(config)
     corners = config.get('Corners', config.get('corners', {}))
     comparison = config.get('Comparison', config.get('comparison', []))
-    if not isinstance(separator, list):
-        # A scoped map belongs to the automatic estimator, not the active
-        # legacy fallback list.
-        separator = []
     if not isinstance(corners, dict):
         corners = {}
     if not isinstance(comparison, list):

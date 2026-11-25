@@ -127,6 +127,13 @@ def run_session(
         return 0
     invalidate_success_manifest(report_dir)
     report = SessionReport(session, output_dir, report_dir=report_dir)
+    if separator_resolution is not None:
+        if separator_resolution.source == "configured_fallback":
+            report.separator_note = "ミニセグメント境界を推定できなかったため、旧形式の距離配列を使用しました。"
+        elif separator_resolution.source == "fallback_corners":
+            report.separator_note = "ミニセグメント境界を推定できなかったため、利用可能なコーナー設定を使用します。"
+        elif refresh_separators and separator_resolution.source == "saved_auto":
+            report.separator_note = "ミニセグメント境界を再推定できなかったため、この開催の保存値を使用しました。"
     with report:
         config.set_attribute_to_span()
         extra_outputs = figures(session, config, log, output_dir)

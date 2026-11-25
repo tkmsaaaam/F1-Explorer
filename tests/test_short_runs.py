@@ -117,6 +117,21 @@ def test_mini_segment_layout_drops_non_positive_separators() -> None:
     assert [boundary.distance for boundary in layout.separator_boundaries] == [120.0]
 
 
+@pytest.mark.parametrize("separators,expected", [
+    ([SeparatorBoundary(120, 0, 1)], [0, 120, 200]),
+    ([80], [0, 80, 200]),
+    ([], [0, 105, 200]),
+])
+def test_mini_segment_layout_uses_corner_offsets_only_as_fallback(separators, expected):
+    circuit = SimpleNamespace(corners=pd.DataFrame({"Number": [1], "Distance": [100]}))
+    session = SimpleNamespace(get_circuit_info=lambda: circuit)
+    layout = make_mini_segment_layout(
+        session, MagicMock(), {"1": [5]}, separators,
+        fastest_lap=SimpleNamespace(), telemetry=pd.DataFrame({"Distance": [0, 200]}),
+    )
+    assert layout.distances == expected
+
+
 def test_mini_segment_layout_projects_structured_boundaries_to_distances() -> None:
     telemetry = pd.DataFrame({
         "Distance": [0.0, 100.0, 200.0, 300.0, 400.0],
