@@ -9,6 +9,7 @@ from typing import Any
 
 import pandas
 from fastf1.exceptions import DataNotLoadedError
+from f1_explorer.driver_numbers import normalize_driver_numbers
 from f1_explorer.sessions import SESSION_TABLE, SessionCategory, session_code
 
 
@@ -234,6 +235,7 @@ def analyze_session(
     laps = session.laps
     if laps.empty or "DriverNumber" not in laps:
         return {}, {}
+    laps = normalize_driver_numbers(laps)
     drivers: dict[str, Driver] = {}
     metrics: dict[str, DriverMetrics] = {}
     for number, driver_laps in laps.groupby("DriverNumber", dropna=True, sort=False):

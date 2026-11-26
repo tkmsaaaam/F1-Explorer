@@ -71,16 +71,27 @@ class SessionOrderTest(unittest.TestCase):
         self.assertEqual({"2": 1, "1": 2}, ranks)
 
     def test_unknown_deleted_marks_do_not_break_the_fallback(self) -> None:
+        for dtype, missing in (("object", float("nan")), ("boolean", pandas.NA)):
+            with self.subTest(dtype=dtype):
+                session = SimpleNamespace(
+                    results=pandas.DataFrame(),
+                    laps=pandas.DataFrame({
+                        "DriverNumber": ["1", "2", "2"],
+                        "LapTime": pandas.to_timedelta([81, 82, 60], unit="s"),
+                        "Deleted": pandas.Series([missing, False, True], dtype=dtype),
+                    }),
+                )
+                self.assertEqual({"1": 1, "2": 2}, driver_order(session))
+
+    def test_zero_position_uses_fallback_and_untimed_driver_stays_unranked(self) -> None:
         session = SimpleNamespace(
-            results=pandas.DataFrame(),
+            results=pandas.DataFrame({"DriverNumber": ["1", "2"], "Position": [1, 0]}),
             laps=pandas.DataFrame({
-                "DriverNumber": ["1", "2"],
-                "LapTime": pandas.to_timedelta([83, 82], unit="s"),
-                "Deleted": [float("nan"), float("nan")],
+                "DriverNumber": ["2", "3"],
+                "LapTime": pandas.to_timedelta([81, None], unit="s"),
             }),
         )
-        ranks = driver_order(session)
-        self.assertEqual({"2": 1, "1": 2}, ranks)
+        self.assertEqual({"1": 1, "2": 2}, driver_order(session))
 
 
 if __name__ == "__main__":

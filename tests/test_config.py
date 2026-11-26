@@ -2,7 +2,7 @@ import json
 
 import pytest
 
-from f1_explorer.config import Config, load_config
+from f1_explorer.config import Config, fast_f1, load_config
 from f1_explorer.separator_estimator import SeparatorBoundary
 
 
@@ -30,3 +30,15 @@ def test_load_legacy_separator(tmp_path, monkeypatch, settings, expected):
     config = {"Year": 2025, "Round": 1, "Session": "FP1", **settings}
     (tmp_path / "config.json").write_text(json.dumps(config))
     assert load_config().get_separator() == expected
+
+
+def test_fast_f1_creates_missing_cache_without_replacing_existing_files(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    configured = []
+    monkeypatch.setattr("fastf1.Cache.configure", lambda *, cache_dir: configured.append(cache_dir))
+    fast_f1()
+    marker = tmp_path / "cache" / "existing"
+    marker.write_text("saved")
+    fast_f1()
+    assert configured == ["cache", "cache"]
+    assert marker.read_text() == "saved"

@@ -59,7 +59,7 @@ Install development dependencies in a virtual environment from the repository ro
 
 ```bash
 python -m venv .venv
-.venv/bin/python -m pip install -r requirements-dev.txt
+.venv/bin/python -m pip install -r requirements.txt
 ```
 
 Node.js must be available on PATH for the report HTML JavaScript tests.
@@ -105,7 +105,7 @@ environment variable, FastF1, Kaleido, and Choreographer logs default to
 
 ### Historical Data Analysis
 
-Run entrypoints from the repository root so relative paths for `config.json`, `cache/`, and outputs resolve correctly:
+Run entrypoints from the repository root so relative paths for `config.json`, `cache/`, and outputs resolve correctly. Historical analysis creates `cache/` on first use.
 
 ```bash
 # For Free Practice analysis

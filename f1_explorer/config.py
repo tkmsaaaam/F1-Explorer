@@ -139,7 +139,9 @@ def load_config() -> Config:
 
 @tracer.start_as_current_span("fast_f1")
 def fast_f1():
-    fastf1.Cache.enable_cache('./cache')
+    directory = Path('cache')
+    directory.mkdir(exist_ok=True)
+    fastf1.Cache.configure(cache_dir=str(directory))
 
 
 @tracer.start_as_current_span("log")

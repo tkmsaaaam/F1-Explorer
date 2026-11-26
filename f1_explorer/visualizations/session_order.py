@@ -7,6 +7,8 @@ from typing import Any
 
 import pandas
 
+from f1_explorer.driver_numbers import driver_number_key
+
 
 def _numeric_position(value: Any) -> int | None:
     try:
@@ -16,28 +18,6 @@ def _numeric_position(value: Any) -> int | None:
     if not isfinite(position) or position <= 0:
         return None
     return int(position)
-
-
-def _driver_number_key(value: Any) -> str | None:
-    """Return a canonical text key for a driver number, or None if absent.
-
-    Integer driver numbers survive pandas float upcasts: 1, 1.0, and "1"
-    all map to "1".  Other values keep their text form.
-    """
-    try:
-        if bool(pandas.isna(value)):
-            return None
-    except (TypeError, ValueError):
-        pass
-    try:
-        number = float(value)
-    except (TypeError, ValueError):
-        return str(value)
-    if not isfinite(number):
-        return None
-    if number.is_integer():
-        return str(int(number))
-    return str(value)
 
 
 def driver_order(session: Any) -> dict[str, int]:
@@ -60,7 +40,7 @@ def driver_order(session: Any) -> dict[str, int]:
         and "Position" in results.columns
     ):
         for number, position in zip(results["DriverNumber"], results["Position"]):
-            key = _driver_number_key(number)
+            key = driver_number_key(number)
             position = _numeric_position(position)
             if key is not None and position is not None:
                 ranks[key] = position
@@ -68,13 +48,13 @@ def driver_order(session: Any) -> dict[str, int]:
     try:
         laps = session.laps.dropna(subset=["LapTime"])
         if "Deleted" in laps.columns:
-            laps = laps[laps["Deleted"].ne(True)]
+            laps = laps[laps["Deleted"].ne(True).fillna(True)]
         best = laps.groupby("DriverNumber")["LapTime"].min().sort_values()
     except (AttributeError, KeyError, TypeError, ValueError):
         best = pandas.Series(dtype="object")
     next_rank = max(ranks.values(), default=0) + 1
     for number in best.index:
-        key = _driver_number_key(number)
+        key = driver_number_key(number)
         if key is not None and key not in ranks:
             ranks[key] = next_rank
             next_rank += 1
@@ -84,5 +64,5 @@ def driver_order(session: Any) -> dict[str, int]:
 def driver_sort_key(number: Any, ranks: dict[str, int]) -> tuple[int, str]:
     """Return a stable key that puts unclassified drivers last."""
 
-    key = _driver_number_key(number) or ""
+    key = driver_number_key(number) or ""
     return ranks.get(key, 1_000_000), key

@@ -146,6 +146,21 @@ class SeasonMileageTests(unittest.TestCase):
         })
         self.assertEqual((3, ["3"]), count_completed_laps(laps))
 
+    def test_numeric_and_text_car_numbers_share_one_driver_history(self):
+        history = {}
+        for number in (1.0, "1"):
+            laps = _laps([1], ["90s"])
+            laps["DriverNumber"] = number
+            get_driver = MagicMock(return_value={"Abbreviation": "AAA"})
+            drivers, metrics = analyze_session(
+                SimpleNamespace(laps=laps, get_driver=get_driver), "FP1",
+                identity_history_by_number=history,
+            )
+            get_driver.assert_called_once_with("1")
+            self.assertEqual(["number:1"], list(drivers))
+            self.assertEqual(1, metrics["number:1"].attacks["FP1"].value)
+        self.assertEqual(1, len(history["1"]))
+
     def test_practice_long_run_is_not_counted_as_attack(self):
         laps = _laps([1, 2, 3, 4, 5], ["90s"] * 5)
         result = _attack_metrics(laps, "FP1", qualifying=False)["FP1:1"]

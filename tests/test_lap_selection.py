@@ -82,3 +82,16 @@ def test_one_unavailable_driver_does_not_hide_others():
 
 def test_empty_session_has_no_personal_fastest_laps():
     assert fastest_laps_by_driver(SimpleNamespace(drivers=[], laps=Laps())) == {}
+
+
+def test_numeric_driver_numbers_match_the_fastf1_string_lookup():
+    laps = Laps({
+        "DriverNumber": [2.0, 10.0],
+        "Driver": ["D2", "D10"],
+        "LapTime": pd.to_timedelta([82, 80], unit="s"),
+        "IsPersonalBest": [True, True],
+    })
+    selected = fastest_laps_by_driver(SimpleNamespace(drivers=[2.0, "10"], laps=laps))
+    assert list(selected) == ["10", "2"]
+    assert selected["2"].DriverNumber == "2"
+    assert laps.DriverNumber.tolist() == [2.0, 10.0]

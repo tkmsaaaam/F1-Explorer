@@ -551,6 +551,7 @@ class Race(unittest.TestCase):
                 session = SimpleNamespace(
                     event=SimpleNamespace(year=2026), results=results,
                     laps=pandas.DataFrame({"DriverNumber": ["2", "10", "3", "4"],
+                                           "Deleted": pandas.array([False, False, False, pandas.NA], dtype="boolean"),
                                            "LapTime": pandas.to_timedelta([82, 80, 83, 79], unit="s")}),
                 )
                 expected = (["TIE10", "TIE3", "DNF", "NORESULT", "UNTIMED"]
