@@ -95,6 +95,16 @@ Before running the scripts, create a local configuration file:
 cp sample.config.json config.json
 ```
 
+To compare two seasons, set `RoundName` in `config.json` to a Grand Prix name
+that FastF1 recognizes in both years. With the sample settings, the following
+command compares FP1 in Australia for 2026 and 2025. It uses the same
+`RoundName` and `Session` even if the round number changes between seasons.
+The single-session analysis scripts use the numeric `Round` field.
+
+```bash
+python compare.py
+```
+
 Set `F1_LOG_LEVEL` to a Python logging level such as `DEBUG`, `INFO`, or
 `WARNING` to control standard Python logging, including FastF1, Kaleido, and
 Choreographer. This does not change the application's structlog output. Without this

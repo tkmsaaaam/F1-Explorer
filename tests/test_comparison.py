@@ -1,7 +1,10 @@
+import json
+from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import ANY, MagicMock, patch
+from unittest.mock import ANY, MagicMock, call, patch
 
 import pandas
+import pytest
 
 from f1_explorer.visualizations.comparison import _plot_driver_lap_telemetry
 
@@ -79,7 +82,8 @@ def test_empty_comparison_closes_the_created_figure():
     close.assert_called_once_with(fig)
 
 
-def test_yearly_gear_comparison_uses_previous_lap_and_both_ranges(tmp_path, monkeypatch):
+@pytest.mark.parametrize(("year", "current_color"), [(2026, "#ff8000"), (2024, "#808080")])
+def test_yearly_gear_comparison_uses_previous_lap_and_both_ranges(tmp_path, monkeypatch, year, current_color):
     # Inline import keeps compare.py's plotly / fastf1.mvapi imports out of test collection;
     # resolves because tests run as `python -m pytest` from the repo root (AGENTS.md).
     import compare
@@ -96,7 +100,7 @@ def test_yearly_gear_comparison_uses_previous_lap_and_both_ranges(tmp_path, monk
     current = _year_summary("VER", "1", [0.0, 100.0], [4, 6])
     previous = _year_summary("HAM", "44", [0.0, 120.0], [2, 8])
     circuit = SimpleNamespace(corners=pandas.DataFrame({"Number": [1], "Distance": [50.0]}))
-    comparison = compare.Comparison(2026, "Test", "Q", current, previous, circuit)
+    comparison = compare.Comparison(year, "Test", "Q", current, previous, circuit)
     fig, ax = MagicMock(), MagicMock()
     monkeypatch.chdir(tmp_path)
     with (
@@ -109,13 +113,13 @@ def test_yearly_gear_comparison_uses_previous_lap_and_both_ranges(tmp_path, monk
     for call, expected, label in zip(
         ax.plot.call_args_list,
         [current, previous],
-        ["2026: VER", "2025: HAM"],
+        [f"{year}: VER", f"{year - 1}: HAM"],
     ):
         data = expected.get_lap().get_car_data()
         pandas.testing.assert_series_equal(call.args[0], data.Distance)
         pandas.testing.assert_series_equal(call.args[1], data.nGear)
         assert call.kwargs["label"] == label
-    assert ax.plot.call_args_list[0].kwargs["color"] == "#ff8000"  # team_color[2026].get(int("1"))
+    assert ax.plot.call_args_list[0].kwargs["color"] == current_color
     assert ax.plot.call_args_list[1].kwargs["linestyle"] == "dashed"
     ax.set_ylim.assert_called_once_with(1.5, 8.5)
     assert ax.vlines.call_args.kwargs["ymin"] == 2
@@ -231,3 +235,42 @@ def test_yearly_summary_values_and_colors(tmp_path, monkeypatch):
         assert save.call_args.args[1] == "./images/comparison/Test/Q/summary.png"
         assert save.call_args.kwargs == {"width": 1920, "height": 1080}
     assert set(plt.get_fignums()) == before
+
+
+def test_comparison_acquires_same_named_round_and_session_for_both_years(tmp_path, monkeypatch):
+    import compare
+
+    sample = Path("sample.config.json").read_text(encoding="utf-8")
+    (tmp_path / "config.json").write_text(sample, encoding="utf-8")
+    config = json.loads(sample)
+    monkeypatch.chdir(tmp_path)
+    current, previous = MagicMock(), MagicMock()
+    current.get_circuit_info.return_value = None
+
+    with (
+        patch.object(compare.config_module, "fast_f1"),
+        patch.object(compare.fastf1, "get_session", side_effect=[current, previous]) as get_session,
+    ):
+        compare.__main()
+
+    assert get_session.call_args_list == [
+        call(config["Year"], config["RoundName"], config["Session"]),
+        call(config["Year"] - 1, config["RoundName"], config["Session"]),
+    ]
+    current.load.assert_called_once_with(messages=False)
+    previous.load.assert_called_once_with(messages=False)
+
+
+@pytest.mark.parametrize("event_settings", [{}, {"RoundName": " "}, {"RoundName": 1}])
+def test_comparison_requires_round_name_before_acquiring_sessions(tmp_path, monkeypatch, event_settings):
+    import compare
+
+    config = {"Year": 2026, "Round": 1, "Session": "FP1", **event_settings}
+    (tmp_path / "config.json").write_text(json.dumps(config), encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+
+    with patch.object(compare.config_module, "log"), patch.object(compare.fastf1, "get_session") as get_session:
+        with pytest.raises(SystemExit, match="RoundName"):
+            compare.__main()
+
+    get_session.assert_not_called()

@@ -85,7 +85,7 @@ def _plot_metric(log: structlog.stdlib.BoundLogger, comparison: Comparison, colu
     current_values = getattr(current_car_data, column)
     ax.plot(current_car_data.Distance, current_values, linestyle='solid',
             label=f"{comparison.get_year()}: {comparison.get_current().get_lap().Driver}",
-            color=constants.team_color[comparison.get_year()].get(
+            color=constants.team_color.get(comparison.get_year(), {}).get(
                 int(comparison.get_current().get_lap().DriverNumber), '#808080'))
     previous_car_data = comparison.get_previous().get_lap().get_car_data().add_distance()
     previous_values = getattr(previous_car_data, column)
@@ -214,17 +214,17 @@ def summary(log: structlog.stdlib.BoundLogger, comparison: Comparison):
 @tracer.start_as_current_span("main")
 def __main():
     log = config_module.log()
-    config = None
-    with open('./config.json', 'r', encoding='utf-8') as file:
+    with config_module.CONFIG_PATH.open(encoding='utf-8') as file:
         config = json.load(file)
     if config is None:
         raise Exception("Config must be provided")
 
-    config_module.fast_f1()
-
     year = config['Year']
-    race = config['RoundName']
+    race = config.get('RoundName')
+    if not isinstance(race, str) or not race.strip():
+        raise SystemExit("Set RoundName in config.json to the Grand Prix name used in both years.")
     session = config['Session']
+    config_module.fast_f1()
     try:
         current = fastf1.get_session(year, race, session)
     except Exception as exception:
@@ -249,7 +249,7 @@ def __main():
         log.warning('setup is failed', args=exception.args)
         return
 
-    log.info(race=race, session=session)
+    log.info("Comparing sessions", race=race, session=session)
 
     circuit = current.get_circuit_info()
     if circuit is None:
